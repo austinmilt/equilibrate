@@ -14,3 +14,5 @@ describe("equilibrate", () => {
     console.log("Your transaction signature", tx);
   });
 });
+
+//TODO compute that tokens are not lost due to the way that spillover is calculated

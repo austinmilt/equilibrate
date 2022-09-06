@@ -1,8 +1,15 @@
 [features]
 seeds = false
 skip-lint = false
+
 [programs.localnet]
-equilibrate = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+equilibrate = "Equi1CUTu17WagNVmpFq4SvcqvrEeNYWqqgzw4MppmjS"
+
+[programs.devnet]
+equilibrate = "Equi1CUTu17WagNVmpFq4SvcqvrEeNYWqqgzw4MppmjS"
+
+[programs.mainnet]
+equilibrate = "Equi1CUTu17WagNVmpFq4SvcqvrEeNYWqqgzw4MppmjS"
 
 [registry]
 url = "https://api.apr.dev"
