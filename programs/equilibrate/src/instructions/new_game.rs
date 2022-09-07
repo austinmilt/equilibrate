@@ -37,27 +37,36 @@ pub struct NewGame<'info> {
     )]
     pub first_player: Account<'info, PlayerState>,
 
+    /// CHECK: wallet where the program fee should be deposited
     #[account(
         mut,
         constraint = program_fee_destination.key().as_ref() == PROGRAM_FEE_DESTINATION
+        @EquilibrateError::InvalidProgramFeeDestination
     )]
     pub program_fee_destination: AccountInfo<'info>,
 
     #[account(
         mut,
-        constraint = escrow_account.mint == config.token.key(),
+        
+        constraint = deposit_source_account.mint == config.token.key()
+        @EquilibrateError::InvalidTokenSourceMint,
+
         owner = token::ID,
     )]
     pub deposit_source_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = program_fee_destination.key().as_ref() == PROGRAM_FEE_DESTINATION,
-        constraint = escrow_account.mint == config.token.key(),
-        constraint = escrow_account.owner == id(),
+
+        constraint = token_pool.mint == config.token
+        @EquilibrateError::InvalidPoolMint,
+
+        constraint = token_pool.owner == id()
+        @EquilibrateError::InvalidPoolOwner,
+
         owner = token::ID,
     )]
-    pub escrow_account: Account<'info, TokenAccount>,
+    pub token_pool: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -96,14 +105,14 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
     );
     system_program::transfer(program_fee_transfer_context, PROGRAM_FEE_LAMPORTS)?;
 
-    let escrow_transfer_accounts = Transfer {
+    let pool_transfer_accounts = Transfer {
         from: ctx.accounts.deposit_source_account.to_account_info(),
-        to: ctx.accounts.escrow_account.to_account_info(),
+        to: ctx.accounts.token_pool.to_account_info(),
         authority: ctx.accounts.payer.to_account_info(),
     };
     let token_program = ctx.accounts.token_program.to_account_info();
-    let escrow_transfer_context = CpiContext::new(token_program, escrow_transfer_accounts);
-    token::transfer(escrow_transfer_context, config.entry_fee_decimal_tokens)?;
+    let pool_transfer_context = CpiContext::new(token_program, pool_transfer_accounts);
+    token::transfer(pool_transfer_context, config.entry_fee_decimal_tokens)?;
 
     let mut buckets = Vec::new();
     buckets.push(Bucket {

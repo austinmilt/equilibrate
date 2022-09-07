@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 #[derive(Debug, Copy, PartialEq)]
 pub struct PlayerState {
     pub game: Pubkey,
-    pub bucket: usize,
+    pub bucket: u64,
 }
 
 impl PlayerState {
@@ -23,11 +23,7 @@ impl PlayerState {
     }
 
     pub fn log_move(&self) {
-        msg!(
-            "Moved to bucket {} in game {}",
-            self.bucket,
-            self.game
-        );
+        msg!("Moved to bucket {} in game {}", self.bucket, self.game);
     }
 
     pub fn log_leave(&self, winnings: u64) {

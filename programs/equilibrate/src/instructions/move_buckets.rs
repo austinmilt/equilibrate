@@ -25,6 +25,7 @@ pub struct MoveBuckets<'info> {
     )]
     pub player: Account<'info, PlayerState>,
 
+    /// CHECK: The program itself, which we use to verify tokens are flowing in and out of the right places
     #[account(executable)]
     pub equilibrate_program_id: UncheckedAccount<'info>,
 
@@ -32,15 +33,19 @@ pub struct MoveBuckets<'info> {
     pub payer: Signer<'info>,
 }
 
-pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: usize) -> Result<()> {
+pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     let game = &mut ctx.accounts.game;
     let config = &game.config;
 
     // check constraints
-    require_neq!(ctx.accounts.player.bucket, i_bucket, EquilibrateError::AlreadyInBucket);
-    
+    require_neq!(
+        ctx.accounts.player.bucket,
+        i_bucket,
+        EquilibrateError::AlreadyInBucket
+    );
+
     require_gt!(
         config.n_buckets,
         i_bucket,
@@ -53,12 +58,13 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: usize) -> Result<()> {
     // update bucket balances and move player to their new bucket
     let new_balances = game.compute_buckets_new_balance(now_epoch_seconds.try_into().unwrap());
     let mut state = game.state.clone();
+    let i_bucket_usize = i_bucket as usize;
+    let player_bucket_usize = ctx.accounts.player.bucket as usize;
     for (i, bucket) in state.buckets.iter_mut().enumerate() {
         bucket.decimal_tokens = *new_balances.get(i).unwrap();
-        if i == i_bucket {
+        if i == i_bucket_usize {
             bucket.players = bucket.players.checked_add(1).unwrap();
-
-        } else if i == ctx.accounts.player.bucket {
+        } else if i == player_bucket_usize {
             bucket.players = bucket.players.checked_sub(1).unwrap();
         }
     }

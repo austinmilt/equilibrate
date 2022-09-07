@@ -1,1 +1,4 @@
-pub const GAME_MAX_BUCKETS: usize = 64;
+pub const GAME_MAX_BUCKETS: u64 = 64;
+pub const PROGRAM_FEE_LAMPORTS: u64 = 15000000;
+// PubKey("GgPpTKg78vmzgDtP1DNn72CHAYjRdKY7AV6zgszoHCSa").as_ref()
+pub const PROGRAM_FEE_DESTINATION: &[u8] = &[232, 246, 193, 139, 141, 72, 45, 206, 79, 68, 213, 201, 118, 104, 133, 89, 31, 189, 102, 107, 250, 21, 75, 40, 71, 211, 50, 140, 111, 25, 135, 87];

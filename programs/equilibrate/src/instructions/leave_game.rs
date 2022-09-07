@@ -7,7 +7,7 @@ use anchor_spl::{
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED},
     model::EquilibrateError,
-    state::{game::Game, PlayerState},
+    state::{game::Game, PlayerState}, id,
 };
 
 #[derive(Accounts)]
@@ -20,6 +20,7 @@ pub struct LeaveGame<'info> {
     )]
     pub game: Account<'info, Game>,
 
+    /// CHECK: wallet to which rent should be returned when closing the game account, which must be the same wallet used to make the game
     #[account(mut)]
     pub game_creator: AccountInfo<'info>,
 
@@ -35,20 +36,28 @@ pub struct LeaveGame<'info> {
 
     #[account(
         mut,
-        constraint = winnings_destination_account.mint == game.config.token.key(),
+        
+        constraint = winnings_destination_account.mint == game.config.token.key()
+        @EquilibrateError::InvalidTokenSourceMint,
+
         owner = token::ID,
     )]
     pub winnings_destination_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = token_pool.owner == equilibrate_program_id.key(),
-        token::mint = game.config.token.key(),
-        token::authority = equilibrate_program_id,
+
+        constraint = token_pool.mint == game.config.token
+        @EquilibrateError::InvalidPoolMint,
+
+        constraint = token_pool.owner == id()
+        @EquilibrateError::InvalidPoolOwner,
+
         owner = token::ID,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
+    /// CHECK: The program itself, which we use to verify tokens are flowing in and out of the right places
     #[account(executable)]
     pub equilibrate_program_id: UncheckedAccount<'info>,
 
@@ -79,9 +88,10 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     } else {
         let new_balances = game.compute_buckets_new_balance(now_epoch_seconds.try_into().unwrap());
         let mut state = game.state.clone();
+        let player_bucket_usize = ctx.accounts.player.bucket as usize;
         for (i, bucket) in state.buckets.iter_mut().enumerate() {
             let balance_basis = new_balances.get(i).unwrap();
-            if i == ctx.accounts.player.bucket {
+            if i == player_bucket_usize {
                 // player takes balance of bucket proportional to their representation
                 // of the population in the bucket
                 found_winnings = true;
@@ -112,11 +122,10 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
 
     // close the game and return rent to the game creator
     if game_player_count == 1 {
-        game
-            .close(ctx.accounts.game_creator.to_account_info())?;
+        game.close(ctx.accounts.game_creator.to_account_info())?;
 
         game.log_end();
     }
-    
+
     Ok(())
 }

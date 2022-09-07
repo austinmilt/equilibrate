@@ -17,11 +17,11 @@ pub mod equilibrate {
         instructions::new_game(ctx, config, game_id)
     }
 
-    pub fn enter_game(ctx: Context<EnterGame>, bucket: usize) -> Result<()> {
+    pub fn enter_game(ctx: Context<EnterGame>, bucket: u64) -> Result<()> {
         instructions::enter_game(ctx, bucket)
     }
 
-    pub fn move_buckets(ctx: Context<MoveBuckets>, bucket: usize) -> Result<()> {
+    pub fn move_buckets(ctx: Context<MoveBuckets>, bucket: u64) -> Result<()> {
         instructions::move_buckets(ctx, bucket)
     }
 

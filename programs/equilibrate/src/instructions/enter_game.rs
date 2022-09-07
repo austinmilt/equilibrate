@@ -7,7 +7,7 @@ use anchor_spl::{
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS},
     model::EquilibrateError,
-    state::{game::Game, PlayerState},
+    state::{game::Game, PlayerState}, id,
 };
 
 #[derive(Accounts)]
@@ -30,6 +30,7 @@ pub struct EnterGame<'info> {
     )]
     pub player: Account<'info, PlayerState>,
 
+    /// CHECK: wallet where the program fee should be deposited
     #[account(
         mut,
         constraint = program_fee_destination.key().as_ref() == PROGRAM_FEE_DESTINATION
@@ -38,20 +39,28 @@ pub struct EnterGame<'info> {
 
     #[account(
         mut,
-        constraint = deposit_source_account.mint == game.config.token.key(),
+        
+        constraint = deposit_source_account.mint == game.config.token.key()
+        @EquilibrateError::InvalidTokenSourceMint,
+
         owner = token::ID,
     )]
     pub deposit_source_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-        constraint = token_pool.owner == equilibrate_program_id.key(),
-        token::mint = game.config.token.key(),
-        token::authority = equilibrate_program_id,
+
+        constraint = token_pool.mint == game.config.token
+        @EquilibrateError::InvalidPoolMint,
+
+        constraint = token_pool.owner == id()
+        @EquilibrateError::InvalidPoolOwner,
+
         owner = token::ID,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
+    /// CHECK: The program itself, which we use to verify tokens are flowing in and out of the right places
     #[account(executable)]
     pub equilibrate_program_id: UncheckedAccount<'info>,
 
@@ -64,7 +73,7 @@ pub struct EnterGame<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn enter_game(ctx: Context<EnterGame>, i_bucket: usize) -> Result<()> {
+pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     let game = &mut ctx.accounts.game;
@@ -103,9 +112,10 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: usize) -> Result<()> {
     // update bucket balances and insert player into desired bucket
     let new_balances = game.compute_buckets_new_balance(now_epoch_seconds.try_into().unwrap());
     let mut state = game.state.clone();
+    let i_bucket_usize = i_bucket as usize;
     for (i, bucket) in state.buckets.iter_mut().enumerate() {
         let balance_basis = new_balances.get(i).unwrap();
-        if i == i_bucket {
+        if i == i_bucket_usize {
             bucket.players = bucket.players.checked_add(1).unwrap();
             bucket.decimal_tokens = balance_basis
                 .checked_add(config.entry_fee_decimal_tokens)

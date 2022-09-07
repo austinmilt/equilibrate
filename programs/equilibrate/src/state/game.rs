@@ -12,7 +12,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn get_space(n_buckets: usize) -> usize {
+    pub fn get_space(n_buckets: u64) -> usize {
         8 + // account discriminator
         GameConfig::get_space() +
         GameState::get_space(n_buckets) +
@@ -113,7 +113,7 @@ pub struct GameConfig {
     pub token: Pubkey,
     pub entry_fee_decimal_tokens: u64,
     pub spill_rate_decimal_tokens_per_second_per_player: u64,
-    pub n_buckets: usize,
+    pub n_buckets: u64,
 }
 
 impl GameConfig {
@@ -132,8 +132,8 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn get_space(n_buckets: usize) -> usize {
-        4 + Bucket::get_space()*n_buckets + // buckets
+    pub fn get_space(n_buckets: u64) -> usize {
+        4 + Bucket::get_space()*(n_buckets as usize) + // buckets
         8 // last_update_epoch_ms
     }
 }

@@ -2,27 +2,39 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum EquilibrateError {
-    #[msg("Entry fee must be positive.")]
+    #[msg("Entry fee must be positive")]
     InvalidEntryFee,
 
-    #[msg("Number of buckets must be positive.")]
+    #[msg("Number of buckets must be positive")]
     TooFewBuckets,
 
-    #[msg(format!("Game cannot have more than {} buckets.", GAME_MAX_BUCKETS))]
+    #[msg("Game cannot have more than 64 buckets")]
     TooManyBuckets,
 
-    #[msg("Token spill rate must be positive.")]
+    #[msg("Token spill rate must be positive")]
     InvalidSpillRate,
 
-    #[msg("Attempted to enter a bucket that doesnt exist.")]
+    #[msg("Attempted to enter a bucket that doesnt exist")]
     BucketDoesNotExist,
 
-    #[msg("Attempted to enter move within the same bucket.")]
+    #[msg("Attempted to enter move within the same bucket")]
     AlreadyInBucket,
 
-    #[msg("Attempted to enter a game that has already ended.")]
+    #[msg("Attempted to enter a game that has already ended")]
     GameIsOver,
 
-    #[msg("Error locating player account to get winnings.")]
+    #[msg("Error locating player account to get winnings")]
     CouldNotFindPlayer,
+
+    #[msg("Program fee pubkey must be the one hard-coded in the program")]
+    InvalidProgramFeeDestination,
+
+    #[msg("Pool mint must be the one configured for the game")]
+    InvalidPoolMint,
+
+    #[msg("Pool owner must be the program")]
+    InvalidPoolOwner,
+
+    #[msg("Token source acount mint must be the one configured for the game")]
+    InvalidTokenSourceMint,
 }

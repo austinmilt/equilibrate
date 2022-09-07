@@ -1,0 +1,26 @@
+import * as anchor from "@project-serum/anchor";
+import { PublicKey } from "@solana/web3.js";
+
+export interface Game {
+  config: GameConfig;
+  state: GameState;
+  id: anchor.BN;
+  creator: PublicKey;
+}
+
+export interface GameConfig {
+    token: PublicKey;
+    entryFeeDecimalTokens: anchor.BN;
+    spillRateDecimalTokensPerSecondPerPlayer: anchor.BN;
+    nBuckets: anchor.BN;
+}
+
+export interface GameState {
+    buckets: {[index: number]: Bucket};
+    lastUpdateEpochSeconds: anchor.BN;
+}
+
+export interface Bucket {
+    decimalTokens: anchor.BN;
+    players: anchor.BN;
+}
