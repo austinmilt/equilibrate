@@ -16,11 +16,17 @@ export interface GameConfig {
 }
 
 export interface GameState {
-    buckets: {[index: number]: Bucket};
+    buckets: Bucket[];
     lastUpdateEpochSeconds: anchor.BN;
 }
 
 export interface Bucket {
     decimalTokens: anchor.BN;
-    players: anchor.BN;
+    players: number;
+}
+
+
+export interface PlayerState {
+    game: PublicKey;
+    bucket: anchor.BN;
 }

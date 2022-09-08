@@ -111,3 +111,22 @@ export async function makeAssociatedTokenAccountWithPayer(
 ): Promise<PublicKey> {
   return await spl.createAssociatedTokenAccount(connection, payer, mint, owner);
 }
+
+
+export async function getTokenBalanceWithoutDecimals(owner: PublicKey, mint: PublicKey, connection: Connection): Promise<number> {
+  const tokenAccountAddress: PublicKey = await spl.getAssociatedTokenAddress(mint, owner);
+  return (await connection.getTokenAccountBalance(tokenAccountAddress)).value.uiAmount;
+}
+
+
+export function withDecimals(amountWithoutDecimals: number, decimals: number): number {
+  return amountWithoutDecimals * Math.pow(10, decimals);
+}
+
+export function withoutDecimals(amountWithDecimals: number, decimals: number): number {
+  return amountWithDecimals / Math.pow(10, decimals);
+}
+
+export async function getSolBalance(wallet: PublicKey, connection: Connection): Promise<number> {
+  return await connection.getBalance(wallet) / anchor.web3.LAMPORTS_PER_SOL;
+}
