@@ -38,7 +38,7 @@ pub struct LeaveGame<'info> {
     #[account(
         mut,
 
-        constraint = winnings_destination_account.mint == game.config.token.key()
+        constraint = winnings_destination_account.mint == game.config.mint.key()
         @EquilibrateError::InvalidTokenSourceMint,
 
         owner = token::ID,
@@ -48,7 +48,7 @@ pub struct LeaveGame<'info> {
     #[account(
         mut,
 
-        constraint = token_pool.mint == game.config.token
+        constraint = token_pool.mint == game.config.mint
         @EquilibrateError::InvalidPoolMint,
 
         constraint = token_pool.owner == id()

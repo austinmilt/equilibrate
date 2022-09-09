@@ -3,6 +3,8 @@ import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateGameConfig,
   generateGameId,
+  getGame,
+  getPlayerState,
   MAX_GAME_BUCKETS,
   PROGRAM_FEE_DESTINATION,
   PROGRAM_FEE_LAMPORTS,
@@ -33,7 +35,7 @@ describe("New Game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
-  it("Create a new game > all good > game config and initial state are as expected", async () => {
+  it("create a new game > all good > game config and initial state are as expected", async () => {
     const {
       playerWallet,
       gameConfig,
@@ -42,7 +44,7 @@ describe("New Game Instruction Tests", () => {
       playerStateAddress,
     } = await setUpNewGame(program);
 
-    const game: Game = (await program.account.game.fetch(gameAddress)) as Game;
+    const game: Game = await getGame(gameAddress, program);
     assert.strictEqual(
       game.config.entryFeeDecimalTokens.toNumber(),
       gameConfig.entryFeeDecimalTokens.toNumber()
@@ -56,8 +58,8 @@ describe("New Game Instruction Tests", () => {
       gameConfig.spillRateDecimalTokensPerSecondPerPlayer.toNumber()
     );
     assert.strictEqual(
-      game.config.token.toBase58(),
-      gameConfig.token.toBase58()
+      game.config.mint.toBase58(),
+      gameConfig.mint.toBase58()
     );
     assert.strictEqual(
       game.creator.toBase58(),
@@ -68,6 +70,10 @@ describe("New Game Instruction Tests", () => {
       game.state.buckets.length,
       gameConfig.nBuckets.toNumber()
     );
+    assert.strictEqual(
+      game.config.maxPlayers.toNumber(),
+      gameConfig.maxPlayers.toNumber()
+    );
     assert.strictEqual(game.state.buckets[0].players, 1);
     assert.strictEqual(
       game.state.buckets[0].decimalTokens.toNumber(),
@@ -75,7 +81,7 @@ describe("New Game Instruction Tests", () => {
     );
 
     const firstPlayerState: PlayerState =
-      await program.account.playerState.fetch(playerStateAddress);
+      await getPlayerState(playerStateAddress, program);
     assert.strictEqual(firstPlayerState.bucket.toNumber(), 0);
     assert.strictEqual(
       firstPlayerState.game.toBase58(),
@@ -83,7 +89,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > all good > program fee is transferred", async () => {
+  it("create a new game > all good > program fee is transferred", async () => {
     const connection: Connection = program.provider.connection;
     // appears that wallet balances (all ledger transactions?) carry over
     // across tests, so we need to check the change in balance rather than the
@@ -113,7 +119,7 @@ describe("New Game Instruction Tests", () => {
     // the player's account
   });
 
-  it("Create a new game > all good > game tokens are transfered", async () => {
+  it("create a new game > all good > game tokens are transfered", async () => {
     const connection: Connection = program.provider.connection;
     const { playerWallet, mint, gameConfig, playerStartingTokens } =
       await setUpNewGame(program);
@@ -144,7 +150,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > game - bad seed - seed > fails", async () => {
+  it("create a new game > game - bad seed - seed > fails", async () => {
     const gameId: number = generateGameId();
     const gameAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -161,7 +167,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > game - bad seed - gameId > fails", async () => {
+  it("create a new game > game - bad seed - gameId > fails", async () => {
     const gameId: number = generateGameId();
     const gameAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -178,7 +184,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > firstPlayer - bad seed - seed > fails", async () => {
+  it("create a new game > firstPlayer - bad seed - seed > fails", async () => {
     const playerWallet: Keypair = Keypair.generate();
     const gameId: number = generateGameId();
     const gameAddress: PublicKey = await getGameAddress(
@@ -206,7 +212,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > firstPlayer - bad seed - game > fails", async () => {
+  it("create a new game > firstPlayer - bad seed - game > fails", async () => {
     const playerWallet: Keypair = Keypair.generate();
     const gameId: number = generateGameId();
     const gameAddress: PublicKey = await getGameAddress(
@@ -234,7 +240,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > firstPlayer - bad seed - player > fails", async () => {
+  it("create a new game > firstPlayer - bad seed - player > fails", async () => {
     const playerWallet: Keypair = Keypair.generate();
     const gameId: number = generateGameId();
     const gameAddress: PublicKey = await getGameAddress(
@@ -262,7 +268,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > wrong program fee destination > fails", async () => {
+  it("create a new game > wrong program fee destination > fails", async () => {
     assertAsyncThrows(() =>
       setUpNewGame(program, {
         programFeeDestination: Keypair.generate().publicKey,
@@ -270,7 +276,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > wrong player token account mint > fails", async () => {
+  it("create a new game > wrong player token account mint > fails", async () => {
     const connection: Connection = program.provider.connection;
     const playerWallet: Keypair = await makeAndFundWallet(1, connection);
     const authority: Keypair = await makeAndFundWallet(5, connection);
@@ -288,7 +294,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > wrong token pool mint > fails", async () => {
+  it("create a new game > wrong token pool mint > fails", async () => {
     const connection: Connection = program.provider.connection;
     const authority: Keypair = await makeAndFundWallet(5, connection);
     const badMint: Keypair = await generateMint(authority, connection);
@@ -311,7 +317,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > token pool owner is not game program > fails", async () => {
+  it("create a new game > token pool owner is not game program > fails", async () => {
     const connection: Connection = program.provider.connection;
     const authority: Keypair = await makeAndFundWallet(5, connection);
     const badMint: Keypair = await generateMint(authority, connection);
@@ -334,7 +340,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > entry fee is non-positive > fails", async () => {
+  it("create a new game > entry fee is non-positive > fails", async () => {
     assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
@@ -351,7 +357,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > too few game buckets > fails", async () => {
+  it("create a new game > too few game buckets > fails", async () => {
     assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
@@ -361,7 +367,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > too many game buckets > fails", async () => {
+  it("create a new game > too many game buckets > fails", async () => {
     assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
@@ -373,7 +379,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > max players too small > fails", async () => {
+  it("create a new game > max players too small > fails", async () => {
     assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
@@ -383,7 +389,7 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("Create a new game > spill rate is non-positive > fails", async () => {
+  it("create a new game > spill rate is non-positive > fails", async () => {
     assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {

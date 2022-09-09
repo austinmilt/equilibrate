@@ -1,7 +1,8 @@
-import { GameConfig } from "./types";
+import { Game, GameConfig, PlayerState } from "./types";
 import { PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { MINT_DECIMALS } from "./token";
+import { Equilibrate } from "../../target/types/equilibrate";
 
 export const PROGRAM_FEE_DESTINATION: PublicKey = new PublicKey('EQui1fSdC2HetpETDAoaLaPYvYR7xVuXmLyUiiEvfA2h');
 export const PROGRAM_FEE_LAMPORTS: number = 15000000;
@@ -15,16 +16,29 @@ export function generateGameId(): number {
   return new Date().getTime();
 }
 
-export function generateGameConfig(token: PublicKey): GameConfig {
+export function generateBucketIndex(nBuckets: number): number {
+  return Math.floor(Math.random()*nBuckets);
+}
+
+export function generateGameConfig(mint: PublicKey): GameConfig {
   const entryFeeDecimalTokens: number = Math.random() * 10 * Math.pow(10, MINT_DECIMALS);
   const spillRate: number = Math.ceil(Math.random() * 2 * Math.pow(10, MINT_DECIMALS));
   const nBuckets: number = Math.ceil(Math.random() * 5 + 1);
   const maxPlayers: number = Math.ceil(Math.random() * 1000 + 1);
   return {
-    token: token,
+    mint: mint,
     entryFeeDecimalTokens: new anchor.BN(entryFeeDecimalTokens),
     spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
     nBuckets: new anchor.BN(nBuckets),
     maxPlayers: new anchor.BN(maxPlayers)
   };
+}
+
+
+export async function getGame(gameAddress: PublicKey, program: anchor.Program<Equilibrate>): Promise<Game> {
+  return (await program.account.game.fetch(gameAddress)) as Game;
+}
+
+export async function getPlayerState(playerStateAddress: PublicKey, program: anchor.Program<Equilibrate>): Promise<PlayerState> {
+  return await program.account.playerState.fetch(playerStateAddress);
 }

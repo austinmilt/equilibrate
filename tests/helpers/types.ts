@@ -9,7 +9,7 @@ export interface Game {
 }
 
 export interface GameConfig {
-    token: PublicKey;
+    mint: PublicKey;
     entryFeeDecimalTokens: anchor.BN;
     spillRateDecimalTokensPerSecondPerPlayer: anchor.BN;
     nBuckets: anchor.BN;

@@ -48,7 +48,7 @@ pub struct NewGame<'info> {
     #[account(
         mut,
 
-        constraint = deposit_source_account.mint == config.token.key()
+        constraint = deposit_source_account.mint == config.mint.key()
         @EquilibrateError::InvalidTokenSourceMint,
 
         owner = token::ID,
@@ -58,7 +58,7 @@ pub struct NewGame<'info> {
     #[account(
         mut,
 
-        constraint = token_pool.mint == config.token
+        constraint = token_pool.mint == config.mint
         @EquilibrateError::InvalidPoolMint,
 
         constraint = token_pool.owner == id()

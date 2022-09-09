@@ -41,7 +41,7 @@ pub struct EnterGame<'info> {
     #[account(
         mut,
 
-        constraint = deposit_source_account.mint == game.config.token.key()
+        constraint = deposit_source_account.mint == game.config.mint.key()
         @EquilibrateError::InvalidTokenSourceMint,
 
         owner = token::ID,
@@ -51,7 +51,7 @@ pub struct EnterGame<'info> {
     #[account(
         mut,
 
-        constraint = token_pool.mint == game.config.token
+        constraint = token_pool.mint == game.config.mint
         @EquilibrateError::InvalidPoolMint,
 
         constraint = token_pool.owner == id()
