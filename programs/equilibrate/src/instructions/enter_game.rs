@@ -6,8 +6,9 @@ use anchor_spl::{
 
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS},
+    id,
     model::EquilibrateError,
-    state::{game::Game, PlayerState}, id,
+    state::{game::Game, PlayerState},
 };
 
 #[derive(Accounts)]
@@ -39,7 +40,7 @@ pub struct EnterGame<'info> {
 
     #[account(
         mut,
-        
+
         constraint = deposit_source_account.mint == game.config.token.key()
         @EquilibrateError::InvalidTokenSourceMint,
 
@@ -88,7 +89,7 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     require_gt!(
         config.max_players,
         game_player_count,
-        EquilibrateError::BucketDoesNotExist
+        EquilibrateError::GameAtCapacity
     );
 
     // take program fee
@@ -133,7 +134,6 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     let player = &mut ctx.accounts.player;
     player.set_inner(PlayerState {
         game: game.key(),
-        // first player always goes into the first bucket
         bucket: i_bucket,
     });
     player.log_make();

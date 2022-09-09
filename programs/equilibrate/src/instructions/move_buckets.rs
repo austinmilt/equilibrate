@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED},
+    id,
     model::EquilibrateError,
-    state::{game::Game, PlayerState}, id,
+    state::{game::Game, PlayerState},
 };
 
 #[derive(Accounts)]

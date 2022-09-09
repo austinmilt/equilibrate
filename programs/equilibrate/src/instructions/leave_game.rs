@@ -6,8 +6,9 @@ use anchor_spl::{
 
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED},
+    id,
     model::EquilibrateError,
-    state::{game::Game, PlayerState}, id,
+    state::{game::Game, PlayerState},
 };
 
 #[derive(Accounts)]
@@ -36,7 +37,7 @@ pub struct LeaveGame<'info> {
 
     #[account(
         mut,
-        
+
         constraint = winnings_destination_account.mint == game.config.token.key()
         @EquilibrateError::InvalidTokenSourceMint,
 

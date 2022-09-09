@@ -47,7 +47,7 @@ pub struct NewGame<'info> {
 
     #[account(
         mut,
-        
+
         constraint = deposit_source_account.mint == config.token.key()
         @EquilibrateError::InvalidTokenSourceMint,
 
@@ -95,11 +95,7 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
         0,
         EquilibrateError::InvalidSpillRate
     );
-    require_gt!(
-        config.max_players,
-        1,
-        EquilibrateError::InvalidMaxPlayers
-    );
+    require_gt!(config.max_players, 1, EquilibrateError::InvalidMaxPlayers);
 
     let program_fee_transfer_context = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),
