@@ -43,4 +43,7 @@ pub enum EquilibrateError {
 
     #[msg("Token source acount mint must be the one configured for the game")]
     InvalidTokenSourceMint,
+
+    #[msg("Program ID must be this program")]
+    InvalidProgramId,
 }

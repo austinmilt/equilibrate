@@ -28,7 +28,7 @@ pub struct LeaveGame<'info> {
         mut,
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
         bump,
-        owner = equilibrate_program_id.key(),
+        owner = id(),
         constraint = player.game.key() == game.key(),
         close = payer
     )]
@@ -57,9 +57,13 @@ pub struct LeaveGame<'info> {
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
-    /// CHECK: The program itself, which we use to verify tokens are flowing in and out of the right places
-    #[account(executable)]
-    pub equilibrate_program_id: UncheckedAccount<'info>,
+    /// CHECK: The program itself and authority for transfering tokens out of the pool
+    #[account(
+        executable,
+        constraint = equilibrate_program.key() == id()
+        @EquilibrateError::InvalidProgramId
+    )]
+    pub equilibrate_program: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -112,7 +116,7 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let pool_transfer_accounts = Transfer {
         from: ctx.accounts.token_pool.to_account_info(),
         to: ctx.accounts.winnings_destination_account.to_account_info(),
-        authority: ctx.accounts.equilibrate_program_id.to_account_info(),
+        authority: ctx.accounts.equilibrate_program.to_account_info(),
     };
     let token_program = ctx.accounts.token_program.to_account_info();
     let pool_transfer_context = CpiContext::new(token_program, pool_transfer_accounts);

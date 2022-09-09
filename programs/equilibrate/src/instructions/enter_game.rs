@@ -25,7 +25,7 @@ pub struct EnterGame<'info> {
         space = PlayerState::get_space(),
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
         bump,
-        owner = equilibrate_program_id.key(),
+        owner = id(),
         constraint = player.game.key() == game.key()
     )]
     pub player: Account<'info, PlayerState>,
@@ -59,10 +59,6 @@ pub struct EnterGame<'info> {
         owner = token::ID,
     )]
     pub token_pool: Account<'info, TokenAccount>,
-
-    /// CHECK: The program itself, which we use to verify tokens are flowing in and out of the right places
-    #[account(executable)]
-    pub equilibrate_program_id: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
