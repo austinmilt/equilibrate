@@ -3,7 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import { MINT_DECIMALS } from "./token";
 
-export const PROGRAM_FEE_DESTINATION: PublicKey = new PublicKey('GgPpTKg78vmzgDtP1DNn72CHAYjRdKY7AV6zgszoHCSa');
+export const PROGRAM_FEE_DESTINATION: PublicKey = new PublicKey('EQui1fSdC2HetpETDAoaLaPYvYR7xVuXmLyUiiEvfA2h');
 export const PROGRAM_FEE_LAMPORTS: number = 15000000;
 export const MAX_GAME_BUCKETS: number = 64
 
