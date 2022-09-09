@@ -3,11 +3,11 @@ import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateGameConfig,
   generateGameId,
+  MAX_GAME_BUCKETS,
   PROGRAM_FEE_DESTINATION,
   PROGRAM_FEE_LAMPORTS,
 } from "./helpers/game";
 import {
-  fundWallet,
   generateMint,
   getSolBalance,
   getTokenBalanceWithoutDecimals,
@@ -19,8 +19,15 @@ import {
 } from "./helpers/token";
 import { Game, GameConfig, PlayerState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
-import { getGameAddress, getPlayerStateAddress } from "./helpers/address";
+import {
+  GAME_SEED,
+  getGameAddress,
+  getPlayerStateAddress,
+  PLAYER_SEED,
+} from "./helpers/address";
 import { assert } from "chai";
+import { assertAsyncThrows } from "./helpers/test";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 
 describe("New Game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -78,14 +85,15 @@ describe("New Game Instruction Tests", () => {
 
   it("Create a new game > all good > program fee is transferred", async () => {
     const connection: Connection = program.provider.connection;
-    // appears that wallet balances (all ledger transactions?) carry over 
-    // across tests, so we need to check the change in balance rather than the 
+    // appears that wallet balances (all ledger transactions?) carry over
+    // across tests, so we need to check the change in balance rather than the
     // whole balance, since other tests may put program fee in the wallet
     const programFeeDestinatonBalancePreGame: number = await getSolBalance(
       PROGRAM_FEE_DESTINATION,
-      connection);
+      connection
+    );
 
-     await setUp(program);
+    await setUp(program);
 
     const programFeeDestinationBalance: number = await getSolBalance(
       PROGRAM_FEE_DESTINATION,
@@ -137,57 +145,270 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("Create a new game > game - bad seed - seed > fails", async () => {
-    assert(false);
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = (
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode("a bad seed my dude"),
+          new anchor.BN(gameId).toArrayLike(Buffer, "le", 8),
+        ],
+        program.programId
+      )
+    )[0];
+
+    assertAsyncThrows(() =>
+      setUp(program, { gameId: gameId, gameAddress: gameAddress })
+    );
   });
 
   it("Create a new game > game - bad seed - gameId > fails", async () => {
-    assert(false);
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = (
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode(GAME_SEED),
+          new anchor.BN(generateGameId()).toArrayLike(Buffer, "le", 8),
+        ],
+        program.programId
+      )
+    )[0];
+
+    assertAsyncThrows(() =>
+      setUp(program, { gameId: gameId, gameAddress: gameAddress })
+    );
   });
 
   it("Create a new game > firstPlayer - bad seed - seed > fails", async () => {
-    assert(false);
+    const playerWallet: Keypair = Keypair.generate();
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = await getGameAddress(
+      gameId,
+      program.programId
+    );
+    const playerStateAddress: PublicKey = (
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode("this player sucks"),
+          gameAddress.toBuffer(),
+          playerWallet.publicKey.toBuffer(),
+        ],
+        program.programId
+      )
+    )[0];
+
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameId: gameId,
+        gameAddress: gameAddress,
+        playerWallet: playerWallet,
+        playerStateAddress: playerStateAddress,
+      })
+    );
   });
 
   it("Create a new game > firstPlayer - bad seed - game > fails", async () => {
-    assert(false);
+    const playerWallet: Keypair = Keypair.generate();
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = await getGameAddress(
+      gameId,
+      program.programId
+    );
+    const playerStateAddress: PublicKey = (
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode(PLAYER_SEED),
+          Keypair.generate().publicKey.toBuffer(),
+          playerWallet.publicKey.toBuffer(),
+        ],
+        program.programId
+      )
+    )[0];
+
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameId: gameId,
+        gameAddress: gameAddress,
+        playerWallet: playerWallet,
+        playerStateAddress: playerStateAddress,
+      })
+    );
   });
 
   it("Create a new game > firstPlayer - bad seed - player > fails", async () => {
-    assert(false);
+    const playerWallet: Keypair = Keypair.generate();
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = await getGameAddress(
+      gameId,
+      program.programId
+    );
+    const playerStateAddress: PublicKey = (
+      await PublicKey.findProgramAddress(
+        [
+          anchor.utils.bytes.utf8.encode(PLAYER_SEED),
+          gameAddress.toBuffer(),
+          Keypair.generate().publicKey.toBuffer(),
+        ],
+        program.programId
+      )
+    )[0];
+
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameId: gameId,
+        gameAddress: gameAddress,
+        playerWallet: playerWallet,
+        playerStateAddress: playerStateAddress,
+      })
+    );
   });
 
   it("Create a new game > wrong program fee destination > fails", async () => {
-    assert(false);
+    assertAsyncThrows(() =>
+      setUp(program, {
+        programFeeDestination: Keypair.generate().publicKey,
+      })
+    );
   });
 
-  it("Create a new game > wrong token source mint > fails", async () => {
-    assert(false);
+  it("Create a new game > wrong player token account mint > fails", async () => {
+    const connection: Connection = program.provider.connection;
+    const playerWallet: Keypair = await makeAndFundWallet(1, connection);
+    const authority: Keypair = await makeAndFundWallet(5, connection);
+    const badMint: Keypair = await generateMint(authority, connection);
+    const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(
+      badMint.publicKey,
+      playerWallet.publicKey
+    );
+    assertAsyncThrows(() =>
+      setUp(program, {
+        playerWallet: playerWallet,
+        playerTokenAccount: playerTokenAccount,
+        mintAuthority: authority,
+      })
+    );
   });
 
   it("Create a new game > wrong token pool mint > fails", async () => {
-    assert(false);
+    const connection: Connection = program.provider.connection;
+    const authority: Keypair = await makeAndFundWallet(5, connection);
+    const badMint: Keypair = await generateMint(authority, connection);
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = await getGameAddress(
+      gameId,
+      program.programId
+    );
+    const tokenPoolAddress: PublicKey = await getAssociatedTokenAddress(
+      badMint.publicKey,
+      program.programId
+    );
+    assertAsyncThrows(() =>
+      setUp(program, {
+        mintAuthority: authority,
+        tokenPoolAddress: tokenPoolAddress,
+        gameId: gameId,
+        gameAddress: gameAddress,
+      })
+    );
   });
 
   it("Create a new game > token pool owner is not game program > fails", async () => {
-    assert(false);
+    const connection: Connection = program.provider.connection;
+    const authority: Keypair = await makeAndFundWallet(5, connection);
+    const badMint: Keypair = await generateMint(authority, connection);
+    const gameId: number = generateGameId();
+    const gameAddress: PublicKey = await getGameAddress(
+      gameId,
+      program.programId
+    );
+    const tokenPoolAddress: PublicKey = await getAssociatedTokenAddress(
+      badMint.publicKey,
+      Keypair.generate().publicKey
+    );
+    assertAsyncThrows(() =>
+      setUp(program, {
+        mintAuthority: authority,
+        tokenPoolAddress: tokenPoolAddress,
+        gameId: gameId,
+        gameAddress: gameAddress,
+      })
+    );
   });
 
   it("Create a new game > entry fee is non-positive > fails", async () => {
-    assert(false);
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameConfig: {
+          entryFeeDecimalTokens: new anchor.BN(0),
+        },
+      })
+    );
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameConfig: {
+          entryFeeDecimalTokens: new anchor.BN(-1),
+        },
+      })
+    );
   });
 
   it("Create a new game > too few game buckets > fails", async () => {
-    assert(false);
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameConfig: {
+          nBuckets: new anchor.BN(1),
+        },
+      })
+    );
   });
 
   it("Create a new game > too many game buckets > fails", async () => {
-    assert(false);
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameConfig: {
+          nBuckets: new anchor.BN(
+            Math.ceil(Math.random() * 1000 + MAX_GAME_BUCKETS)
+          ),
+        },
+      })
+    );
   });
 
   it("Create a new game > spill rate is non-positive > fails", async () => {
-    assert(false);
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameConfig: {
+          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(0),
+        },
+      })
+    );
+    assertAsyncThrows(() =>
+      setUp(program, {
+        gameConfig: {
+          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(-1),
+        },
+      })
+    );
   });
 });
+
+interface NewGameSetupArgs {
+  mintAuthority?: Keypair;
+  mint?: Keypair;
+  gameConfig?: {
+    entryFeeDecimalTokens?: anchor.BN;
+    spillRateDecimalTokensPerSecondPerPlayer?: anchor.BN;
+    nBuckets?: anchor.BN;
+  };
+  gameId?: number;
+  gameAddress?: PublicKey;
+  playerStartingSol?: number;
+  playerStartingTokens?: number;
+  playerWallet?: Keypair;
+  playerTokenAccount?: PublicKey;
+  playerStateAddress?: PublicKey;
+  tokenPoolAddress?: PublicKey;
+  programFeeDestination?: PublicKey;
+}
 
 interface NewGameContext {
   mintAuthority: Keypair;
@@ -204,23 +425,51 @@ interface NewGameContext {
 }
 
 async function setUp(
-  program: anchor.Program<Equilibrate>
+  program: anchor.Program<Equilibrate>,
+  customSetup?: NewGameSetupArgs
 ): Promise<NewGameContext> {
   const connection: Connection = program.provider.connection;
-  const mintAuthority: Keypair = await makeAndFundWallet(1, connection);
-  const mint = await generateMint(mintAuthority, connection);
+  const mintAuthority: Keypair =
+    customSetup?.mintAuthority ?? (await makeAndFundWallet(1, connection));
+  const mint =
+    customSetup?.mint ?? (await generateMint(mintAuthority, connection));
+
   const config: GameConfig = generateGameConfig(mint.publicKey);
-  const gameId: number = generateGameId();
-  const gameAddress: PublicKey = await getGameAddress(
-    gameId,
-    program.programId
-  );
-  const playerTokens: number = Math.ceil(
-    1.1 *
-      withoutDecimals(config.entryFeeDecimalTokens.toNumber(), MINT_DECIMALS)
-  );
-  const playerStartingSol: number = 10*PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
-  const { wallet: player, tokenAccount: playerTokenAccount } =
+  if (customSetup?.gameConfig?.entryFeeDecimalTokens != null) {
+    config.entryFeeDecimalTokens =
+      customSetup?.gameConfig?.entryFeeDecimalTokens;
+  }
+
+  if (customSetup?.gameConfig?.nBuckets != null) {
+    config.nBuckets = customSetup?.gameConfig?.nBuckets;
+  }
+
+  if (
+    customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer != null
+  ) {
+    config.spillRateDecimalTokensPerSecondPerPlayer =
+      customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer;
+  }
+
+  const gameId: number = customSetup?.gameId ?? generateGameId();
+  const gameAddress: PublicKey =
+    customSetup?.gameAddress ??
+    (await getGameAddress(gameId, program.programId));
+  const playerTokens: number =
+    customSetup?.playerStartingTokens != null
+      ? customSetup?.playerStartingTokens
+      : Math.ceil(
+          1.1 *
+            withoutDecimals(
+              config.entryFeeDecimalTokens.toNumber(),
+              MINT_DECIMALS
+            )
+        );
+  const playerStartingSol: number =
+    customSetup?.playerStartingSol != null
+      ? customSetup?.playerStartingSol
+      : (10 * PROGRAM_FEE_LAMPORTS) / anchor.web3.LAMPORTS_PER_SOL;
+  let { wallet: player, tokenAccount: playerTokenAccount } =
     await makeAndFundWalletWithTokens(
       playerStartingSol,
       playerTokens,
@@ -228,24 +477,37 @@ async function setUp(
       mintAuthority,
       connection
     );
-  const playerStateAddress: PublicKey = await getPlayerStateAddress(
-    gameAddress,
-    player.publicKey,
-    program.programId
-  );
-  const tokenPoolAddress: PublicKey = await makeAssociatedTokenAccountWithPayer(
-    mintAuthority,
-    program.programId,
-    mint.publicKey,
-    connection
-  );
+
+  if (customSetup?.playerWallet != null) player = customSetup.playerWallet;
+
+  if (customSetup?.playerTokenAccount != null) {
+    playerTokenAccount = customSetup.playerTokenAccount;
+  }
+
+  const playerStateAddress: PublicKey =
+    customSetup?.playerStateAddress ??
+    (await getPlayerStateAddress(
+      gameAddress,
+      player.publicKey,
+      program.programId
+    ));
+
+  const tokenPoolAddress: PublicKey =
+    customSetup?.tokenPoolAddress ??
+    (await makeAssociatedTokenAccountWithPayer(
+      mintAuthority,
+      program.programId,
+      mint.publicKey,
+      connection
+    ));
 
   await program.methods
     .newGame(config, new anchor.BN(gameId))
     .accountsStrict({
       game: gameAddress,
       firstPlayer: playerStateAddress,
-      programFeeDestination: PROGRAM_FEE_DESTINATION,
+      programFeeDestination:
+        customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
       depositSourceAccount: playerTokenAccount,
       tokenPool: tokenPoolAddress,
       payer: player.publicKey,
