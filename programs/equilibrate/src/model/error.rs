@@ -11,8 +11,14 @@ pub enum EquilibrateError {
     #[msg("Game cannot have more than 64 buckets")]
     TooManyBuckets,
 
+    #[msg("Game is at capacity")]
+    GameAtCapacity,
+
     #[msg("Token spill rate must be positive")]
     InvalidSpillRate,
+
+    #[msg("Game must allow more than 1 player")]
+    InvalidMaxPlayers,
 
     #[msg("Attempted to enter a bucket that doesnt exist")]
     BucketDoesNotExist,

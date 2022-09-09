@@ -114,6 +114,7 @@ pub struct GameConfig {
     pub entry_fee_decimal_tokens: u64,
     pub spill_rate_decimal_tokens_per_second_per_player: u64,
     pub n_buckets: u64,
+    pub max_players: u64
 }
 
 impl GameConfig {
@@ -121,7 +122,8 @@ impl GameConfig {
         32 + // token
         8 + // entry_fee_decimal_tokens
         8 + // spill_rate_decimal_tokens_per_second_per_player
-        8 // n_buckets
+        8 + // n_buckets
+        8 // max_players
     }
 }
 

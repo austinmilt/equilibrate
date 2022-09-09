@@ -18,11 +18,13 @@ export function generateGameId(): number {
 export function generateGameConfig(token: PublicKey): GameConfig {
   const entryFeeDecimalTokens: number = Math.random() * 10 * Math.pow(10, MINT_DECIMALS);
   const spillRate: number = Math.ceil(Math.random() * 2 * Math.pow(10, MINT_DECIMALS));
-  const nBuckets: number = Math.ceil(Math.random() * 5);
+  const nBuckets: number = Math.ceil(Math.random() * 5 + 1);
+  const maxPlayers: number = Math.ceil(Math.random() * 1000 + 1);
   return {
     token: token,
     entryFeeDecimalTokens: new anchor.BN(entryFeeDecimalTokens),
     spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
     nBuckets: new anchor.BN(nBuckets),
+    maxPlayers: new anchor.BN(maxPlayers)
   };
 }

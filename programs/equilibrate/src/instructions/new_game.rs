@@ -85,7 +85,7 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
         0,
         EquilibrateError::InvalidEntryFee
     );
-    require_gt!(config.n_buckets, 0, EquilibrateError::TooFewBuckets);
+    require_gt!(config.n_buckets, 1, EquilibrateError::TooFewBuckets);
     require!(
         config.n_buckets <= GAME_MAX_BUCKETS,
         EquilibrateError::TooManyBuckets
@@ -94,6 +94,11 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
         config.spill_rate_decimal_tokens_per_second_per_player,
         0,
         EquilibrateError::InvalidSpillRate
+    );
+    require_gt!(
+        config.max_players,
+        1,
+        EquilibrateError::InvalidMaxPlayers
     );
 
     let program_fee_transfer_context = CpiContext::new(

@@ -89,6 +89,12 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     let game_player_count: u64 = game.state.buckets.iter().map(|b| b.players as u64).sum();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
+    require_gt!(
+        config.max_players,
+        game_player_count,
+        EquilibrateError::BucketDoesNotExist
+    );
+
     // take program fee
     let program_fee_transfer_context = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),
