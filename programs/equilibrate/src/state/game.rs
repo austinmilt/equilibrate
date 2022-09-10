@@ -1,4 +1,7 @@
-use std::cmp::{max, Ordering};
+use std::{
+    cmp::{min, Ordering},
+    mem::replace,
+};
 
 use anchor_lang::prelude::*;
 
@@ -27,76 +30,53 @@ impl Game {
 
         // compute the spillover from each bucket, then
         // equally distribute that across other buckets
-        let mut total_spillover: u64 = 0;
-        let spillover: Vec<u64> = self
-            .state
-            .buckets
-            .iter()
-            .map(|b| {
-                let bucket_spillover = b.compute_spillover(
+        let n_buckets = self.config.n_buckets as usize;
+        let mut inflow: Vec<u64> = vec![0; self.config.n_buckets as usize];
+        let mut outflow: Vec<u64> = vec![0; self.config.n_buckets as usize];
+        let mut result: Vec<u64> = vec![0; self.config.n_buckets as usize];
+        for i in 0..n_buckets {
+            let bucket_i = &self.state.buckets[i];
+            let spillover_i = bucket_i.compute_spillover(
+                self.config.spill_rate_decimal_tokens_per_second_per_player,
+                seconds_since_last_update,
+            );
+            let _ = replace(&mut outflow[i], spillover_i);
+            let spillover_to_j =
+                spillover_div_peers(spillover_i, self.config.n_buckets);
+            for j in (i + 1)..n_buckets {
+                let spillover_to_i = self.compute_spillover_per_peer(j, seconds_since_last_update);
+                let inflow_i = inflow[i].checked_add(spillover_to_i).unwrap();
+                let inflow_j = inflow[j].checked_add(spillover_to_j).unwrap();
+                let _ = replace(&mut inflow[i], inflow_i);
+                let _ = replace(&mut inflow[j], inflow_j);
+            }
+            let balance_i = bucket_i
+                .decimal_tokens
+                .checked_add(inflow[i])
+                .unwrap()
+                .checked_sub(outflow[i])
+                .unwrap();
+            let _ = replace(&mut result[i], balance_i);
+        }
+        result
+    }
+
+    fn compute_spillover_per_peer(
+        &self,
+        bucket_index: usize,
+        seconds_since_last_update: u64,
+    ) -> u64 {
+        spillover_div_peers(
+            self.state
+                .buckets
+                .get(bucket_index)
+                .unwrap()
+                .compute_spillover(
                     self.config.spill_rate_decimal_tokens_per_second_per_player,
                     seconds_since_last_update,
-                );
-                total_spillover = total_spillover.checked_add(bucket_spillover).unwrap();
-                bucket_spillover
-            })
-            .collect();
-
-        let n_other_buckets = (self.config.n_buckets - 1) as f64;
-        let mut undistributed_flow: f64 = 0.0;
-        let mut flow_data: Vec<(usize, f64, f64, u64)> = spillover
-            .iter()
-            .enumerate()
-            .map(|(i, bucket_spillover)| {
-                let inflow = ((total_spillover - bucket_spillover) as f64) / n_other_buckets;
-                let net_desired_flow = inflow - (bucket_spillover.clone() as f64);
-                let flow_floor = net_desired_flow.floor();
-                let flow_remainder = net_desired_flow - flow_floor;
-                undistributed_flow += flow_remainder;
-                (i, net_desired_flow, flow_remainder, flow_floor as u64)
-            })
-            .collect();
-
-        // since we can only store whole-number amounts in each bucket - buckets
-        // already track maximum resolution of the token being gambled - let's
-        // now distribute the leftover in whole amounts across buckets, opting
-        // for getting each bucket as close to its desired balance as possible
-        flow_data.sort_by(|a, b| {
-            if a.2 < b.2 {
-                // sort descending
-                Ordering::Greater
-            } else if a.2 > b.2 {
-                Ordering::Less
-            } else {
-                Ordering::Equal
-            }
-        });
-
-        // The total undistributed flow should always add to a whole
-        // number, but just in case it doesnt due to small floating point
-        // errors, we'll round down to ensure we dont try to distribute
-        // more tokens than are available (the last player will still
-        // get all the remaining tokens). This number will be guaranteed
-        // to be less than the number of buckets since we're adding up
-        // fractions less than 1 over every bucket.
-        let mut undistributed_flow = undistributed_flow.floor() as u64;
-        let mut flow_reconciled: Vec<(&usize, u64)> = flow_data
-            .iter()
-            .map(|(i, _, _, flow_floor)| {
-                if undistributed_flow > 0 {
-                    undistributed_flow -= 1;
-                    (i, flow_floor + 1)
-                } else {
-                    (i, *flow_floor)
-                }
-            })
-            .collect();
-        flow_reconciled.sort_by_key(|v| v.0);
-
-        flow_reconciled
-            .into_iter()
-            .map(|(i, v)| v + self.state.buckets.get(*i).unwrap().decimal_tokens)
-            .collect()
+                ),
+            self.config.n_buckets,
+        )
     }
 
     pub fn log_make(&self) {
@@ -106,6 +86,12 @@ impl Game {
     pub fn log_end(&self) {
         msg!("Ended game {}", self.id);
     }
+}
+
+fn spillover_div_peers(spillover: u64, n_buckets: u64) -> u64 {
+    spillover
+        .checked_div(n_buckets.checked_sub(1).unwrap())
+        .unwrap()
 }
 
 #[derive(Debug, PartialEq, AnchorSerialize, AnchorDeserialize, Clone)]
@@ -158,9 +144,11 @@ impl Bucket {
         time_elapsed_since_last_update_seconds: u64,
     ) -> u64 {
         // each bucket can lose at most the number of tokens it contains
-        max(
-            self.decimal_tokens,
-            (self.players as u64) * spill_rate * time_elapsed_since_last_update_seconds,
-        )
+        let desired_spillover = (self.players as u64)
+            .checked_mul(spill_rate)
+            .unwrap()
+            .checked_mul(time_elapsed_since_last_update_seconds)
+            .unwrap();
+        min(self.decimal_tokens, desired_spillover)
     }
 }
