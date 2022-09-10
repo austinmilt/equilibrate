@@ -46,4 +46,7 @@ pub enum EquilibrateError {
 
     #[msg("Program ID must be this program")]
     InvalidProgramId,
+
+    #[msg("Player state account doesnt belong to this game")]
+    InvalidPlayerState,
 }

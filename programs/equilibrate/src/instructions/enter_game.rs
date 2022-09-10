@@ -27,7 +27,6 @@ pub struct EnterGame<'info> {
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
         bump,
         owner = id(),
-        constraint = player.game.key() == game.key()
     )]
     pub player: Account<'info, PlayerState>,
 
@@ -35,6 +34,7 @@ pub struct EnterGame<'info> {
     #[account(
         mut,
         constraint = program_fee_destination.key().as_ref() == PROGRAM_FEE_DESTINATION
+        @EquilibrateError::InvalidProgramFeeDestination
     )]
     pub program_fee_destination: AccountInfo<'info>,
 

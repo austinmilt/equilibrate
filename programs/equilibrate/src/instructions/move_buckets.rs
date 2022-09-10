@@ -21,8 +21,8 @@ pub struct MoveBuckets<'info> {
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
         bump,
         owner = id(),
-        constraint = player.game.key() == game.key(),
-        close = payer
+        constraint = player.game.key() == game.key()
+        @EquilibrateError::InvalidPlayerState
     )]
     pub player: Account<'info, PlayerState>,
 
