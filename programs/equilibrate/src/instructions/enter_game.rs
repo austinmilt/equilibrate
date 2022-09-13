@@ -73,8 +73,7 @@ pub struct EnterGame<'info> {
 pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
-    let game = &mut ctx.accounts.game;
-    let config = &game.config;
+    let config = &ctx.accounts.game.config.clone();
 
     // check constraints
     require_gt!(
@@ -84,9 +83,16 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
         EquilibrateError::BucketDoesNotExist
     );
 
-    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
+    require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
 
-    let game_player_count: u64 = game.state.buckets.iter().map(|b| b.players as u64).sum();
+    let game_player_count: u64 = ctx
+        .accounts
+        .game
+        .state
+        .buckets
+        .iter()
+        .map(|b| b.players as u64)
+        .sum();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
     require_gt!(
@@ -116,40 +122,22 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     token::transfer(pool_transfer_context, config.entry_fee_decimal_tokens)?;
 
     // update bucket balances and insert player into desired bucket
-    let new_balances = game.compute_buckets_new_balance(now_epoch_seconds.try_into().unwrap());
-    let mut state = game.state.clone();
-    let i_bucket_usize = i_bucket as usize;
-    for (i, bucket) in state.buckets.iter_mut().enumerate() {
-        let balance_before = bucket.decimal_tokens;
-        let balance_basis = new_balances.get(i).unwrap();
-        if i == 0 {
-            // the number of players in the holding bucket is always the number
-            // of players in the game
-            bucket.players = bucket.players.checked_add(1).unwrap();
-            bucket.decimal_tokens = balance_basis
-                .checked_add(config.entry_fee_decimal_tokens)
-                .unwrap()
-        } else if i == i_bucket_usize {
-            bucket.players = bucket.players.checked_add(1).unwrap();
-        } else {
-            bucket.decimal_tokens = *balance_basis;
-        }
-
-        //TODO delete
-        msg!(
-            "bucket {:?} before = {:?}, after = {:?}",
-            i,
-            (balance_before as f64) / 1e9,
-            (bucket.decimal_tokens as f64) / 1e9
-        );
-    }
-    state.last_update_epoch_seconds = now_epoch_seconds;
-    game.state = state;
+    let game = &mut ctx.accounts.game;
+    game.update_bucket_balances(now_epoch_seconds.try_into().unwrap());
+    game.state.buckets[0].players = game.state.buckets[0].players.checked_add(1).unwrap();
+    game.state.buckets[0].decimal_tokens = game.state.buckets[0]
+        .decimal_tokens
+        .checked_add(config.entry_fee_decimal_tokens)
+        .unwrap();
+    game.state.buckets[i_bucket as usize].players = game.state.buckets[i_bucket as usize]
+        .players
+        .checked_add(1)
+        .unwrap();
 
     // create player state account
     let player = &mut ctx.accounts.player;
     player.set_inner(PlayerState {
-        game: game.key(),
+        game: ctx.accounts.game.key(),
         bucket: i_bucket,
     });
     player.log_make();

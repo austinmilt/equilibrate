@@ -38,11 +38,12 @@ describe("enter game Instruction Tests", () => {
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
   it("enter game > all good > player is deposited into correct bucket", async () => {
+    const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
     const {
       playerStateAddress,
       newGame: { gameAddress },
       playerBucketIndex,
-    } = await setUpNewGameAndEnter(program);
+    } = await setUpNewGameAndEnter(program, { otherPlayers: nOtherPlayers });
 
     const playerState: PlayerState = await getPlayerState(
       playerStateAddress,
@@ -57,6 +58,12 @@ describe("enter game Instruction Tests", () => {
       game.state.buckets[playerBucketIndex].players,
       expectedBucketPlayerCount
     );
+
+    const totalPlayerAcrossBuckets: number = game.state.buckets
+      .slice(1)
+      .reduce((partialSum, b) => partialSum + b.players, 0);
+    assert.strictEqual(game.state.buckets[0].players, nOtherPlayers + 1);
+    assert.strictEqual(totalPlayerAcrossBuckets, nOtherPlayers + 1);
   });
 
   it("enter game > all good > program fee is transferred", async () => {
@@ -130,73 +137,64 @@ describe("enter game Instruction Tests", () => {
     );
   });
 
-  it.only("enter game > all good > bucket balances update correctly", repeat(10, async () => {
-
-    //TODO With the current game setup, the most strategic thing to do is enter a game
-    //TODO and bucket with no other players and and immediatley leave, because you're
-    //TODO very likely to get your fee + some balance back. This way, the game will never
-    //TODO grow to something interesting because people will just sap funds away from
-    //TODO the game maker
-    // const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
-    const nOtherPlayers: number = 10;
+  it.only("enter game > all good > bucket balances update correctly", async () => {
+    const entryFee: number = 1 * Math.pow(10, MINT_DECIMALS);
+    const spillRate: number = 1 * Math.pow(10, MINT_DECIMALS);
     const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {
-      otherPlayers: nOtherPlayers - 1,
-      //TODO revert
+      otherPlayers: 1,
+      playerBucketIndex: 2,
       newGame: {
         gameConfig: {
-          entryFeeDecimalTokens: new anchor.BN(1 * Math.pow(10, MINT_DECIMALS)),
-          nBuckets: new anchor.BN(3),
-          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(1 * Math.pow(10, MINT_DECIMALS))
-        },
-      },
+          nBuckets: new anchor.BN(2),
+          entryFeeDecimalTokens: new anchor.BN(entryFee),
+          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate)
+        }
+      }
     });
 
-    const gameStateBeforeWeEnter: GameState = (
+    const gameState: GameState = (
       await getGame(newGameContext.gameAddress, program)
     ).state;
 
-    await setUpEnterGame(program, newGameContext);
-
-    const gameStateAfterWeEnter: GameState = (
-      await getGame(newGameContext.gameAddress, program)
-    ).state;
-
-    const tokenPoolBalance: number = await getTokenBalanceWithoutDecimals(
-      program.programId,
-      newGameContext.gameConfig.mint,
-      program.provider.connection
-    );
-    const bucketTokenTotal: number = gameStateAfterWeEnter.buckets.reduce(
-      (partialSum, b) => partialSum + b.decimalTokens.toNumber(),
-      0
-    );
-    const expectedTokenTotal: number =
-      (nOtherPlayers + 1) *
-      newGameContext.gameConfig.entryFeeDecimalTokens.toNumber();
-    console.log(`\nplayers = ${nOtherPlayers + 1}`);
-    console.log(
-      `fee = ${(
-        newGameContext.gameConfig.entryFeeDecimalTokens.toNumber() * 1e-9
-      ).toFixed(3)}`
-    );
-    console.log(`expected = ${(expectedTokenTotal * 1e-9).toFixed(3)}`);
-    console.log(`pool = ${tokenPoolBalance.toFixed(3)}`);
-    console.log(`bucket = ${(bucketTokenTotal * 1e-9).toFixed(3)}`);
-    console.log(
-      `(bucket - expected)/fee = ${(
-        (bucketTokenTotal - expectedTokenTotal) /
-        newGameContext.gameConfig.entryFeeDecimalTokens.toNumber()
-      ).toFixed(3)}`
-    );
-    assert.strictEqual(bucketTokenTotal, expectedTokenTotal);
-
-    //TODO revert
-    // assert.fail("check that the total in each bucket is correct");
-  }));
-
-  it("enter game > game is at capacity > bucket balances update correctly", async () => {
-    assert.fail();
+    // after the first player enters, the holding bucket gets their fee.
+    // after the second player enters, the holding bucket distributes the holding
+    // fee equally to the other two buckets, and we add the new player's fee
+    // to the holding bucket
+    assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), entryFee);
+    assert.strictEqual(gameState.buckets[1].decimalTokens.toNumber(), entryFee / 2);
+    assert.strictEqual(gameState.buckets[2].decimalTokens.toNumber(), entryFee / 2);
   });
+
+  it(
+    "enter game > all good > prize pool balance remains consistent",
+    repeat(10, async () => {
+      const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
+      const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {
+        otherPlayers: nOtherPlayers - 1,
+      });
+
+      await setUpEnterGame(program, newGameContext);
+
+      const gameStateAfterWeEnter: GameState = (
+        await getGame(newGameContext.gameAddress, program)
+      ).state;
+
+      const bucketTokenTotal: number = gameStateAfterWeEnter.buckets.reduce(
+        (partialSum, b) => partialSum + b.decimalTokens.toNumber(),
+        0
+      );
+      const tokenPoolBalance: number = await getTokenBalanceWithoutDecimals(
+        program.programId,
+        newGameContext.gameConfig.mint,
+        program.provider.connection
+      );
+      const expectedTokenTotal: number =
+        (nOtherPlayers + 1) *
+        newGameContext.gameConfig.entryFeeDecimalTokens.toNumber();
+      assert.strictEqual(bucketTokenTotal, expectedTokenTotal);
+      assert.strictEqual(tokenPoolBalance, expectedTokenTotal);
+    })
+  );
 
   it("enter game > game is at capacity > fails", async () => {
     assert.fail();
@@ -246,7 +244,11 @@ describe("enter game Instruction Tests", () => {
     assert.fail();
   });
 
-  it("enter game > invalid bucket index > fails", async () => {
+  it("enter game > bucket index too high > fails", async () => {
+    assert.fail();
+  });
+
+  it("enter game > player tries to enter holding bucket > fails", async () => {
     assert.fail();
   });
 
@@ -287,7 +289,6 @@ export async function setUpNewGameAndEnter(
   program: anchor.Program<Equilibrate>,
   customSetup?: NewGameAndEnterSetupArgs
 ): Promise<NewGameAndEnterContext> {
-  const connection: Connection = program.provider.connection;
   const newGameContext: NewGameContext = await setUpNewGame(
     program,
     customSetup?.newGame
