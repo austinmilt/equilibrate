@@ -137,7 +137,7 @@ describe("enter game Instruction Tests", () => {
     );
   });
 
-  it.only("enter game > all good > bucket balances update correctly", async () => {
+  it("enter game > all good > bucket balances update correctly", async () => {
     const entryFee: number = 1 * Math.pow(10, MINT_DECIMALS);
     const spillRate: number = 1 * Math.pow(10, MINT_DECIMALS);
     const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {

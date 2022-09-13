@@ -57,10 +57,7 @@ describe("New Game Instruction Tests", () => {
       game.config.spillRateDecimalTokensPerSecondPerPlayer.toNumber(),
       gameConfig.spillRateDecimalTokensPerSecondPerPlayer.toNumber()
     );
-    assert.strictEqual(
-      game.config.mint.toBase58(),
-      gameConfig.mint.toBase58()
-    );
+    assert.strictEqual(game.config.mint.toBase58(), gameConfig.mint.toBase58());
     assert.strictEqual(
       game.creator.toBase58(),
       playerWallet.publicKey.toBase58()
@@ -81,8 +78,10 @@ describe("New Game Instruction Tests", () => {
       gameConfig.entryFeeDecimalTokens.toNumber()
     );
 
-    const firstPlayerState: PlayerState =
-      await getPlayerState(playerStateAddress, program);
+    const firstPlayerState: PlayerState = await getPlayerState(
+      playerStateAddress,
+      program
+    );
     assert.strictEqual(firstPlayerState.bucket.toNumber(), 0);
     assert.strictEqual(
       firstPlayerState.game.toBase58(),
@@ -90,34 +89,38 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("create a new game > all good > program fee is transferred", async () => {
-    const connection: Connection = program.provider.connection;
-    // appears that wallet balances (all ledger transactions?) carry over
-    // across tests, so we need to check the change in balance rather than the
-    // whole balance, since other tests may put program fee in the wallet
-    const programFeeDestinatonBalancePreGame: number = await getSolBalance(
-      PROGRAM_FEE_DESTINATION,
-      connection
-    );
+  it("create a new game > all good > program fee is transferred", () => {
+    const test = async () => {
+      const connection: Connection = program.provider.connection;
+      // appears that wallet balances (all ledger transactions?) carry over
+      // across tests, so we need to check the change in balance rather than the
+      // whole balance, since other tests may put program fee in the wallet
+      const programFeeDestinatonBalancePreGame: number = await getSolBalance(
+        PROGRAM_FEE_DESTINATION,
+        connection
+      );
 
-    await setUpNewGame(program);
+      await setUpNewGame(program);
 
-    const programFeeDestinationBalance: number = await getSolBalance(
-      PROGRAM_FEE_DESTINATION,
-      connection
-    );
-    const programFeeSol: number =
-      PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
-    assert.approximately(
-      programFeeSol,
-      programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
-      1 / anchor.web3.LAMPORTS_PER_SOL
-    );
-    // It would be great to also check that the player's balance went
-    // down by the program fee, but without knowing solana's transaction
-    // fee we cant calculate what the new balance should be. That's OK,
-    // though, since the only source of income to the fee destination is
-    // the player's account
+      const programFeeDestinationBalance: number = await getSolBalance(
+        PROGRAM_FEE_DESTINATION,
+        connection
+      );
+      const programFeeSol: number =
+        PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
+
+      assert.approximately(
+        programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
+        programFeeSol,
+        1 / anchor.web3.LAMPORTS_PER_SOL
+      );
+      // It would be great to also check that the player's balance went
+      // down by the program fee, but without knowing solana's transaction
+      // fee we cant calculate what the new balance should be. That's OK,
+      // though, since the only source of income to the fee destination is
+      // the player's account
+    };
+    test();
   });
 
   it("create a new game > all good > game tokens are transfered", async () => {
