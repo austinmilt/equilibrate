@@ -16,8 +16,12 @@ export function generateGameId(): number {
   return new Date().getTime();
 }
 
-export function generateBucketIndex(nBuckets: number): number {
-  return Math.floor(Math.random()*nBuckets);
+/**
+ * @param nBucketsConfigured number of buckets configured by the user (there is always one additional bucket)
+ * @returns 
+ */
+export function generateBucketIndex(nBucketsConfigured: number): number {
+  return Math.floor(Math.random()*nBucketsConfigured) + 1;
 }
 
 export function generateGameConfig(mint: PublicKey): GameConfig {

@@ -49,6 +49,8 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
         EquilibrateError::BucketDoesNotExist
     );
 
+    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
+
     let game_player_count: u64 = game.state.buckets.iter().map(|b| b.players as u64).sum();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 

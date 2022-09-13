@@ -115,14 +115,30 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
     let pool_transfer_context = CpiContext::new(token_program, pool_transfer_accounts);
     token::transfer(pool_transfer_context, config.entry_fee_decimal_tokens)?;
 
+    // first bucket is the holding bucket, where fees live until they
+    // have been distributed over the other buckets
     let mut buckets = Vec::new();
     buckets.push(Bucket {
+        // entry fee is held in the holding bucket and distributed to
+        // other buckets as the game progresses
         decimal_tokens: config.entry_fee_decimal_tokens,
-        // first player always goes into the first bucket
+
+        // the number of players in the holding bucket is always
+        // the number of players in the game (to adjust how fast
+        // tokens leave this bucket)
         players: 1,
     });
 
-    for _ in 1..config.n_buckets {
+    // second bucket is the first one that players can enter
+    // and this is the one that the first player always enters
+    buckets.push(Bucket {
+        decimal_tokens: 0,
+        players: 1,
+    });
+
+    // remaining buckets are initialized to empty since no one
+    // goes into these buckets at the beginning of the game
+    for _ in 2..(config.n_buckets + 1) {
         buckets.push(Bucket {
             decimal_tokens: 0,
             players: 0,

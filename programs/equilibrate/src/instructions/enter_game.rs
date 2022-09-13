@@ -78,10 +78,13 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
 
     // check constraints
     require_gt!(
-        config.n_buckets,
+        // there is one more bucket than the creator configures: the holding bucket
+        (config.n_buckets + 1),
         i_bucket,
         EquilibrateError::BucketDoesNotExist
     );
+
+    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
 
     let game_player_count: u64 = game.state.buckets.iter().map(|b| b.players as u64).sum();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
@@ -117,15 +120,28 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     let mut state = game.state.clone();
     let i_bucket_usize = i_bucket as usize;
     for (i, bucket) in state.buckets.iter_mut().enumerate() {
+        let balance_before = bucket.decimal_tokens;
         let balance_basis = new_balances.get(i).unwrap();
-        if i == i_bucket_usize {
+        if i == 0 {
+            // the number of players in the holding bucket is always the number
+            // of players in the game
             bucket.players = bucket.players.checked_add(1).unwrap();
             bucket.decimal_tokens = balance_basis
                 .checked_add(config.entry_fee_decimal_tokens)
                 .unwrap()
+        } else if i == i_bucket_usize {
+            bucket.players = bucket.players.checked_add(1).unwrap();
         } else {
             bucket.decimal_tokens = *balance_basis;
         }
+
+        //TODO delete
+        msg!(
+            "bucket {:?} before = {:?}, after = {:?}",
+            i,
+            (balance_before as f64) / 1e9,
+            (bucket.decimal_tokens as f64) / 1e9
+        );
     }
     state.last_update_epoch_seconds = now_epoch_seconds;
     game.state = state;

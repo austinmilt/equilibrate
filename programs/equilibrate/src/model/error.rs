@@ -23,6 +23,9 @@ pub enum EquilibrateError {
     #[msg("Attempted to enter a bucket that doesnt exist")]
     BucketDoesNotExist,
 
+    #[msg("Not allowed to enter the holding bucket (index 0)")]
+    CannotEnterHoldingBucket,
+
     #[msg("Attempted to enter move within the same bucket")]
     AlreadyInBucket,
 

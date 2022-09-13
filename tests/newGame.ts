@@ -68,7 +68,8 @@ describe("New Game Instruction Tests", () => {
     assert.strictEqual(game.id.toNumber(), gameId);
     assert.strictEqual(
       game.state.buckets.length,
-      gameConfig.nBuckets.toNumber()
+      // account for the holding bucket (bucket 0)
+      gameConfig.nBuckets.toNumber() + 1
     );
     assert.strictEqual(
       game.config.maxPlayers.toNumber(),

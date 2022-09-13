@@ -97,7 +97,11 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
         let player_bucket_usize = ctx.accounts.player.bucket as usize;
         for (i, bucket) in state.buckets.iter_mut().enumerate() {
             let balance_basis = new_balances.get(i).unwrap();
-            if i == player_bucket_usize {
+            if i == 0 {
+                // the number of players in the holding bucket is always the number
+                // of players in the game
+                bucket.players = bucket.players.checked_sub(1).unwrap();
+            } else if i == player_bucket_usize {
                 // player takes balance of bucket proportional to their representation
                 // of the population in the bucket
                 found_winnings = true;

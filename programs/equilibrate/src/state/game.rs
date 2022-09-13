@@ -1,7 +1,4 @@
-use std::{
-    cmp::{min, Ordering},
-    mem::replace,
-};
+use std::{cmp::min, mem::replace};
 
 use anchor_lang::prelude::*;
 
@@ -15,10 +12,10 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn get_space(n_buckets: u64) -> usize {
+    pub fn get_space(n_buckets_configured: u64) -> usize {
         8 + // account discriminator
         GameConfig::get_space() +
-        GameState::get_space(n_buckets) +
+        GameState::get_space(n_buckets_configured) +
         8 + // id
         32 // creator
     }
@@ -41,10 +38,13 @@ impl Game {
                 seconds_since_last_update,
             );
             let _ = replace(&mut outflow[i], spillover_i);
-            let spillover_to_j =
-                spillover_div_peers(spillover_i, self.config.n_buckets);
+            let spillover_to_j = spillover_div_peers(spillover_i, self.config.n_buckets);
             for j in (i + 1)..n_buckets {
-                let spillover_to_i = self.compute_spillover_per_peer(j, seconds_since_last_update);
+                let spillover_to_i = match i {
+                    // the holding bucket only flows out, not in (except for getting the entry fees)
+                    0 => 0,
+                    _ => self.compute_spillover_per_peer(j, seconds_since_last_update)
+                };
                 let inflow_i = inflow[i].checked_add(spillover_to_i).unwrap();
                 let inflow_j = inflow[j].checked_add(spillover_to_j).unwrap();
                 let _ = replace(&mut inflow[i], inflow_i);
@@ -120,8 +120,9 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn get_space(n_buckets: u64) -> usize {
-        4 + Bucket::get_space()*(n_buckets as usize) + // buckets
+    pub fn get_space(n_buckets_configured: u64) -> usize {
+        // add 1 to the number of buckets to include the holding bucket
+        4 + Bucket::get_space()*((n_buckets_configured.checked_add(1).unwrap()) as usize) + // buckets
         8 // last_update_epoch_ms
     }
 }
@@ -129,6 +130,8 @@ impl GameState {
 #[derive(Debug, PartialEq, AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Bucket {
     pub decimal_tokens: u64,
+    /// Number of players currently occupying this bucket. For the holding bucket
+    /// this will be the total number of players in the game.
     pub players: u16,
 }
 
