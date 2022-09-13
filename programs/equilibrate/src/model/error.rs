@@ -32,9 +32,6 @@ pub enum EquilibrateError {
     #[msg("Attempted to enter a game that has already ended")]
     GameIsOver,
 
-    #[msg("Error locating player account to get winnings")]
-    CouldNotFindPlayer,
-
     #[msg("Program fee pubkey must be the one hard-coded in the program")]
     InvalidProgramFeeDestination,
 

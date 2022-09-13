@@ -33,9 +33,6 @@ pub struct MoveBuckets<'info> {
 pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
-    let game = &mut ctx.accounts.game;
-    let config = &game.config;
-
     // check constraints
     require_neq!(
         ctx.accounts.player.bucket,
@@ -44,32 +41,40 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
     );
 
     require_gt!(
-        config.n_buckets,
+        // there is one more bucket than the creator configures: the holding bucket
+        ctx.accounts.game.state.buckets.len() as u64,
         i_bucket,
         EquilibrateError::BucketDoesNotExist
     );
 
-    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
+    require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
 
-    let game_player_count: u64 = game.state.buckets.iter().map(|b| b.players as u64).sum();
+    let game_player_count: u64 = ctx
+        .accounts
+        .game
+        .state
+        .buckets
+        .iter()
+        .map(|b| b.players as u64)
+        .sum();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
     // update bucket balances and move player to their new bucket
-    let new_balances = game.compute_buckets_new_balance(now_epoch_seconds.try_into().unwrap());
-    let mut state = game.state.clone();
-    let i_bucket_usize = i_bucket as usize;
-    let player_bucket_usize = ctx.accounts.player.bucket as usize;
-    for (i, bucket) in state.buckets.iter_mut().enumerate() {
-        bucket.decimal_tokens = *new_balances.get(i).unwrap();
-        if i == i_bucket_usize {
-            bucket.players = bucket.players.checked_add(1).unwrap();
-        } else if i == player_bucket_usize {
-            bucket.players = bucket.players.checked_sub(1).unwrap();
-        }
-    }
-    state.last_update_epoch_seconds = now_epoch_seconds;
-    game.state = state;
+    let game = &mut ctx.accounts.game;
+    game.update_bucket_balances(now_epoch_seconds.try_into().unwrap());
+    let i_current = ctx.accounts.player.bucket as usize;
+    game.state.buckets[i_current].players = game.state.buckets[i_current]
+        .players
+        .checked_add(1)
+        .unwrap();
+    game.state.buckets[i_bucket as usize].players = game.state.buckets[i_bucket as usize]
+        .players
+        .checked_add(1)
+        .unwrap();
+    game.state.last_update_epoch_seconds = now_epoch_seconds;
 
+    // update player state account
+    ctx.accounts.player.bucket = i_bucket;
     ctx.accounts.player.log_move();
 
     Ok(())

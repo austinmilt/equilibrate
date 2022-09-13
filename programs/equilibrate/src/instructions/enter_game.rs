@@ -133,6 +133,7 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
         .players
         .checked_add(1)
         .unwrap();
+    game.state.last_update_epoch_seconds = now_epoch_seconds;
 
     // create player state account
     let player = &mut ctx.accounts.player;

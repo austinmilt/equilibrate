@@ -78,45 +78,37 @@ pub struct LeaveGame<'info> {
 pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
-    let game = &mut ctx.accounts.game;
-
     // check constraints
-    let game_player_count: u64 = game.state.buckets.iter().map(|b| b.players as u64).sum();
+    let game_player_count: u64 = ctx
+        .accounts
+        .game
+        .state
+        .buckets
+        .iter()
+        .map(|b| b.players as u64)
+        .sum();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
     // update bucket balances and remove player and their winnings from their bucket
-    let mut winnings: u64 = 0;
-    let mut found_winnings: bool = false;
+    let winnings: u64;
+    let game = &mut ctx.accounts.game;
     if game_player_count == 1 {
         // if they are the player to end the game, give them all the remaining tokens
         winnings = game.state.buckets.iter().map(|b| b.decimal_tokens).sum();
-        found_winnings = true;
     } else {
-        let new_balances = game.compute_buckets_new_balance(now_epoch_seconds.try_into().unwrap());
-        let mut state = game.state.clone();
-        let player_bucket_usize = ctx.accounts.player.bucket as usize;
-        for (i, bucket) in state.buckets.iter_mut().enumerate() {
-            let balance_basis = new_balances.get(i).unwrap();
-            if i == 0 {
-                // the number of players in the holding bucket is always the number
-                // of players in the game
-                bucket.players = bucket.players.checked_sub(1).unwrap();
-            } else if i == player_bucket_usize {
-                // player takes balance of bucket proportional to their representation
-                // of the population in the bucket
-                found_winnings = true;
-                winnings = balance_basis.checked_div(bucket.players.into()).unwrap();
-                bucket.players = bucket.players.checked_sub(1).unwrap();
-                bucket.decimal_tokens = balance_basis.checked_sub(winnings).unwrap()
-            } else {
-                bucket.decimal_tokens = *balance_basis;
-            }
-        }
-        state.last_update_epoch_seconds = now_epoch_seconds;
-        game.state = state;
+        game.update_bucket_balances(now_epoch_seconds.try_into().unwrap());
+        let i_current = ctx.accounts.player.bucket as usize;
+        winnings = game.state.buckets[i_current]
+            .decimal_tokens
+            .checked_div(game.state.buckets[i_current].players.into())
+            .unwrap();
+        game.state.buckets[0].players = game.state.buckets[0].players.checked_sub(1).unwrap();
+        game.state.buckets[i_current].players = game.state.buckets[i_current]
+            .players
+            .checked_sub(1)
+            .unwrap();
     }
-
-    require!(found_winnings, EquilibrateError::CouldNotFindPlayer);
+    game.state.last_update_epoch_seconds = now_epoch_seconds;
 
     // transfer game tokens from pool account
     let pool_transfer_accounts = Transfer {

@@ -20,7 +20,7 @@ impl Game {
         32 // creator
     }
 
-    pub fn update_bucket_balances(&mut self, now_epoch_seconds: u64) -> () {
+    pub fn update_bucket_balances(&mut self, now_epoch_seconds: u64) {
         let seconds_since_last_update = now_epoch_seconds
             .checked_sub(self.state.last_update_epoch_seconds.try_into().unwrap())
             .unwrap();
@@ -49,7 +49,9 @@ impl Game {
             // how  much is actually going into other buckets.
             let spillover_i = match i {
                 0 => spillover_to_j.checked_mul(self.config.n_buckets).unwrap(),
-                _ => spillover_to_j.checked_mul(self.config.n_buckets - 1).unwrap()
+                _ => spillover_to_j
+                    .checked_mul(self.config.n_buckets - 1)
+                    .unwrap(),
             };
             for j in (i + 1)..n_buckets {
                 let bucket = &mut buckets[j];
