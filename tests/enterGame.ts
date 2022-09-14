@@ -33,30 +33,39 @@ import { assertAsyncThrows, repeat } from "./helpers/test";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { NewGameContext, NewGameSetupArgs, setUpNewGame } from "./newGame";
 
+let ready = false;
+beforeEach(async () => {
+  ready = true;
+});
+
+afterEach(async () => {
+  ready = false;
+});
+
 describe("enter game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
   it("enter game > all good > player is deposited into correct bucket", async () => {
     const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
-    const {
-      playerStateAddress,
-      newGame: { gameAddress },
-      playerBucketIndex,
-    } = await setUpNewGameAndEnter(program, { otherPlayers: nOtherPlayers });
+      const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {
+        otherPlayers: nOtherPlayers - 1,
+      });
+
+      const gameBeforePlayerEnters: Game = await getGame(newGameContext.gameAddress, program);
+
+    const {playerStateAddress, playerBucketIndex} = await setUpEnterGame(program, newGameContext);
 
     const playerState: PlayerState = await getPlayerState(
       playerStateAddress,
       program
     );
-    const game: Game = await getGame(gameAddress, program);
-
-    const expectedBucketPlayerCount: number = playerBucketIndex === 0 ? 2 : 1;
+    const game: Game = await getGame(newGameContext.gameAddress, program);
 
     assert.strictEqual(playerState.bucket.toNumber(), playerBucketIndex);
     assert.strictEqual(
       game.state.buckets[playerBucketIndex].players,
-      expectedBucketPlayerCount
+      gameBeforePlayerEnters.state.buckets[playerBucketIndex].players + 1
     );
 
     const totalPlayerAcrossBuckets: number = game.state.buckets
@@ -197,7 +206,15 @@ describe("enter game Instruction Tests", () => {
   );
 
   it("enter game > game is at capacity > fails", async () => {
-    assert.fail();
+    const maxPlayers: number = Math.ceil(Math.random()*5) + 1
+    await assertAsyncThrows(() => setUpNewGameAndEnter(program, {
+      otherPlayers: maxPlayers,
+      newGame: {
+        gameConfig: {
+          maxPlayers: new anchor.BN(maxPlayers)
+        }
+      }
+    }), "GameAtCapacita");
   });
 
   it("enter game > game - bad seed - seed > fails", async () => {
@@ -311,6 +328,7 @@ async function setUpEnterGame(
   newGameContext: NewGameContext,
   customSetup?: EnterGameSetupArgs
 ): Promise<EnterGameContext> {
+  if (!ready) throw new Error('not ready');
   const connection: Connection = program.provider.connection;
 
   const nonFirstPlayersToEnter: number =

@@ -31,6 +31,15 @@ import { assert } from "chai";
 import { assertAsyncThrows } from "./helpers/test";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 
+let ready = false;
+beforeEach(async () => {
+  ready = true;
+});
+
+afterEach(async () => {
+  ready = false;
+});
+
 describe("New Game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
@@ -89,38 +98,35 @@ describe("New Game Instruction Tests", () => {
     );
   });
 
-  it("create a new game > all good > program fee is transferred", () => {
-    const test = async () => {
-      const connection: Connection = program.provider.connection;
-      // appears that wallet balances (all ledger transactions?) carry over
-      // across tests, so we need to check the change in balance rather than the
-      // whole balance, since other tests may put program fee in the wallet
-      const programFeeDestinatonBalancePreGame: number = await getSolBalance(
-        PROGRAM_FEE_DESTINATION,
-        connection
-      );
+  it("create a new game > all good > program fee is transferred", async () => {
+    const connection: Connection = program.provider.connection;
+    // appears that wallet balances (all ledger transactions?) carry over
+    // across tests, so we need to check the change in balance rather than the
+    // whole balance, since other tests may put program fee in the wallet
+    const programFeeDestinatonBalancePreGame: number = await getSolBalance(
+      PROGRAM_FEE_DESTINATION,
+      connection
+    );
 
-      await setUpNewGame(program);
+    await setUpNewGame(program);
 
-      const programFeeDestinationBalance: number = await getSolBalance(
-        PROGRAM_FEE_DESTINATION,
-        connection
-      );
-      const programFeeSol: number =
-        PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
+    const programFeeDestinationBalance: number = await getSolBalance(
+      PROGRAM_FEE_DESTINATION,
+      connection
+    );
+    const programFeeSol: number =
+      PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
 
-      assert.approximately(
-        programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
-        programFeeSol,
-        1 / anchor.web3.LAMPORTS_PER_SOL
-      );
-      // It would be great to also check that the player's balance went
-      // down by the program fee, but without knowing solana's transaction
-      // fee we cant calculate what the new balance should be. That's OK,
-      // though, since the only source of income to the fee destination is
-      // the player's account
-    };
-    test();
+    assert.approximately(
+      programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
+      programFeeSol,
+      1 / anchor.web3.LAMPORTS_PER_SOL
+    );
+    // It would be great to also check that the player's balance went
+    // down by the program fee, but without knowing solana's transaction
+    // fee we cant calculate what the new balance should be. That's OK,
+    // though, since the only source of income to the fee destination is
+    // the player's account
   });
 
   it("create a new game > all good > game tokens are transfered", async () => {
@@ -166,7 +172,7 @@ describe("New Game Instruction Tests", () => {
       )
     )[0];
 
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, { gameId: gameId, gameAddress: gameAddress })
     );
   });
@@ -183,7 +189,7 @@ describe("New Game Instruction Tests", () => {
       )
     )[0];
 
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, { gameId: gameId, gameAddress: gameAddress })
     );
   });
@@ -206,7 +212,7 @@ describe("New Game Instruction Tests", () => {
       )
     )[0];
 
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameId: gameId,
         gameAddress: gameAddress,
@@ -234,7 +240,7 @@ describe("New Game Instruction Tests", () => {
       )
     )[0];
 
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameId: gameId,
         gameAddress: gameAddress,
@@ -262,7 +268,7 @@ describe("New Game Instruction Tests", () => {
       )
     )[0];
 
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameId: gameId,
         gameAddress: gameAddress,
@@ -273,7 +279,7 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("create a new game > wrong program fee destination > fails", async () => {
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         programFeeDestination: Keypair.generate().publicKey,
       })
@@ -289,7 +295,7 @@ describe("New Game Instruction Tests", () => {
       badMint.publicKey,
       playerWallet.publicKey
     );
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         playerWallet: playerWallet,
         playerTokenAccount: playerTokenAccount,
@@ -311,7 +317,7 @@ describe("New Game Instruction Tests", () => {
       badMint.publicKey,
       program.programId
     );
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         mintAuthority: authority,
         tokenPoolAddress: tokenPoolAddress,
@@ -334,7 +340,7 @@ describe("New Game Instruction Tests", () => {
       badMint.publicKey,
       Keypair.generate().publicKey
     );
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         mintAuthority: authority,
         tokenPoolAddress: tokenPoolAddress,
@@ -345,14 +351,14 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("create a new game > entry fee is non-positive > fails", async () => {
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           entryFeeDecimalTokens: new anchor.BN(0),
         },
       })
     );
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           entryFeeDecimalTokens: new anchor.BN(-1),
@@ -362,7 +368,7 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("create a new game > too few game buckets > fails", async () => {
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           nBuckets: new anchor.BN(1),
@@ -372,7 +378,7 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("create a new game > too many game buckets > fails", async () => {
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           nBuckets: new anchor.BN(
@@ -384,7 +390,7 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("create a new game > max players too small > fails", async () => {
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           nBuckets: new anchor.BN(1),
@@ -394,14 +400,14 @@ describe("New Game Instruction Tests", () => {
   });
 
   it("create a new game > spill rate is non-positive > fails", async () => {
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(0),
         },
       })
     );
-    assertAsyncThrows(() =>
+    await assertAsyncThrows(() =>
       setUpNewGame(program, {
         gameConfig: {
           spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(-1),
@@ -449,6 +455,7 @@ export async function setUpNewGame(
   program: anchor.Program<Equilibrate>,
   customSetup?: NewGameSetupArgs
 ): Promise<NewGameContext> {
+  if (!ready) throw new Error("not ready");
   const connection: Connection = program.provider.connection;
   const mintAuthority: Keypair =
     customSetup?.mintAuthority ?? (await makeAndFundWallet(1, connection));

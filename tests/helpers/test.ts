@@ -1,13 +1,26 @@
+import { AnchorError } from "@project-serum/anchor";
 import { assert } from "chai";
 
 export async function assertAsyncThrows(
-  method: () => Promise<any>
+  method: () => Promise<any>,
+  anchorErrorCode?: string,
+  anchorErrorNumber?: number
 ): Promise<void> {
   try {
     await method();
     assert.fail("Expected an error to be thrown");
   } catch (e) {
-    // passes
+    if (anchorErrorCode || anchorErrorNumber) {
+      const error: AnchorError = e as AnchorError;
+      console.log(error.error.errorCode.code, anchorErrorCode, error.error.errorCode.code ===  anchorErrorCode);
+      if (anchorErrorCode != null) {
+        assert.strictEqual(error.error.errorCode.code, anchorErrorCode);
+      }
+      if (anchorErrorNumber != null) {
+        assert.strictEqual(error.error.errorCode.number, anchorErrorNumber);
+      }
+    }
+    // otherwise it passes if any error is thrown
   }
 }
 
