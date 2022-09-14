@@ -12,7 +12,6 @@ export async function assertAsyncThrows(
   } catch (e) {
     if (anchorErrorCode || anchorErrorNumber) {
       const error: AnchorError = e as AnchorError;
-      console.log(error.error.errorCode.code, anchorErrorCode, error.error.errorCode.code ===  anchorErrorCode);
       if (anchorErrorCode != null) {
         assert.strictEqual(error.error.errorCode.code, anchorErrorCode);
       }
