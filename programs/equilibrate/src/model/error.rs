@@ -49,4 +49,7 @@ pub enum EquilibrateError {
 
     #[msg("Player state account doesnt belong to this game")]
     InvalidPlayerState,
+
+    #[msg("Given gameCreator doesnt match the one that created the game")]
+    GameCreatorMismatch,
 }

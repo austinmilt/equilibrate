@@ -18,6 +18,7 @@ pub struct LeaveGame<'info> {
         seeds = [GAME_SEED.as_ref(), &game.id.to_le_bytes()],
         bump,
         constraint = game.creator == game_creator.key()
+        @EquilibrateError::GameCreatorMismatch
     )]
     pub game: Account<'info, Game>,
 
@@ -82,11 +83,11 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let game_player_count: u64 = ctx
         .accounts
         .game
-        .state
-        .buckets
-        .iter()
-        .map(|b| b.players as u64)
-        .sum();
+        .get_player_count();
+
+    // This is untestable since the last person leaving the game
+    // also results in the game account being deleted. However, we'll
+    // leave it in for completeness.
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
     // update bucket balances and remove player and their winnings from their bucket
