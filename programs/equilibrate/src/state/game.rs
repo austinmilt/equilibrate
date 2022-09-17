@@ -87,6 +87,16 @@ impl Game {
         }
     }
 
+    pub fn get_player_count(&self) -> u64 {
+        self.state
+        .buckets
+        .iter()
+        .map(|b| b.players as u64)
+        .sum::<u64>()
+        .checked_div(2) // with the holding bucket we are double-counting players
+        .unwrap()
+    }
+
     pub fn log_make(&self) {
         msg!("Initialized game {}", self.id);
     }

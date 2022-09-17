@@ -91,13 +91,8 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     let game_player_count: u64 = ctx
         .accounts
         .game
-        .state
-        .buckets
-        .iter()
-        .map(|b| b.players as u64)
-        .sum::<u64>()
-        .checked_div(2) // with the holding bucket we are double-counting players
-        .unwrap();
+        .get_player_count();
+
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
     require_gt!(
