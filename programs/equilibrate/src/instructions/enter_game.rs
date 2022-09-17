@@ -85,6 +85,9 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
 
     require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
 
+    // This is untestable since the last person leaving the game
+    // also results in the game account being deleted. However, we'll
+    // leave it in for completeness.
     let game_player_count: u64 = ctx
         .accounts
         .game

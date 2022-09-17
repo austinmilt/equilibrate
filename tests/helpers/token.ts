@@ -118,6 +118,10 @@ export async function getTokenBalanceWithoutDecimals(owner: PublicKey, mint: Pub
   return (await connection.getTokenAccountBalance(tokenAccountAddress)).value.uiAmount;
 }
 
+export async function getTokenBalanceWithDecimals(owner: PublicKey, mint: PublicKey, connection: Connection): Promise<number> {
+  const tokenAccountAddress: PublicKey = await spl.getAssociatedTokenAddress(mint, owner);
+  return Number.parseInt((await connection.getTokenAccountBalance(tokenAccountAddress)).value.amount);
+}
 
 export function withDecimals(amountWithoutDecimals: number, decimals: number): number {
   return amountWithoutDecimals * Math.pow(10, decimals);

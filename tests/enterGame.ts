@@ -2,6 +2,7 @@ import * as anchor from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateBucketIndex as chooseBucket,
+  generateGameConfig,
   generateGameId,
   getGame,
   getPlayerState,
@@ -11,13 +12,16 @@ import {
 import {
   generateMint,
   getSolBalance,
+  getTokenBalanceWithDecimals,
   getTokenBalanceWithoutDecimals,
   makeAndFundWallet,
   makeAndFundWalletWithTokens,
+  makeAssociatedTokenAccount,
+  makeAssociatedTokenAccountWithPayer,
   MINT_DECIMALS,
   withoutDecimals,
 } from "./helpers/token";
-import { Game, GameState, PlayerState } from "./helpers/types";
+import { Game, GameConfig, GameState, PlayerState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import {
   GAME_SEED,
@@ -26,12 +30,10 @@ import {
   PLAYER_SEED,
 } from "./helpers/address";
 import { assert } from "chai";
-import {
-  assertAsyncThrows,
-  repeat,
-} from "./helpers/test";
+import { assertAsyncThrows, repeat } from "./helpers/test";
 import { NewGameContext, NewGameSetupArgs, setUpNewGame } from "./newGame";
 import { testIsReady } from "./setup";
+import { token } from "@project-serum/anchor/dist/cjs/utils";
 
 describe("enter game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -195,7 +197,7 @@ describe("enter game Instruction Tests", () => {
         (partialSum, b) => partialSum + b.decimalTokens.toNumber(),
         0
       );
-      const tokenPoolBalance: number = await getTokenBalanceWithoutDecimals(
+      const tokenPoolBalance: number = await getTokenBalanceWithDecimals(
         program.programId,
         newGameContext.gameConfig.mint,
         program.provider.connection
@@ -471,23 +473,77 @@ describe("enter game Instruction Tests", () => {
   });
 
   it("enter game > token pool - wrong mint > fails", async () => {
-    assert.fail();
+    const connection: Connection = program.provider.connection;
+    const authority: Keypair = await makeAndFundWallet(10, connection);
+    const wrongMint: Keypair = await generateMint(authority, connection);
+    const wallet: Keypair = await makeAndFundWallet(1, connection);
+
+    const wrongTokenPool: PublicKey = await makeAssociatedTokenAccountWithPayer(
+      wallet,
+      program.programId,
+      wrongMint.publicKey,
+      connection
+    );
+
+    await assertAsyncThrows(
+      () =>
+        setUpNewGameAndEnter(program, {
+          tokenPoolAddress: wrongTokenPool,
+        }),
+      "InvalidPoolMint"
+    );
   });
 
   it("enter game > token pool - owner isnt program > fails", async () => {
-    assert.fail();
+    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const connection: Connection = program.provider.connection;
+    const wallet: Keypair = await makeAndFundWallet(1, connection);
+
+    const wrongTokenPool: PublicKey = await makeAssociatedTokenAccount(
+      wallet,
+      newGameContext.mint.publicKey,
+      connection
+    );
+
+    await assertAsyncThrows(
+      () =>
+        setUpEnterGame(program, newGameContext, {
+          tokenPoolAddress: wrongTokenPool,
+        }),
+      "InvalidPoolOwner"
+    );
   });
 
   it("enter game > bucket index too high > fails", async () => {
-    assert.fail();
+    const newGameContext: NewGameContext = await setUpNewGame(program);
+    await assertAsyncThrows(
+      () =>
+        setUpEnterGame(program, newGameContext, {
+          playerBucketIndex: newGameContext.gameConfig.nBuckets.toNumber() + 1,
+        }),
+      "BucketDoesNotExist"
+    );
   });
 
   it("enter game > player tries to enter holding bucket > fails", async () => {
-    assert.fail();
+    await assertAsyncThrows(
+      () =>
+        setUpNewGameAndEnter(program, {
+          playerBucketIndex: 0,
+        }),
+      "CannotEnterHoldingBucket"
+    );
   });
 
   it("enter game > game hasnt been created > fails", async () => {
-    assert.fail();
+    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const nonGame: PublicKey = await getGameAddress(generateGameId(), program.programId);
+    await assertAsyncThrows(
+      () =>
+        setUpEnterGame(program, newGameContext, {
+          gameAddress: nonGame
+        })
+    );
   });
 });
 
@@ -504,6 +560,8 @@ export interface EnterGameSetupArgs {
   playerTokenAccount?: PublicKey;
   playerStateAddress?: PublicKey;
   programFeeDestination?: PublicKey;
+  tokenPoolAddress?: PublicKey;
+  gameAddress?: PublicKey;
 }
 
 export interface EnterGameContext {
@@ -626,12 +684,13 @@ async function setUpEnterGame(
       await program.methods
         .enterGame(new anchor.BN(bucketIndex))
         .accountsStrict({
-          game: newGameContext.gameAddress,
+          game: customSetup?.gameAddress ?? newGameContext.gameAddress,
           player: playerStateAddress,
           programFeeDestination:
             customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
           depositSourceAccount: playerTokenAccount,
-          tokenPool: newGameContext.tokenPoolAddress,
+          tokenPool:
+            customSetup?.tokenPoolAddress ?? newGameContext.tokenPoolAddress,
           payer: player.publicKey,
           associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
           tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,

@@ -25,12 +25,16 @@ export async function assertAsyncThrows(
 
 export function repeat<T>(
   times: number,
-  method: () => Promise<T>
+  method: () => Promise<T>,
+  printIteration: boolean = false
 ): () => Promise<T> {
   return async () => {
     let result: T;
     for (let i = 0; i < times; i++) {
       result = await method();
+      if (printIteration) {
+        console.log(`Result from iteration ${i} = ${result}`);
+      }
     }
     return result;
   }
