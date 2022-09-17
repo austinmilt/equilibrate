@@ -92,7 +92,9 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
         .buckets
         .iter()
         .map(|b| b.players as u64)
-        .sum();
+        .sum::<u64>()
+        .checked_div(2) // with the holding bucket we are double-counting players
+        .unwrap();
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
     require_gt!(
