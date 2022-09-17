@@ -32,7 +32,7 @@ import { assertAsyncThrows } from "./helpers/test";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { testIsReady } from "./setup";
 
-describe("New Game Instruction Tests", () => {
+describe("NewGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 

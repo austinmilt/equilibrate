@@ -2,7 +2,6 @@ import * as anchor from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateBucketIndex as chooseBucket,
-  generateGameConfig,
   generateGameId,
   getGame,
   getPlayerState,
@@ -21,7 +20,7 @@ import {
   MINT_DECIMALS,
   withoutDecimals,
 } from "./helpers/token";
-import { Game, GameConfig, GameState, PlayerState } from "./helpers/types";
+import { Game, GameState, PlayerState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import {
   GAME_SEED,
@@ -33,9 +32,8 @@ import { assert } from "chai";
 import { assertAsyncThrows, repeat } from "./helpers/test";
 import { NewGameContext, NewGameSetupArgs, setUpNewGame } from "./newGame";
 import { testIsReady } from "./setup";
-import { token } from "@project-serum/anchor/dist/cjs/utils";
 
-describe("enter game Instruction Tests", () => {
+describe("EnterGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
