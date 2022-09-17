@@ -27,9 +27,11 @@ export function repeat<T>(
   times: number,
   method: () => Promise<T>
 ): () => Promise<T> {
-  let promise: Promise<T> = method();
-  for (let i = 1; i < times; i++) {
-    promise = promise.then(method);
+  return async () => {
+    let result: T;
+    for (let i = 0; i < times; i++) {
+      result = await method();
+    }
+    return result;
   }
-  return () => promise;
 }

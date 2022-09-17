@@ -2,11 +2,9 @@ import * as anchor from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateBucketIndex as chooseBucket,
-  generateGameConfig,
   generateGameId,
   getGame,
   getPlayerState,
-  MAX_GAME_BUCKETS,
   PROGRAM_FEE_DESTINATION,
   PROGRAM_FEE_LAMPORTS,
 } from "./helpers/game";
@@ -16,11 +14,10 @@ import {
   getTokenBalanceWithoutDecimals,
   makeAndFundWallet,
   makeAndFundWalletWithTokens,
-  makeAssociatedTokenAccountWithPayer,
   MINT_DECIMALS,
   withoutDecimals,
 } from "./helpers/token";
-import { Game, GameConfig, GameState, PlayerState } from "./helpers/types";
+import { Game, GameState, PlayerState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import {
   GAME_SEED,
@@ -29,18 +26,12 @@ import {
   PLAYER_SEED,
 } from "./helpers/address";
 import { assert } from "chai";
-import { assertAsyncThrows, repeat } from "./helpers/test";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  assertAsyncThrows,
+  repeat,
+} from "./helpers/test";
 import { NewGameContext, NewGameSetupArgs, setUpNewGame } from "./newGame";
-
-let ready = false;
-beforeEach(async () => {
-  ready = true;
-});
-
-afterEach(async () => {
-  ready = false;
-});
+import { testIsReady } from "./setup";
 
 describe("enter game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -194,7 +185,7 @@ describe("enter game Instruction Tests", () => {
         otherPlayers: nOtherPlayers - 1,
       });
 
-      await setUpEnterGame(program, newGameContext);
+      await setUpEnterGame(program, newGameContext, undefined, true);
 
       const gameStateAfterWeEnter: GameState = (
         await getGame(newGameContext.gameAddress, program)
@@ -457,7 +448,7 @@ describe("enter game Instruction Tests", () => {
     );
   });
 
-  it.only("enter game > deposit source account - mint doesnt match game > fails", async () => {
+  it("enter game > deposit source account - mint doesnt match game > fails", async () => {
     const connection: Connection = program.provider.connection;
     const authority: Keypair = await makeAndFundWallet(10, connection);
     const wrongMint: Keypair = await generateMint(authority, connection);
@@ -532,6 +523,18 @@ export async function setUpNewGameAndEnter(
   program: anchor.Program<Equilibrate>,
   customSetup?: NewGameAndEnterSetupArgs
 ): Promise<NewGameAndEnterContext> {
+  if (
+    customSetup?.otherPlayers != null &&
+    customSetup?.newGame?.gameConfig?.maxPlayers == null
+  ) {
+    customSetup = customSetup ?? {};
+    customSetup.newGame = customSetup.newGame ?? {};
+    customSetup.newGame.gameConfig = customSetup.newGame.gameConfig ?? {};
+    customSetup.newGame.gameConfig.maxPlayers = new anchor.BN(
+      customSetup.otherPlayers * 10
+    );
+  }
+
   const newGameContext: NewGameContext = await setUpNewGame(
     program,
     customSetup?.newGame
@@ -552,9 +555,10 @@ export async function setUpNewGameAndEnter(
 async function setUpEnterGame(
   program: anchor.Program<Equilibrate>,
   newGameContext: NewGameContext,
-  customSetup?: EnterGameSetupArgs
+  customSetup?: EnterGameSetupArgs,
+  debug: boolean = false
 ): Promise<EnterGameContext> {
-  if (!ready) throw new Error("not ready");
+  if (!testIsReady()) throw new Error("not ready");
   const connection: Connection = program.provider.connection;
 
   const nonFirstPlayersToEnter: number =
@@ -637,7 +641,9 @@ async function setUpEnterGame(
         .signers([player])
         .rpc();
     } catch (e) {
-      console.log(JSON.stringify(e));
+      if (debug) {
+        console.log(JSON.stringify(e));
+      }
       throw e;
     }
   }

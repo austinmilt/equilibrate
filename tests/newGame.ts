@@ -30,15 +30,7 @@ import {
 import { assert } from "chai";
 import { assertAsyncThrows } from "./helpers/test";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-
-let ready = false;
-beforeEach(async () => {
-  ready = true;
-});
-
-afterEach(async () => {
-  ready = false;
-});
+import { testIsReady } from "./setup";
 
 describe("New Game Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -453,9 +445,9 @@ export interface NewGameContext {
 
 export async function setUpNewGame(
   program: anchor.Program<Equilibrate>,
-  customSetup?: NewGameSetupArgs
+  customSetup?: NewGameSetupArgs,
 ): Promise<NewGameContext> {
-  if (!ready) throw new Error("not ready");
+  if (!testIsReady()) throw new Error("not ready");
   const connection: Connection = program.provider.connection;
   const mintAuthority: Keypair =
     customSetup?.mintAuthority ?? (await makeAndFundWallet(1, connection));
