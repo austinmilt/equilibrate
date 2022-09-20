@@ -9,8 +9,10 @@ import {
   PROGRAM_FEE_LAMPORTS,
 } from "./helpers/game";
 import {
+  generateMint,
   makeAndFundWallet,
   makeAndFundWalletWithTokens,
+  makeAssociatedTokenAccountWithPayer,
   MINT_DECIMALS,
   withoutDecimals,
 } from "./helpers/token";
@@ -81,7 +83,7 @@ describe("LeaveGame Instruction Tests", () => {
     );
   });
 
-  it("leave game > game - bad seed - game ID > fails", async () => {
+  it.only("leave game > game - bad seed - game ID > fails", async () => {
     const gameId: number = generateGameId();
     const goodGameAddress: PublicKey = await getGameAddress(
       gameId,
@@ -114,11 +116,7 @@ describe("LeaveGame Instruction Tests", () => {
           {
             gameAddress: badGameAddress,
           }
-        ),
-      // there's not really a situation where we can try to leave a game
-      // that already exists but then provide a bad seeded game address, so
-      // checking that the account isnt initialized is as close as we can get
-      "AccountNotInitialized"
+        )
     );
   });
 
@@ -244,7 +242,27 @@ describe("LeaveGame Instruction Tests", () => {
     );
   });
 
-  it("leave game > winnings_destination_account - wrong mint > fails", async () => {});
+  it("leave game > winnings_destination_account - wrong mint > fails", async () => {
+    const connection: Connection = program.provider.connection;
+    const authority: Keypair = await makeAndFundWallet(10, connection);
+    const wrongMint: Keypair = await generateMint(authority, connection);
+    const wallet: Keypair = await makeAndFundWallet(1, connection);
+
+    const wrongTokenAccount: PublicKey = await makeAssociatedTokenAccountWithPayer(
+      wallet,
+      program.programId,
+      wrongMint.publicKey,
+      connection
+    );
+
+    await assertAsyncThrows(
+      () =>
+        setUpNewGameEnterAndLeave(program, {
+          playerTokenAccount: wrongTokenAccount,
+        }),
+      "InvalidWinningsDestinationMint"
+    );
+  });
 
   it("leave game > token_pool - wrong mint > fails", async () => {});
 

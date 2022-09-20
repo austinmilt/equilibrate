@@ -284,11 +284,7 @@ describe("EnterGame Instruction Tests", () => {
         setUpEnterGame(program, {
           ...newGameContext,
           gameAddress: badGameAddress,
-        }),
-      // there's not really a situation where we can try to enter a game
-      // that already exists but then provide a bad seeded game address, so
-      // checking that the account isnt initialized is as close as we can get
-      "AccountNotInitialized"
+        })
     );
   });
 
