@@ -161,7 +161,6 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
 
     let player = &mut ctx.accounts.first_player;
     player.set_inner(PlayerState {
-        game: game.key(),
         // first player always goes into the first bucket
         bucket: 0,
     });

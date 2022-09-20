@@ -88,10 +88,7 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     // This is untestable since the last person leaving the game
     // also results in the game account being deleted. However, we'll
     // leave it in for completeness.
-    let game_player_count: u64 = ctx
-        .accounts
-        .game
-        .get_player_count();
+    let game_player_count: u64 = ctx.accounts.game.get_player_count();
 
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
@@ -138,7 +135,6 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     // create player state account
     let player = &mut ctx.accounts.player;
     player.set_inner(PlayerState {
-        game: ctx.accounts.game.key(),
         bucket: i_bucket,
     });
     player.log_make();

@@ -16,14 +16,16 @@ pub struct LeaveGame<'info> {
     #[account(
         mut,
         seeds = [GAME_SEED.as_ref(), &game.id.to_le_bytes()],
-        bump,
-        constraint = game.creator == game_creator.key()
-        @EquilibrateError::GameCreatorMismatch
+        bump
     )]
     pub game: Account<'info, Game>,
 
     /// CHECK: wallet to which rent should be returned when closing the game account, which must be the same wallet used to make the game
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = game_creator.key() == game.creator
+        @EquilibrateError::GameCreatorMismatch
+    )]
     pub game_creator: AccountInfo<'info>,
 
     #[account(
@@ -32,8 +34,6 @@ pub struct LeaveGame<'info> {
         bump,
         owner = id(),
         close = payer,
-        constraint = player.game.key() == game.key()
-        @EquilibrateError::InvalidPlayerState
     )]
     pub player: Account<'info, PlayerState>,
 
@@ -41,7 +41,7 @@ pub struct LeaveGame<'info> {
         mut,
 
         constraint = winnings_destination_account.mint == game.config.mint.key()
-        @EquilibrateError::InvalidTokenSourceMint,
+        @EquilibrateError::InvalidWinningsDestinationMint,
 
         owner = token::ID,
     )]
@@ -80,10 +80,7 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     // check constraints
-    let game_player_count: u64 = ctx
-        .accounts
-        .game
-        .get_player_count();
+    let game_player_count: u64 = ctx.accounts.game.get_player_count();
 
     // This is untestable since the last person leaving the game
     // also results in the game account being deleted. However, we'll
@@ -94,7 +91,7 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let winnings: u64;
     let game = &mut ctx.accounts.game;
     if game_player_count == 1 {
-        // if they are the player to end the game, give them all the remaining tokens
+        // if this is the player to end the game, give them all the remaining tokens
         winnings = game.state.buckets.iter().map(|b| b.decimal_tokens).sum();
     } else {
         game.update_bucket_balances(now_epoch_seconds.try_into().unwrap());

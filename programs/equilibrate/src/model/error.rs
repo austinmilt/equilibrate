@@ -41,14 +41,14 @@ pub enum EquilibrateError {
     #[msg("Pool owner must be the program")]
     InvalidPoolOwner,
 
+    #[msg("Token winnings acount mint must be the one configured for the game")]
+    InvalidWinningsDestinationMint,
+
     #[msg("Token source acount mint must be the one configured for the game")]
     InvalidTokenSourceMint,
 
     #[msg("Program ID must be this program")]
     InvalidProgramId,
-
-    #[msg("Player state account doesnt belong to this game")]
-    InvalidPlayerState,
 
     #[msg("Given gameCreator doesnt match the one that created the game")]
     GameCreatorMismatch,

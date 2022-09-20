@@ -28,6 +28,5 @@ export interface Bucket {
 
 
 export interface PlayerState {
-    game: PublicKey;
     bucket: anchor.BN;
 }

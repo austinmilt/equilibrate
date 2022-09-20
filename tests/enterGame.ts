@@ -293,53 +293,37 @@ describe("EnterGame Instruction Tests", () => {
   });
 
   it("enter game > player - bad seed - seed > fails", async () => {
-    const playerWallet: Keypair = Keypair.generate();
-    const gameId: number = generateGameId();
-    const gameAddress: PublicKey = await getGameAddress(
-      gameId,
-      program.programId
+    const newGameContext: NewGameContext = await setUpNewGame(program);
+
+    const playerWallet: Keypair = await makeAndFundWallet(
+      5,
+      program.provider.connection
     );
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode("this player sucks"),
-          gameAddress.toBuffer(),
+          newGameContext.gameAddress.toBuffer(),
           playerWallet.publicKey.toBuffer(),
         ],
         program.programId
       )
     )[0];
-    const goodPlayerStateAddress: PublicKey = await getPlayerStateAddress(
-      gameAddress,
-      playerWallet.publicKey,
-      program.programId
-    );
 
-    const newGameContext: NewGameContext = await setUpNewGame(program, {
-      gameId: gameId,
-      gameAddress: gameAddress,
-      playerWallet: playerWallet,
-      playerStateAddress: goodPlayerStateAddress,
-    });
-
-    await assertAsyncThrows(
-      () =>
-        setUpEnterGame(program, newGameContext, {
-          playerStateAddress: badPlayerStateAddress,
-        }),
-      // there's not really a situation where we can try to enter a game
-      // that already exists but then provide a bad seeded address, so
-      // checking that the account isnt initialized is as close as we can get
-      "AccountNotInitialized"
+    await assertAsyncThrows(() =>
+      setUpEnterGame(program, newGameContext, {
+        playerWallet: playerWallet,
+        playerStateAddress: badPlayerStateAddress,
+      })
     );
   });
 
   it("enter game > player - bad seed - game > fails", async () => {
-    const playerWallet: Keypair = Keypair.generate();
-    const gameId: number = generateGameId();
-    const gameAddress: PublicKey = await getGameAddress(
-      gameId,
-      program.programId
+    const newGameContext: NewGameContext = await setUpNewGame(program);
+
+    const playerWallet: Keypair = await makeAndFundWallet(
+      5,
+      program.provider.connection
     );
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -351,74 +335,42 @@ describe("EnterGame Instruction Tests", () => {
         program.programId
       )
     )[0];
-    const goodPlayerStateAddress: PublicKey = await getPlayerStateAddress(
-      gameAddress,
-      playerWallet.publicKey,
-      program.programId
-    );
 
-    const newGameContext: NewGameContext = await setUpNewGame(program, {
-      gameId: gameId,
-      gameAddress: gameAddress,
-      playerWallet: playerWallet,
-      playerStateAddress: goodPlayerStateAddress,
-    });
-
-    await assertAsyncThrows(
-      () =>
-        setUpEnterGame(program, newGameContext, {
-          playerStateAddress: badPlayerStateAddress,
-        }),
-      // there's not really a situation where we can try to enter a game
-      // that already exists but then provide a bad seeded address, so
-      // checking that the account isnt initialized is as close as we can get
-      "AccountNotInitialized"
+    await assertAsyncThrows(() =>
+      setUpEnterGame(program, newGameContext, {
+        playerWallet: playerWallet,
+        playerStateAddress: badPlayerStateAddress,
+      })
     );
   });
 
   it("enter game > player - bad seed - payer > fails", async () => {
-    const playerWallet: Keypair = Keypair.generate();
-    const gameId: number = generateGameId();
-    const gameAddress: PublicKey = await getGameAddress(
-      gameId,
-      program.programId
+    const newGameContext: NewGameContext = await setUpNewGame(program);
+
+    const playerWallet: Keypair = await makeAndFundWallet(
+      5,
+      program.provider.connection
     );
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(PLAYER_SEED),
-          gameAddress.toBuffer(),
+          newGameContext.gameAddress.toBuffer(),
           Keypair.generate().publicKey.toBuffer(),
         ],
         program.programId
       )
     )[0];
-    const goodPlayerStateAddress: PublicKey = await getPlayerStateAddress(
-      gameAddress,
-      playerWallet.publicKey,
-      program.programId
-    );
 
-    const newGameContext: NewGameContext = await setUpNewGame(program, {
-      gameId: gameId,
-      gameAddress: gameAddress,
-      playerWallet: playerWallet,
-      playerStateAddress: goodPlayerStateAddress,
-    });
-
-    await assertAsyncThrows(
-      () =>
-        setUpEnterGame(program, newGameContext, {
-          playerStateAddress: badPlayerStateAddress,
-        }),
-      // there's not really a situation where we can try to enter a game
-      // that already exists but then provide a bad seeded address, so
-      // checking that the account isnt initialized is as close as we can get
-      "AccountNotInitialized"
+    await assertAsyncThrows(() =>
+      setUpEnterGame(program, newGameContext, {
+        playerWallet: playerWallet,
+        playerStateAddress: badPlayerStateAddress,
+      })
     );
   });
 
-  it("enter game > player - wrong account owner > fails", async () => {
+  it("enter game > player - owner isnt program > fails", async () => {
     const newGameContext: NewGameContext = await setUpNewGame(program);
     const playerWallet: Keypair = await makeAndFundWallet(
       1,
@@ -535,12 +487,14 @@ describe("EnterGame Instruction Tests", () => {
 
   it("enter game > game hasnt been created > fails", async () => {
     const newGameContext: NewGameContext = await setUpNewGame(program);
-    const nonGame: PublicKey = await getGameAddress(generateGameId(), program.programId);
-    await assertAsyncThrows(
-      () =>
-        setUpEnterGame(program, newGameContext, {
-          gameAddress: nonGame
-        })
+    const nonGame: PublicKey = await getGameAddress(
+      generateGameId(),
+      program.programId
+    );
+    await assertAsyncThrows(() =>
+      setUpEnterGame(program, newGameContext, {
+        gameAddress: nonGame,
+      })
     );
   });
 });
@@ -577,7 +531,8 @@ export interface NewGameAndEnterContext extends EnterGameContext {
 
 export async function setUpNewGameAndEnter(
   program: anchor.Program<Equilibrate>,
-  customSetup?: NewGameAndEnterSetupArgs
+  customSetup?: NewGameAndEnterSetupArgs,
+  debug: boolean = false
 ): Promise<NewGameAndEnterContext> {
   if (
     customSetup?.otherPlayers != null &&
@@ -593,13 +548,15 @@ export async function setUpNewGameAndEnter(
 
   const newGameContext: NewGameContext = await setUpNewGame(
     program,
-    customSetup?.newGame
+    customSetup?.newGame,
+    debug
   );
 
   const enterGameContext: EnterGameContext = await setUpEnterGame(
     program,
     newGameContext,
-    customSetup
+    customSetup,
+    debug
   );
 
   return {
@@ -608,7 +565,7 @@ export async function setUpNewGameAndEnter(
   };
 }
 
-async function setUpEnterGame(
+export async function setUpEnterGame(
   program: anchor.Program<Equilibrate>,
   newGameContext: NewGameContext,
   customSetup?: EnterGameSetupArgs,

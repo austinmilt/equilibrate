@@ -84,10 +84,6 @@ describe("NewGame Instruction Tests", () => {
       program
     );
     assert.strictEqual(firstPlayerState.bucket.toNumber(), 0);
-    assert.strictEqual(
-      firstPlayerState.game.toBase58(),
-      gameAddress.toBase58()
-    );
   });
 
   it("create a new game > all good > program fee is transferred", async () => {
@@ -446,6 +442,7 @@ export interface NewGameContext {
 export async function setUpNewGame(
   program: anchor.Program<Equilibrate>,
   customSetup?: NewGameSetupArgs,
+  debug: boolean = false
 ): Promise<NewGameContext> {
   if (!testIsReady()) throw new Error("not ready");
   const connection: Connection = program.provider.connection;
@@ -528,23 +525,31 @@ export async function setUpNewGame(
       connection
     ));
 
-  await program.methods
-    .newGame(config, new anchor.BN(gameId))
-    .accountsStrict({
-      game: gameAddress,
-      firstPlayer: playerStateAddress,
-      programFeeDestination:
-        customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
-      depositSourceAccount: playerTokenAccount,
-      tokenPool: tokenPoolAddress,
-      payer: player.publicKey,
-      associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
-      tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-      systemProgram: anchor.web3.SystemProgram.programId,
-      rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-    })
-    .signers([player])
-    .rpc();
+    try {
+      await program.methods
+        .newGame(config, new anchor.BN(gameId))
+        .accountsStrict({
+          game: gameAddress,
+          firstPlayer: playerStateAddress,
+          programFeeDestination:
+            customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
+          depositSourceAccount: playerTokenAccount,
+          tokenPool: tokenPoolAddress,
+          payer: player.publicKey,
+          associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
+          tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        })
+        .signers([player])
+        .rpc();
+
+    } catch (e) {
+      if (debug) {
+        console.log(e);
+      }
+      throw e;
+    }
 
   return {
     mintAuthority,
