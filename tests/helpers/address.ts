@@ -4,6 +4,8 @@ import * as spl from '@solana/spl-token';
 
 export const GAME_SEED: string = "equilibrate-game";
 export const PLAYER_SEED: string = "equilibrate-player";
+export const POOL_SEED: string = "equilibrate-pool";
+export const POOL_MANAGER_SEED: string = "equilibrate-pool-manager";
 
 export async function getGameAddress(
   gameId: number,
@@ -29,6 +31,35 @@ export async function getPlayerStateAddress(
       anchor.utils.bytes.utf8.encode(PLAYER_SEED),
       game.toBuffer(),
       player.toBuffer(),
+    ],
+    programId
+  ))[0];
+}
+
+
+export async function getTokenPoolAddress(
+  mint: PublicKey,
+  programId: PublicKey
+): Promise<PublicKey> {
+  return (await PublicKey.findProgramAddress(
+    [
+      anchor.utils.bytes.utf8.encode(POOL_SEED),
+      mint.toBuffer(),
+      (await getPoolManagerAddress(mint, programId)).toBuffer()
+    ],
+    programId
+  ))[0];
+}
+
+
+export async function getPoolManagerAddress(
+  mint: PublicKey,
+  programId: PublicKey
+): Promise<PublicKey> {
+  return (await PublicKey.findProgramAddress(
+    [
+      anchor.utils.bytes.utf8.encode(POOL_MANAGER_SEED),
+      mint.toBuffer(),
     ],
     programId
   ))[0];

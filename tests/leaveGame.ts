@@ -1,22 +1,17 @@
 import * as anchor from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import {
-  generateBucketIndex as chooseBucket,
   generateGameId,
   getGame,
-  getPlayerState,
-  PROGRAM_FEE_DESTINATION,
-  PROGRAM_FEE_LAMPORTS,
 } from "./helpers/game";
 import {
   generateMint,
   makeAndFundWallet,
-  makeAndFundWalletWithTokens,
+  makeAssociatedTokenAccount,
   makeAssociatedTokenAccountWithPayer,
   MINT_DECIMALS,
-  withoutDecimals,
 } from "./helpers/token";
-import { Game, PlayerState } from "./helpers/types";
+import { GameState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import {
   GAME_SEED,
@@ -32,12 +27,14 @@ import {
   EnterGameContext,
   EnterGameSetupArgs,
   setUpEnterGame,
-  setUpNewGameAndEnter,
-  NewGameAndEnterContext,
+  setUpEnterGameEtc,
+  EnterGameEtcContext,
 } from "./enterGame";
 import { assertAsyncThrows } from "./helpers/test";
+import { getAccount } from "@solana/spl-token";
+import { CreatePoolContext, CreatePoolSetupArgs, setUpCreatePool } from "./createPool";
 
-describe("LeaveGame Instruction Tests", () => {
+describe.only("LeaveGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
@@ -57,8 +54,8 @@ describe("LeaveGame Instruction Tests", () => {
       )
     )[0];
 
-    const newGameAndEnterContext: NewGameAndEnterContext =
-      await setUpNewGameAndEnter(program, {
+    const enterEtcContext: EnterGameEtcContext =
+      await setUpEnterGameEtc(program, {
         newGame: {
           gameId: gameId,
           gameAddress: goodGameAddress,
@@ -69,8 +66,9 @@ describe("LeaveGame Instruction Tests", () => {
       () =>
         setUpLeaveGame(
           program,
-          newGameAndEnterContext.newGame,
-          newGameAndEnterContext,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
           {
             gameAddress: badGameAddress,
           },
@@ -83,7 +81,7 @@ describe("LeaveGame Instruction Tests", () => {
     );
   });
 
-  it.only("leave game > game - bad seed - game ID > fails", async () => {
+  it("leave game > game - bad seed - game ID > fails", async () => {
     const gameId: number = generateGameId();
     const goodGameAddress: PublicKey = await getGameAddress(
       gameId,
@@ -99,8 +97,8 @@ describe("LeaveGame Instruction Tests", () => {
       )
     )[0];
 
-    const newGameAndEnterContext: NewGameAndEnterContext =
-      await setUpNewGameAndEnter(program, {
+    const enterEtcContext: EnterGameEtcContext =
+      await setUpEnterGameEtc(program, {
         newGame: {
           gameId: gameId,
           gameAddress: goodGameAddress,
@@ -111,8 +109,9 @@ describe("LeaveGame Instruction Tests", () => {
       () =>
         setUpLeaveGame(
           program,
-          newGameAndEnterContext.newGame,
-          newGameAndEnterContext,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
           {
             gameAddress: badGameAddress,
           }
@@ -123,7 +122,7 @@ describe("LeaveGame Instruction Tests", () => {
   it("leave game > game - wrong game creator > fails", async () => {
     await assertAsyncThrows(
       () =>
-        setUpNewGameEnterAndLeave(program, {
+        setUpLeaveGameEtc(program, {
           gameCreator: Keypair.generate().publicKey,
         }),
       "GameCreatorMismatch"
@@ -131,15 +130,15 @@ describe("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - bad seed - seed > fails", async () => {
-    const newGameAndEnterContext: NewGameAndEnterContext =
-      await setUpNewGameAndEnter(program);
+    const enterEtcContext: EnterGameEtcContext =
+      await setUpEnterGameEtc(program);
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode("this player sucks"),
-          newGameAndEnterContext.newGame.gameAddress.toBuffer(),
-          newGameAndEnterContext.playerWallet.publicKey.toBuffer(),
+          enterEtcContext.newGame.gameAddress.toBuffer(),
+          enterEtcContext.playerWallet.publicKey.toBuffer(),
         ],
         program.programId
       )
@@ -148,10 +147,11 @@ describe("LeaveGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpLeaveGame(
         program,
-        newGameAndEnterContext.newGame,
-        newGameAndEnterContext,
+        enterEtcContext.createPool,
+        enterEtcContext.newGame,
+        enterEtcContext,
         {
-          playerWallet: newGameAndEnterContext.playerWallet,
+          playerWallet: enterEtcContext.playerWallet,
           playerStateAddress: badPlayerStateAddress,
         }
       )
@@ -159,15 +159,15 @@ describe("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - bad seed - game  > fails", async () => {
-    const newGameAndEnterContext: NewGameAndEnterContext =
-      await setUpNewGameAndEnter(program);
+    const enterEtcContext: EnterGameEtcContext =
+      await setUpEnterGameEtc(program);
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(PLAYER_SEED),
           Keypair.generate().publicKey.toBuffer(),
-          newGameAndEnterContext.playerWallet.publicKey.toBuffer(),
+          enterEtcContext.playerWallet.publicKey.toBuffer(),
         ],
         program.programId
       )
@@ -176,10 +176,11 @@ describe("LeaveGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpLeaveGame(
         program,
-        newGameAndEnterContext.newGame,
-        newGameAndEnterContext,
+        enterEtcContext.createPool,
+        enterEtcContext.newGame,
+        enterEtcContext,
         {
-          playerWallet: newGameAndEnterContext.playerWallet,
+          playerWallet: enterEtcContext.playerWallet,
           playerStateAddress: badPlayerStateAddress,
         }
       )
@@ -187,14 +188,14 @@ describe("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - bad seed - payer > fails", async () => {
-    const newGameAndEnterContext: NewGameAndEnterContext =
-      await setUpNewGameAndEnter(program);
+    const enterEtcContext: EnterGameEtcContext =
+      await setUpEnterGameEtc(program);
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(PLAYER_SEED),
-          newGameAndEnterContext.newGame.gameAddress.toBuffer(),
+          enterEtcContext.newGame.gameAddress.toBuffer(),
           Keypair.generate().publicKey.toBuffer(),
         ],
         program.programId
@@ -204,10 +205,11 @@ describe("LeaveGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpLeaveGame(
         program,
-        newGameAndEnterContext.newGame,
-        newGameAndEnterContext,
+        enterEtcContext.createPool,
+        enterEtcContext.newGame,
+        enterEtcContext,
         {
-          playerWallet: newGameAndEnterContext.playerWallet,
+          playerWallet: enterEtcContext.playerWallet,
           playerStateAddress: badPlayerStateAddress,
         }
       )
@@ -215,15 +217,15 @@ describe("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - owner isnt program > fails", async () => {
-    const newGameAndEnterContext: NewGameAndEnterContext =
-      await setUpNewGameAndEnter(program);
+    const enterEtcContext: EnterGameEtcContext =
+      await setUpEnterGameEtc(program);
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(PLAYER_SEED),
-          newGameAndEnterContext.newGame.gameAddress.toBuffer(),
-          newGameAndEnterContext.playerWallet.publicKey.toBuffer(),
+          enterEtcContext.newGame.gameAddress.toBuffer(),
+          enterEtcContext.playerWallet.publicKey.toBuffer(),
         ],
         anchor.web3.SystemProgram.programId
       )
@@ -232,10 +234,11 @@ describe("LeaveGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpLeaveGame(
         program,
-        newGameAndEnterContext.newGame,
-        newGameAndEnterContext,
+        enterEtcContext.createPool,
+        enterEtcContext.newGame,
+        enterEtcContext,
         {
-          playerWallet: newGameAndEnterContext.playerWallet,
+          playerWallet: enterEtcContext.playerWallet,
           playerStateAddress: badPlayerStateAddress,
         }
       )
@@ -257,20 +260,94 @@ describe("LeaveGame Instruction Tests", () => {
 
     await assertAsyncThrows(
       () =>
-        setUpNewGameEnterAndLeave(program, {
+        setUpLeaveGameEtc(program, {
           playerTokenAccount: wrongTokenAccount,
         }),
-      "InvalidWinningsDestinationMint"
+      "ConstraintTokenOwner"
     );
   });
 
-  it("leave game > token_pool - wrong mint > fails", async () => {});
+  it("leave game > token_pool - wrong mint > fails", async () => {
+    const connection: Connection = program.provider.connection;
+    const authority: Keypair = await makeAndFundWallet(10, connection);
+    const wrongMint: Keypair = await generateMint(authority, connection);
 
-  it("leave game > token_pool - wrong owner > fails", async () => {});
+    const context: CreatePoolContext = await setUpCreatePool(program);
+    const context2: CreatePoolContext = await setUpCreatePool(program, {
+      mint: wrongMint,
+      mintAuthority: authority,
+    })
 
-  it("leave game > equilibrate_program - wrong program ID > fails", async () => {});
+    const newGameContext: NewGameContext = await setUpNewGame(program, context);
+    const enterGameContext: EnterGameContext = await setUpEnterGame(program, context, newGameContext);
 
-  it("leave game > bucket balances update correctly", async () => {});
+    await assertAsyncThrows(
+      () =>
+        setUpLeaveGame(program, context, newGameContext, enterGameContext, {
+          tokenPoolAddress: context2.tokenPoolAddress,
+        }),
+        "ConstraintTokenOwner"
+    );
+  });
+
+  it("leave game > token_pool - owner isnt manager > fails", async () => {
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(program);
+    const connection: Connection = program.provider.connection;
+    const wallet: Keypair = await makeAndFundWallet(1, connection);
+
+    const wrongTokenPool: PublicKey = await makeAssociatedTokenAccount(
+      wallet,
+      enterEtcContext.createPool.mint.publicKey,
+      connection
+    );
+
+
+    await assertAsyncThrows(
+      () =>
+        setUpLeaveGame(program, enterEtcContext.createPool, enterEtcContext.newGame, enterEtcContext, {
+          tokenPoolAddress: wrongTokenPool,
+        }),
+      "ConstraintTokenOwner"
+    );
+  });
+
+  it.only("leave game > bucket balances update correctly", async () => {
+    const entryFee: number = 1 * Math.pow(10, MINT_DECIMALS);
+    const spillRate: number = 1 * Math.pow(10, MINT_DECIMALS);
+    const { newGame: newGameContext } = await setUpLeaveGameEtc(program, {
+      enterGame: {
+        otherPlayers: 1,
+        playerBucketIndex: 2,
+      },
+      newGame: {
+        gameConfig: {
+          nBuckets: new anchor.BN(2),
+          entryFeeDecimalTokens: new anchor.BN(entryFee),
+          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+        },
+      },
+    }, true);
+
+    const gameState: GameState = (
+      await getGame(newGameContext.gameAddress, program)
+    ).state;
+
+    // After the first player enters, the holding bucket gets their fee.
+    // After the second player enters, the holding bucket distributes the holding
+    // fee equally to the other two buckets, and we add the new player's fee
+    // to the holding bucket. When the second player leaves, they take their proportion
+    // of the bucket they were in and leave the remaining balance to the other
+    // players.
+    assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), entryFee);
+    assert.strictEqual(
+      gameState.buckets[1].decimalTokens.toNumber(),
+      entryFee
+    );
+    assert.strictEqual(
+      gameState.buckets[2].decimalTokens.toNumber(),
+      0
+    );
+  });
 
   it("leave game > token pool balance remains consistent", async () => {});
 
@@ -287,7 +364,8 @@ describe("LeaveGame Instruction Tests", () => {
   it("leave game > player state account is closed and rent returned to payer", async () => {});
 });
 
-export interface NewGameEnterAndLeaveSetupArgs extends LeaveGameSetupArgs {
+export interface LeaveGameEtcSetupArgs extends LeaveGameSetupArgs {
+  createPool?: CreatePoolSetupArgs;
   newGame?: NewGameSetupArgs;
   enterGame?: EnterGameSetupArgs;
 }
@@ -298,39 +376,55 @@ export interface LeaveGameSetupArgs {
   playerStateAddress?: PublicKey;
   playerWallet?: Keypair;
   playerTokenAccount?: PublicKey;
+  tokenPoolAddress?: PublicKey;
 }
 
 export interface LeaveGameContext {}
 
-export interface NewGameEnterAndLeaveContext extends LeaveGameContext {
+export interface LeaveGameEtcContext extends LeaveGameContext {
+  createPool: CreatePoolContext;
   newGame: NewGameContext;
   enterGame: EnterGameContext;
 }
 
-export async function setUpNewGameEnterAndLeave(
+export async function setUpLeaveGameEtc(
   program: anchor.Program<Equilibrate>,
-  customSetup?: NewGameEnterAndLeaveSetupArgs
-): Promise<NewGameEnterAndLeaveContext> {
+  customSetup?: LeaveGameEtcSetupArgs,
+  debug: boolean = false
+): Promise<LeaveGameEtcContext> {
+  const createPoolContext: CreatePoolContext = await setUpCreatePool(
+    program,
+    customSetup?.createPool,
+    debug
+  )
+
   const newGameContext: NewGameContext = await setUpNewGame(
     program,
-    customSetup?.newGame
+    createPoolContext,
+    customSetup?.newGame,
+    debug
   );
 
   const enterGameContext: EnterGameContext = await setUpEnterGame(
     program,
+    createPoolContext,
     newGameContext,
-    customSetup?.enterGame
+    customSetup?.enterGame,
+    debug
   );
 
   const leaveGameContext: LeaveGameContext = await setUpLeaveGame(
     program,
+    createPoolContext,
     newGameContext,
     enterGameContext,
-    customSetup
+    customSetup,
+    debug
   );
 
   return {
     ...leaveGameContext,
+    createPool: createPoolContext,
     newGame: newGameContext,
     enterGame: enterGameContext,
   };
@@ -338,13 +432,13 @@ export async function setUpNewGameEnterAndLeave(
 
 async function setUpLeaveGame(
   program: anchor.Program<Equilibrate>,
+  createPoolContext: CreatePoolContext,
   newGameContext: NewGameContext,
   enterGameContext: EnterGameContext,
   customSetup?: LeaveGameSetupArgs,
   debug: boolean = false
 ): Promise<LeaveGameContext> {
   if (!testIsReady()) throw new Error("not ready");
-  const connection: Connection = program.provider.connection;
 
   let playerStateAddress: PublicKey;
   if (customSetup?.playerStateAddress) {
@@ -359,32 +453,32 @@ async function setUpLeaveGame(
   if (customSetup?.playerTokenAccount) {
     playerTokenAccount = customSetup.playerTokenAccount;
   } else if (customSetup?.playerWallet) {
-    playerTokenAccount = await getAssociatedTokenAddress(newGameContext.mint.publicKey, customSetup?.playerWallet.publicKey);
+    playerTokenAccount = await getAssociatedTokenAddress(createPoolContext.mint.publicKey, customSetup?.playerWallet.publicKey);
   } else {
     playerTokenAccount = enterGameContext.playerTokenAccount;
   }
 
   try {
     await program.methods
-      .leaveGame()
+      .leaveGame(createPoolContext.poolManagerAddress)
       .accountsStrict({
         game: customSetup?.gameAddress ?? newGameContext.gameAddress,
         gameCreator:
           customSetup?.gameCreator ?? newGameContext.playerWallet.publicKey,
         player: playerStateAddress,
         winningsDestinationAccount: playerTokenAccount,
-        tokenPool: newGameContext.tokenPoolAddress,
-        equilibrateProgram: program.programId,
-        payer: enterGameContext.playerWallet.publicKey,
+        poolManager: createPoolContext.poolManagerAddress,
+        tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
+        payer: customSetup?.playerWallet?.publicKey ?? enterGameContext.playerWallet.publicKey,
         associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
         tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
-      .signers([enterGameContext.playerWallet])
+      .signers([customSetup?.playerWallet ?? enterGameContext.playerWallet])
       .rpc();
   } catch (e) {
     if (debug) {
-      console.log(JSON.stringify(e));
+      console.log(JSON.stringify(e, undefined, 2));
     }
     throw e;
   }

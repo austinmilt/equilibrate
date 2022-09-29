@@ -1,6 +1,7 @@
 import { PublicKey, Connection, Keypair } from "@solana/web3.js";
 import * as spl from "@solana/spl-token";
 import * as anchor from "@project-serum/anchor";
+import { getTokenPoolAddress } from "./address";
 
 export const MINT_DECIMALS: number = 9;
 
@@ -112,6 +113,15 @@ export async function makeAssociatedTokenAccountWithPayer(
   return await spl.createAssociatedTokenAccount(connection, payer, mint, owner);
 }
 
+export async function getTokenPoolBalanceWithoutDecimals(mint: PublicKey, programId: PublicKey, connection: Connection): Promise<number> {
+  const address: PublicKey = await getTokenPoolAddress(mint, programId);
+  return (await connection.getTokenAccountBalance(address)).value.uiAmount;
+}
+
+export async function getTokenPoolBalanceWithDecimals(mint: PublicKey, programId: PublicKey, connection: Connection): Promise<number> {
+  const address: PublicKey = await getTokenPoolAddress(mint, programId);
+  return Number.parseInt((await connection.getTokenAccountBalance(address)).value.amount);
+}
 
 export async function getTokenBalanceWithoutDecimals(owner: PublicKey, mint: PublicKey, connection: Connection): Promise<number> {
   const tokenAccountAddress: PublicKey = await spl.getAssociatedTokenAddress(mint, owner);

@@ -9,13 +9,17 @@ describe("dummy", () => {
 
   const program = anchor.workspace.Equilibrate as Program<Equilibrate>;
 
-  it("compute that tokens are not lost due to the way that spillover is calculated", async () => {
+  it("check that multiple games with the same configs can run concurrently", async () => {
     assert(false);
   });
 
-  it("simulate a game 100 times", async () => {
+  it("check that token pool is not drained of additional tokens from other games when multiple games of the same token are running concurrently", async () => {
+    assert(false);
+  });
+
+  it("simulate a game 100 times without error", async () => {
     assert(false);
   });
 });
 
-//TODO 
+//TODO

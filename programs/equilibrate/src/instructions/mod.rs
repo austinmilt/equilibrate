@@ -9,3 +9,6 @@ pub use leave_game::*;
 
 pub mod move_buckets;
 pub use move_buckets::*;
+
+pub mod create_pool;
+pub use create_pool::*;

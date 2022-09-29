@@ -1,4 +1,5 @@
 import * as anchor from "@project-serum/anchor";
+import * as spl from "@solana/spl-token";
 import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateBucketIndex as chooseBucket,
@@ -13,6 +14,8 @@ import {
   getSolBalance,
   getTokenBalanceWithDecimals,
   getTokenBalanceWithoutDecimals,
+  getTokenPoolBalanceWithDecimals,
+  getTokenPoolBalanceWithoutDecimals,
   makeAndFundWallet,
   makeAndFundWalletWithTokens,
   makeAssociatedTokenAccount,
@@ -30,8 +33,19 @@ import {
 } from "./helpers/address";
 import { assert } from "chai";
 import { assertAsyncThrows, repeat } from "./helpers/test";
-import { NewGameContext, NewGameSetupArgs, setUpNewGame } from "./newGame";
+import {
+  NewGameContext,
+  NewGameEtcContext,
+  NewGameSetupArgs,
+  setUpNewGame,
+  setUpNewGameEtc,
+} from "./newGame";
 import { testIsReady } from "./setup";
+import {
+  CreatePoolContext,
+  CreatePoolSetupArgs,
+  setUpCreatePool,
+} from "./createPool";
 
 describe("EnterGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -39,25 +53,26 @@ describe("EnterGame Instruction Tests", () => {
 
   it("enter game > all good > player is deposited into correct bucket", async () => {
     const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
-    const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {
+    const context = await setUpEnterGameEtc(program, {
       otherPlayers: nOtherPlayers - 1,
     });
 
     const gameBeforePlayerEnters: Game = await getGame(
-      newGameContext.gameAddress,
+      context.newGame.gameAddress,
       program
     );
 
     const { playerStateAddress, playerBucketIndex } = await setUpEnterGame(
       program,
-      newGameContext
+      context.createPool,
+      context.newGame
     );
 
     const playerState: PlayerState = await getPlayerState(
       playerStateAddress,
       program
     );
-    const game: Game = await getGame(newGameContext.gameAddress, program);
+    const game: Game = await getGame(context.newGame.gameAddress, program);
 
     assert.strictEqual(playerState.bucket.toNumber(), playerBucketIndex);
     assert.strictEqual(
@@ -83,7 +98,7 @@ describe("EnterGame Instruction Tests", () => {
     );
     const nOtherPlayers: number = Math.round(Math.random() * 10) + 1;
 
-    await setUpNewGameAndEnter(program, {
+    await setUpEnterGameEtc(program, {
       otherPlayers: nOtherPlayers,
     });
 
@@ -111,9 +126,10 @@ describe("EnterGame Instruction Tests", () => {
     const nOtherPlayers: number = Math.round(Math.random() * 10) + 1;
     const {
       playerWallet,
-      newGame: { mint, gameConfig },
+      createPool: { mint },
+      newGame: { gameConfig },
       playerStartingTokens,
-    } = await setUpNewGameAndEnter(program, {
+    } = await setUpEnterGameEtc(program, {
       otherPlayers: nOtherPlayers,
     });
 
@@ -122,9 +138,9 @@ describe("EnterGame Instruction Tests", () => {
       mint.publicKey,
       connection
     );
-    const tokenPoolBalance: number = await getTokenBalanceWithoutDecimals(
-      program.programId,
+    const tokenPoolBalance: number = await getTokenPoolBalanceWithoutDecimals(
       mint.publicKey,
+      program.programId,
       connection
     );
     const entryFeeWithoutDecimals: number = withoutDecimals(
@@ -146,7 +162,7 @@ describe("EnterGame Instruction Tests", () => {
   it("enter game > all good > bucket balances update correctly", async () => {
     const entryFee: number = 1 * Math.pow(10, MINT_DECIMALS);
     const spillRate: number = 1 * Math.pow(10, MINT_DECIMALS);
-    const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {
+    const { newGame: newGameContext } = await setUpEnterGameEtc(program, {
       otherPlayers: 1,
       playerBucketIndex: 2,
       newGame: {
@@ -181,28 +197,28 @@ describe("EnterGame Instruction Tests", () => {
     "enter game > all good > prize pool balance remains consistent",
     repeat(10, async () => {
       const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
-      const { newGame: newGameContext } = await setUpNewGameAndEnter(program, {
+      const context = await setUpEnterGameEtc(program, {
         otherPlayers: nOtherPlayers - 1,
       });
 
-      await setUpEnterGame(program, newGameContext, undefined, true);
+      await setUpEnterGame(program, context.createPool, context.newGame);
 
       const gameStateAfterWeEnter: GameState = (
-        await getGame(newGameContext.gameAddress, program)
+        await getGame(context.newGame.gameAddress, program)
       ).state;
 
       const bucketTokenTotal: number = gameStateAfterWeEnter.buckets.reduce(
         (partialSum, b) => partialSum + b.decimalTokens.toNumber(),
         0
       );
-      const tokenPoolBalance: number = await getTokenBalanceWithDecimals(
+      const tokenPoolBalance: number = await getTokenPoolBalanceWithDecimals(
+        context.newGame.gameConfig.mint,
         program.programId,
-        newGameContext.gameConfig.mint,
         program.provider.connection
       );
       const expectedTokenTotal: number =
         (nOtherPlayers + 1) *
-        newGameContext.gameConfig.entryFeeDecimalTokens.toNumber();
+        context.newGame.gameConfig.entryFeeDecimalTokens.toNumber();
       assert.strictEqual(bucketTokenTotal, expectedTokenTotal);
       assert.strictEqual(tokenPoolBalance, expectedTokenTotal);
     })
@@ -212,7 +228,7 @@ describe("EnterGame Instruction Tests", () => {
     const maxPlayers: number = Math.ceil(Math.random() * 5) + 1;
     await assertAsyncThrows(
       () =>
-        setUpNewGameAndEnter(program, {
+        setUpEnterGameEtc(program, {
           otherPlayers: maxPlayers,
           newGame: {
             gameConfig: {
@@ -240,14 +256,14 @@ describe("EnterGame Instruction Tests", () => {
       )
     )[0];
 
-    const newGameContext: NewGameContext = await setUpNewGame(program, {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
       gameId: gameId,
       gameAddress: goodGameAddress,
     });
 
     await assertAsyncThrows(
       () =>
-        setUpEnterGame(program, {
+        setUpEnterGame(program, newGameContext.createPool, {
           ...newGameContext,
           gameAddress: badGameAddress,
         }),
@@ -268,28 +284,27 @@ describe("EnterGame Instruction Tests", () => {
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(GAME_SEED),
-          new anchor.BN(generateGameId()).toArrayLike(Buffer, "le", 8),
+          new anchor.BN(gameId+1).toArrayLike(Buffer, "le", 8),
         ],
         program.programId
       )
     )[0];
 
-    const newGameContext: NewGameContext = await setUpNewGame(program, {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
       gameId: gameId,
       gameAddress: goodGameAddress,
     });
 
-    await assertAsyncThrows(
-      () =>
-        setUpEnterGame(program, {
-          ...newGameContext,
-          gameAddress: badGameAddress,
-        })
+    await assertAsyncThrows(() =>
+      setUpEnterGame(program, newGameContext.createPool, {
+        ...newGameContext,
+        gameAddress: badGameAddress,
+      })
     );
   });
 
   it("enter game > player - bad seed - seed > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
 
     const playerWallet: Keypair = await makeAndFundWallet(
       5,
@@ -307,7 +322,7 @@ describe("EnterGame Instruction Tests", () => {
     )[0];
 
     await assertAsyncThrows(() =>
-      setUpEnterGame(program, newGameContext, {
+      setUpEnterGame(program, newGameContext.createPool, newGameContext, {
         playerWallet: playerWallet,
         playerStateAddress: badPlayerStateAddress,
       })
@@ -315,7 +330,7 @@ describe("EnterGame Instruction Tests", () => {
   });
 
   it("enter game > player - bad seed - game > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
 
     const playerWallet: Keypair = await makeAndFundWallet(
       5,
@@ -333,7 +348,7 @@ describe("EnterGame Instruction Tests", () => {
     )[0];
 
     await assertAsyncThrows(() =>
-      setUpEnterGame(program, newGameContext, {
+      setUpEnterGame(program, newGameContext.createPool, newGameContext, {
         playerWallet: playerWallet,
         playerStateAddress: badPlayerStateAddress,
       })
@@ -341,7 +356,7 @@ describe("EnterGame Instruction Tests", () => {
   });
 
   it("enter game > player - bad seed - payer > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
 
     const playerWallet: Keypair = await makeAndFundWallet(
       5,
@@ -359,7 +374,7 @@ describe("EnterGame Instruction Tests", () => {
     )[0];
 
     await assertAsyncThrows(() =>
-      setUpEnterGame(program, newGameContext, {
+      setUpEnterGame(program, newGameContext.createPool, newGameContext, {
         playerWallet: playerWallet,
         playerStateAddress: badPlayerStateAddress,
       })
@@ -367,7 +382,7 @@ describe("EnterGame Instruction Tests", () => {
   });
 
   it("enter game > player - owner isnt program > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
     const playerWallet: Keypair = await makeAndFundWallet(
       1,
       program.provider.connection
@@ -379,7 +394,7 @@ describe("EnterGame Instruction Tests", () => {
     );
 
     await assertAsyncThrows(() =>
-      setUpEnterGame(program, newGameContext, {
+      setUpEnterGame(program, newGameContext.createPool, newGameContext, {
         playerWallet: playerWallet,
         playerStateAddress: badPlayerStateAddress,
       })
@@ -389,7 +404,7 @@ describe("EnterGame Instruction Tests", () => {
   it("enter game > program fee destination is wrong > fails", async () => {
     await assertAsyncThrows(
       () =>
-        setUpNewGameAndEnter(program, {
+        setUpEnterGameEtc(program, {
           programFeeDestination: Keypair.generate().publicKey,
         }),
       "InvalidProgramFeeDestination"
@@ -410,11 +425,11 @@ describe("EnterGame Instruction Tests", () => {
 
     await assertAsyncThrows(
       () =>
-        setUpNewGameAndEnter(program, {
+        setUpEnterGameEtc(program, {
           playerWallet: wallet,
           playerTokenAccount: tokenAccount,
         }),
-      "InvalidTokenSourceMint"
+      "ConstraintTokenMint"
     );
   });
 
@@ -433,38 +448,38 @@ describe("EnterGame Instruction Tests", () => {
 
     await assertAsyncThrows(
       () =>
-        setUpNewGameAndEnter(program, {
+        setUpEnterGameEtc(program, {
           tokenPoolAddress: wrongTokenPool,
         }),
-      "InvalidPoolMint"
+      "ConstraintTokenMint"
     );
   });
 
   it("enter game > token pool - owner isnt program > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
     const connection: Connection = program.provider.connection;
     const wallet: Keypair = await makeAndFundWallet(1, connection);
 
     const wrongTokenPool: PublicKey = await makeAssociatedTokenAccount(
       wallet,
-      newGameContext.mint.publicKey,
+      newGameContext.createPool.mint.publicKey,
       connection
     );
 
     await assertAsyncThrows(
       () =>
-        setUpEnterGame(program, newGameContext, {
+        setUpEnterGame(program, newGameContext.createPool, newGameContext, {
           tokenPoolAddress: wrongTokenPool,
         }),
-      "InvalidPoolOwner"
+      "InvalidTokenPool"
     );
   });
 
   it("enter game > bucket index too high > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
     await assertAsyncThrows(
       () =>
-        setUpEnterGame(program, newGameContext, {
+        setUpEnterGame(program, newGameContext.createPool, newGameContext, {
           playerBucketIndex: newGameContext.gameConfig.nBuckets.toNumber() + 1,
         }),
       "BucketDoesNotExist"
@@ -474,7 +489,7 @@ describe("EnterGame Instruction Tests", () => {
   it("enter game > player tries to enter holding bucket > fails", async () => {
     await assertAsyncThrows(
       () =>
-        setUpNewGameAndEnter(program, {
+        setUpEnterGameEtc(program, {
           playerBucketIndex: 0,
         }),
       "CannotEnterHoldingBucket"
@@ -482,20 +497,21 @@ describe("EnterGame Instruction Tests", () => {
   });
 
   it("enter game > game hasnt been created > fails", async () => {
-    const newGameContext: NewGameContext = await setUpNewGame(program);
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
     const nonGame: PublicKey = await getGameAddress(
       generateGameId(),
       program.programId
     );
     await assertAsyncThrows(() =>
-      setUpEnterGame(program, newGameContext, {
+      setUpEnterGame(program, newGameContext.createPool, newGameContext, {
         gameAddress: nonGame,
       })
     );
   });
 });
 
-export interface NewGameAndEnterSetupArgs extends EnterGameSetupArgs {
+export interface EnterGameEtcSetupArgs extends EnterGameSetupArgs {
+  createPool?: CreatePoolSetupArgs;
   newGame?: NewGameSetupArgs;
 }
 
@@ -521,15 +537,16 @@ export interface EnterGameContext {
   playerBucketIndex: number;
 }
 
-export interface NewGameAndEnterContext extends EnterGameContext {
+export interface EnterGameEtcContext extends EnterGameContext {
   newGame: NewGameContext;
+  createPool: CreatePoolContext;
 }
 
-export async function setUpNewGameAndEnter(
+export async function setUpEnterGameEtc(
   program: anchor.Program<Equilibrate>,
-  customSetup?: NewGameAndEnterSetupArgs,
+  customSetup?: EnterGameEtcSetupArgs,
   debug: boolean = false
-): Promise<NewGameAndEnterContext> {
+): Promise<EnterGameEtcContext> {
   if (
     customSetup?.otherPlayers != null &&
     customSetup?.newGame?.gameConfig?.maxPlayers == null
@@ -542,14 +559,22 @@ export async function setUpNewGameAndEnter(
     );
   }
 
+  const createPoolContext: CreatePoolContext = await setUpCreatePool(
+    program,
+    customSetup?.createPool,
+    debug
+  );
+
   const newGameContext: NewGameContext = await setUpNewGame(
     program,
+    createPoolContext,
     customSetup?.newGame,
     debug
   );
 
   const enterGameContext: EnterGameContext = await setUpEnterGame(
     program,
+    createPoolContext,
     newGameContext,
     customSetup,
     debug
@@ -557,12 +582,14 @@ export async function setUpNewGameAndEnter(
 
   return {
     ...enterGameContext,
+    createPool: createPoolContext,
     newGame: newGameContext,
   };
 }
 
 export async function setUpEnterGame(
   program: anchor.Program<Equilibrate>,
+  createPoolContext: CreatePoolContext,
   newGameContext: NewGameContext,
   customSetup?: EnterGameSetupArgs,
   debug: boolean = false
@@ -605,8 +632,8 @@ export async function setUpEnterGame(
     const fundResult = await makeAndFundWalletWithTokens(
       playerStartingSol,
       playerTokens,
-      newGameContext.mint.publicKey,
-      newGameContext.mintAuthority,
+      createPoolContext.mint.publicKey,
+      createPoolContext.mintAuthority,
       connection
     );
     player = fundResult.wallet;
@@ -633,7 +660,10 @@ export async function setUpEnterGame(
 
     try {
       await program.methods
-        .enterGame(new anchor.BN(bucketIndex))
+        .enterGame(
+          new anchor.BN(bucketIndex),
+          createPoolContext.poolManagerAddress
+        )
         .accountsStrict({
           game: customSetup?.gameAddress ?? newGameContext.gameAddress,
           player: playerStateAddress,
@@ -641,7 +671,7 @@ export async function setUpEnterGame(
             customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
           depositSourceAccount: playerTokenAccount,
           tokenPool:
-            customSetup?.tokenPoolAddress ?? newGameContext.tokenPoolAddress,
+            customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
           payer: player.publicKey,
           associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
           tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
@@ -652,7 +682,7 @@ export async function setUpEnterGame(
         .rpc();
     } catch (e) {
       if (debug) {
-        console.log(JSON.stringify(e));
+        console.log(JSON.stringify(e, undefined, 2));
       }
       throw e;
     }

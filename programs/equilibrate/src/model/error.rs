@@ -38,8 +38,17 @@ pub enum EquilibrateError {
     #[msg("Pool mint must be the one configured for the game")]
     InvalidPoolMint,
 
-    #[msg("Pool owner must be the program")]
-    InvalidPoolOwner,
+    #[msg("Pool manager must be the provided pool manager")]
+    InvalidPoolManager,
+
+    #[msg("Token pool address is incorrect")]
+    InvalidTokenPool,
+
+    #[msg("Token pool owner must be the pool manager")]
+    InvalidTokenPoolOwner,
+
+    #[msg("Pool manager owner must be this program")]
+    InvalidPoolManagerOwner,
 
     #[msg("Token winnings acount mint must be the one configured for the game")]
     InvalidWinningsDestinationMint,

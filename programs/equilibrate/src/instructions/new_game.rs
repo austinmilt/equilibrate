@@ -8,16 +8,15 @@ use crate::{
     constants::{
         GAME_MAX_BUCKETS, GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS,
     },
-    id,
     model::EquilibrateError,
     state::{
         game::{Bucket, Game, GameConfig, GameState},
-        PlayerState,
+        PlayerState, PoolManager,
     },
 };
 
 #[derive(Accounts)]
-#[instruction(config: GameConfig, game_id: u64)]
+#[instruction(config: GameConfig, game_id: u64, pool_manager: Pubkey)]
 pub struct NewGame<'info> {
     #[account(
         init,
@@ -47,24 +46,14 @@ pub struct NewGame<'info> {
 
     #[account(
         mut,
-
-        constraint = deposit_source_account.mint == config.mint.key()
-        @EquilibrateError::InvalidTokenSourceMint,
-
-        owner = token::ID,
+        token::mint = config.mint,
     )]
     pub deposit_source_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-
-        constraint = token_pool.mint == config.mint
-        @EquilibrateError::InvalidPoolMint,
-
-        constraint = token_pool.owner == id()
-        @EquilibrateError::InvalidPoolOwner,
-
-        owner = token::ID,
+        token::mint = config.mint,
+        token::authority = pool_manager,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
@@ -77,7 +66,7 @@ pub struct NewGame<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Result<()> {
+pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64, pool_manager: Pubkey) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     require_gt!(
@@ -90,12 +79,15 @@ pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64) -> Resu
         config.n_buckets <= GAME_MAX_BUCKETS,
         EquilibrateError::TooManyBuckets
     );
+
     require_gt!(
         config.spill_rate_decimal_tokens_per_second_per_player,
         0,
         EquilibrateError::InvalidSpillRate
     );
     require_gt!(config.max_players, 1, EquilibrateError::InvalidMaxPlayers);
+
+    PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 
     let program_fee_transfer_context = CpiContext::new(
         ctx.accounts.system_program.to_account_info(),

@@ -1,5 +1,5 @@
 import { AnchorError } from "@project-serum/anchor";
-import { assert } from "chai";
+import { assert, AssertionError } from "chai";
 
 export async function assertAsyncThrows(
   method: () => Promise<any>,
@@ -10,6 +10,9 @@ export async function assertAsyncThrows(
     await method();
     assert.fail("Expected an error to be thrown");
   } catch (e) {
+    if (e instanceof AssertionError) {
+      throw e;
+    }
     if (anchorErrorCode || anchorErrorNumber) {
       const error: AnchorError = e as AnchorError;
       if (anchorErrorCode != null) {

@@ -18,7 +18,7 @@ export function generateGameId(): number {
 
 /**
  * @param nBucketsConfigured number of buckets configured by the user (there is always one additional bucket)
- * @returns 
+ * @returns
  */
 export function generateBucketIndex(nBucketsConfigured: number): number {
   return Math.floor(Math.random()*nBucketsConfigured) + 1;

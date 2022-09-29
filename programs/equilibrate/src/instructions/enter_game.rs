@@ -8,10 +8,11 @@ use crate::{
     constants::{GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS},
     id,
     model::EquilibrateError,
-    state::{game::Game, PlayerState},
+    state::{game::Game, PlayerState, PoolManager},
 };
 
 #[derive(Accounts)]
+#[instruction(pool_manager: Pubkey)]
 pub struct EnterGame<'info> {
     #[account(
         mut,
@@ -40,24 +41,14 @@ pub struct EnterGame<'info> {
 
     #[account(
         mut,
-
-        constraint = deposit_source_account.mint == game.config.mint.key()
-        @EquilibrateError::InvalidTokenSourceMint,
-
-        owner = token::ID,
+        token::mint = game.config.mint
     )]
     pub deposit_source_account: Account<'info, TokenAccount>,
 
     #[account(
         mut,
-
-        constraint = token_pool.mint == game.config.mint
-        @EquilibrateError::InvalidPoolMint,
-
-        constraint = token_pool.owner == id()
-        @EquilibrateError::InvalidPoolOwner,
-
-        owner = token::ID,
+        token::mint = game.config.mint,
+        // token::authority = pool_manager,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
@@ -70,7 +61,7 @@ pub struct EnterGame<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
+pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64, pool_manager: Pubkey) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     let config = &ctx.accounts.game.config.clone();
@@ -84,6 +75,8 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
     );
 
     require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
+
+    PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 
     // This is untestable since the last person leaving the game
     // also results in the game account being deleted. However, we'll
@@ -134,9 +127,7 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64) -> Result<()> {
 
     // create player state account
     let player = &mut ctx.accounts.player;
-    player.set_inner(PlayerState {
-        bucket: i_bucket,
-    });
+    player.set_inner(PlayerState { bucket: i_bucket });
     player.log_make();
 
     Ok(())

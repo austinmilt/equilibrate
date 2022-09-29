@@ -70,14 +70,6 @@ impl Game {
                 let _ = replace(&mut inflow[j], inflow_j);
             }
             let bucket = &mut buckets[i];
-            msg!(
-                "{:?},\t\t{:?},\t\t{:?},\t\t{:?},\t\t{:?}",
-                i,
-                bucket.players,
-                (bucket.decimal_tokens as f64) / 1e9,
-                (inflow[i] as f64) / 1e9,
-                (spillover_i as f64) / 1e9
-            );
             bucket.decimal_tokens = bucket
                 .decimal_tokens
                 .checked_add(inflow[i])

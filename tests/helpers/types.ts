@@ -30,3 +30,8 @@ export interface Bucket {
 export interface PlayerState {
     bucket: anchor.BN;
 }
+
+
+export interface PoolManager {
+    bump: number;
+}

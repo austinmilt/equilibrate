@@ -5,13 +5,14 @@ use anchor_spl::{
 };
 
 use crate::{
-    constants::{GAME_SEED, PLAYER_SEED},
+    constants::{GAME_SEED, PLAYER_SEED, POOL_MANAGER_SEED},
     id,
     model::EquilibrateError,
-    state::{game::Game, PlayerState},
+    state::{game::Game, PlayerState, PoolManager},
 };
 
 #[derive(Accounts)]
+#[instruction(pool_manager: Pubkey)]
 pub struct LeaveGame<'info> {
     #[account(
         mut,
@@ -39,34 +40,19 @@ pub struct LeaveGame<'info> {
 
     #[account(
         mut,
-
-        constraint = winnings_destination_account.mint == game.config.mint.key()
-        @EquilibrateError::InvalidWinningsDestinationMint,
-
-        owner = token::ID,
+        token::mint = game.config.mint,
+        token::authority = player.key(),
     )]
     pub winnings_destination_account: Account<'info, TokenAccount>,
 
+    #[account()]
+    pub pool_manager: Account<'info, PoolManager>,
+
     #[account(
         mut,
-
-        constraint = token_pool.mint == game.config.mint
-        @EquilibrateError::InvalidPoolMint,
-
-        constraint = token_pool.owner == id()
-        @EquilibrateError::InvalidPoolOwner,
-
-        owner = token::ID,
+        token::mint = game.config.mint,
     )]
     pub token_pool: Account<'info, TokenAccount>,
-
-    /// CHECK: The program itself and authority for transfering tokens out of the pool
-    #[account(
-        executable,
-        constraint = equilibrate_program.key() == id()
-        @EquilibrateError::InvalidProgramId
-    )]
-    pub equilibrate_program: UncheckedAccount<'info>,
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -76,7 +62,7 @@ pub struct LeaveGame<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
+pub fn leave_game(ctx: Context<LeaveGame>, pool_manager: Pubkey) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     // check constraints
@@ -86,6 +72,8 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     // also results in the game account being deleted. However, we'll
     // leave it in for completeness.
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
+
+    PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, ctx.accounts.game.config.mint)?;
 
     // update bucket balances and remove player and their winnings from their bucket
     let winnings: u64;
@@ -109,21 +97,28 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     game.state.last_update_epoch_seconds = now_epoch_seconds;
 
     // transfer game tokens from pool account
-    let pool_transfer_accounts = Transfer {
+    let winnings_transfer_accounts = Transfer {
         from: ctx.accounts.token_pool.to_account_info(),
         to: ctx.accounts.winnings_destination_account.to_account_info(),
-        authority: ctx.accounts.equilibrate_program.to_account_info(),
+        authority: ctx.accounts.pool_manager.to_account_info(),
     };
     let token_program = ctx.accounts.token_program.to_account_info();
-    let pool_transfer_context = CpiContext::new(token_program, pool_transfer_accounts);
-    token::transfer(pool_transfer_context, winnings)?;
+    let mint = game.config.mint.key();
+    let seeds = &[
+        POOL_MANAGER_SEED.as_ref(),
+        mint.as_ref(),
+        &[ctx.accounts.pool_manager.bump],
+    ];
+    let signer = &[&seeds[..]];
+    let winnings_transfer_context =
+        CpiContext::new_with_signer(token_program, winnings_transfer_accounts, signer);
+    token::transfer(winnings_transfer_context, winnings)?;
 
     ctx.accounts.player.log_leave(winnings);
 
     // close the game and return rent to the game creator
     if game_player_count == 1 {
         game.close(ctx.accounts.game_creator.to_account_info())?;
-
         game.log_end();
     }
 

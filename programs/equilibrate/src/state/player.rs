@@ -13,10 +13,7 @@ impl PlayerState {
     }
 
     pub fn log_make(&self) {
-        msg!(
-            "Initialized player in bucket {}",
-            self.bucket
-        );
+        msg!("Initialized player in bucket {}", self.bucket);
     }
 
     pub fn log_move(&self) {
@@ -24,9 +21,6 @@ impl PlayerState {
     }
 
     pub fn log_leave(&self, winnings: u64) {
-        msg!(
-            "Left with winnings (with decimals) {}",
-            winnings
-        );
+        msg!("Left with winnings (with decimals) {}", winnings);
     }
 }
