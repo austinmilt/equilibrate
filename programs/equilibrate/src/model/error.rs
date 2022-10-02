@@ -26,7 +26,7 @@ pub enum EquilibrateError {
     #[msg("Not allowed to enter the holding bucket (index 0)")]
     CannotEnterHoldingBucket,
 
-    #[msg("Attempted to enter move within the same bucket")]
+    #[msg("Attempted to move within the same bucket")]
     AlreadyInBucket,
 
     #[msg("Attempted to enter a game that has already ended")]

@@ -10,7 +10,7 @@ import {
   makeAssociatedTokenAccountWithPayer,
   MINT_DECIMALS,
 } from "./helpers/token";
-import { Bucket, Game, GameState } from "./helpers/types";
+import { GameState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import {
   GAME_SEED,
@@ -36,14 +36,13 @@ import {
   EnterGameEtcContext,
 } from "./enterGame";
 import { assertAsyncThrows, repeat } from "./helpers/test";
-import { getAccount } from "@solana/spl-token";
 import {
   CreatePoolContext,
   CreatePoolSetupArgs,
   setUpCreatePool,
 } from "./createPool";
 
-describe.only("LeaveGame Instruction Tests", () => {
+describe("LeaveGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
@@ -83,7 +82,6 @@ describe.only("LeaveGame Instruction Tests", () => {
           {
             gameAddress: badGameAddress,
           },
-          true
         ),
       // there's not really a situation where we can try to leave a game
       // that already exists but then provide a bad seeded game address, so
@@ -871,7 +869,7 @@ async function setUpLeaveGame(
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([customSetup?.playerWallet ?? enterGameContext.playerWallet])
-      .rpc({ skipPreflight: true });
+      .rpc();
   } catch (e) {
     if (debug) {
       console.log(JSON.stringify(e, undefined, 2));

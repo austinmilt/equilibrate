@@ -63,7 +63,7 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
     let i_current = ctx.accounts.player.bucket as usize;
     game.state.buckets[i_current].players = game.state.buckets[i_current]
         .players
-        .checked_add(1)
+        .checked_sub(1)
         .unwrap();
     game.state.buckets[i_bucket as usize].players = game.state.buckets[i_bucket as usize]
         .players
