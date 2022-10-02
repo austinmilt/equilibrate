@@ -1,17 +1,16 @@
 import * as anchor from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
-import {
-  generateGameId,
-  getGame,
-} from "./helpers/game";
+import { generateGameId, getGame } from "./helpers/game";
 import {
   generateMint,
+  getTokenBalanceWithDecimals,
+  getTokenPoolBalanceWithDecimals,
   makeAndFundWallet,
   makeAssociatedTokenAccount,
   makeAssociatedTokenAccountWithPayer,
   MINT_DECIMALS,
 } from "./helpers/token";
-import { GameState } from "./helpers/types";
+import { Bucket, Game, GameState } from "./helpers/types";
 import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import {
   GAME_SEED,
@@ -21,7 +20,13 @@ import {
   PLAYER_SEED,
 } from "./helpers/address";
 import { assert } from "chai";
-import { NewGameContext, NewGameSetupArgs, setUpNewGame } from "./newGame";
+import {
+  NewGameContext,
+  NewGameEtcContext,
+  NewGameSetupArgs,
+  setUpNewGame,
+  setUpNewGameEtc,
+} from "./newGame";
 import { testIsReady } from "./setup";
 import {
   EnterGameContext,
@@ -30,9 +35,13 @@ import {
   setUpEnterGameEtc,
   EnterGameEtcContext,
 } from "./enterGame";
-import { assertAsyncThrows } from "./helpers/test";
+import { assertAsyncThrows, repeat } from "./helpers/test";
 import { getAccount } from "@solana/spl-token";
-import { CreatePoolContext, CreatePoolSetupArgs, setUpCreatePool } from "./createPool";
+import {
+  CreatePoolContext,
+  CreatePoolSetupArgs,
+  setUpCreatePool,
+} from "./createPool";
 
 describe.only("LeaveGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -54,13 +63,15 @@ describe.only("LeaveGame Instruction Tests", () => {
       )
     )[0];
 
-    const enterEtcContext: EnterGameEtcContext =
-      await setUpEnterGameEtc(program, {
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program,
+      {
         newGame: {
           gameId: gameId,
           gameAddress: goodGameAddress,
         },
-      });
+      }
+    );
 
     await assertAsyncThrows(
       () =>
@@ -97,25 +108,26 @@ describe.only("LeaveGame Instruction Tests", () => {
       )
     )[0];
 
-    const enterEtcContext: EnterGameEtcContext =
-      await setUpEnterGameEtc(program, {
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program,
+      {
         newGame: {
           gameId: gameId,
           gameAddress: goodGameAddress,
         },
-      });
+      }
+    );
 
-    await assertAsyncThrows(
-      () =>
-        setUpLeaveGame(
-          program,
-          enterEtcContext.createPool,
-          enterEtcContext.newGame,
-          enterEtcContext,
-          {
-            gameAddress: badGameAddress,
-          }
-        )
+    await assertAsyncThrows(() =>
+      setUpLeaveGame(
+        program,
+        enterEtcContext.createPool,
+        enterEtcContext.newGame,
+        enterEtcContext,
+        {
+          gameAddress: badGameAddress,
+        }
+      )
     );
   });
 
@@ -130,8 +142,9 @@ describe.only("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - bad seed - seed > fails", async () => {
-    const enterEtcContext: EnterGameEtcContext =
-      await setUpEnterGameEtc(program);
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program
+    );
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -159,8 +172,9 @@ describe.only("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - bad seed - game  > fails", async () => {
-    const enterEtcContext: EnterGameEtcContext =
-      await setUpEnterGameEtc(program);
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program
+    );
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -188,8 +202,9 @@ describe.only("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - bad seed - payer > fails", async () => {
-    const enterEtcContext: EnterGameEtcContext =
-      await setUpEnterGameEtc(program);
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program
+    );
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -217,8 +232,9 @@ describe.only("LeaveGame Instruction Tests", () => {
   });
 
   it("leave game > player - owner isnt program > fails", async () => {
-    const enterEtcContext: EnterGameEtcContext =
-      await setUpEnterGameEtc(program);
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program
+    );
 
     const badPlayerStateAddress: PublicKey = (
       await PublicKey.findProgramAddress(
@@ -251,12 +267,13 @@ describe.only("LeaveGame Instruction Tests", () => {
     const wrongMint: Keypair = await generateMint(authority, connection);
     const wallet: Keypair = await makeAndFundWallet(1, connection);
 
-    const wrongTokenAccount: PublicKey = await makeAssociatedTokenAccountWithPayer(
-      wallet,
-      program.programId,
-      wrongMint.publicKey,
-      connection
-    );
+    const wrongTokenAccount: PublicKey =
+      await makeAssociatedTokenAccountWithPayer(
+        wallet,
+        program.programId,
+        wrongMint.publicKey,
+        connection
+      );
 
     await assertAsyncThrows(
       () =>
@@ -276,22 +293,28 @@ describe.only("LeaveGame Instruction Tests", () => {
     const context2: CreatePoolContext = await setUpCreatePool(program, {
       mint: wrongMint,
       mintAuthority: authority,
-    })
+    });
 
     const newGameContext: NewGameContext = await setUpNewGame(program, context);
-    const enterGameContext: EnterGameContext = await setUpEnterGame(program, context, newGameContext);
+    const enterGameContext: EnterGameContext = await setUpEnterGame(
+      program,
+      context,
+      newGameContext
+    );
 
     await assertAsyncThrows(
       () =>
         setUpLeaveGame(program, context, newGameContext, enterGameContext, {
           tokenPoolAddress: context2.tokenPoolAddress,
         }),
-        "ConstraintTokenOwner"
+      "ConstraintTokenOwner"
     );
   });
 
   it("leave game > token_pool - owner isnt manager > fails", async () => {
-    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(program);
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program
+    );
     const connection: Connection = program.provider.connection;
     const wallet: Keypair = await makeAndFundWallet(1, connection);
 
@@ -301,32 +324,46 @@ describe.only("LeaveGame Instruction Tests", () => {
       connection
     );
 
-
     await assertAsyncThrows(
       () =>
-        setUpLeaveGame(program, enterEtcContext.createPool, enterEtcContext.newGame, enterEtcContext, {
-          tokenPoolAddress: wrongTokenPool,
-        }),
+        setUpLeaveGame(
+          program,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
+          {
+            tokenPoolAddress: wrongTokenPool,
+          }
+        ),
       "ConstraintTokenOwner"
     );
   });
 
-  it.only("leave game > bucket balances update correctly", async () => {
+  it("leave game > bucket balances update correctly", async () => {
     const entryFee: number = 1 * Math.pow(10, MINT_DECIMALS);
-    const spillRate: number = 1 * Math.pow(10, MINT_DECIMALS);
-    const { newGame: newGameContext } = await setUpLeaveGameEtc(program, {
-      enterGame: {
-        otherPlayers: 1,
+    const spillRate: number = Number.MAX_SAFE_INTEGER;
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+      gameConfig: {
+        nBuckets: new anchor.BN(2),
+        entryFeeDecimalTokens: new anchor.BN(entryFee),
+        spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+      },
+    });
+    const enterGameContext: EnterGameContext = await setUpEnterGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      {
         playerBucketIndex: 2,
-      },
-      newGame: {
-        gameConfig: {
-          nBuckets: new anchor.BN(2),
-          entryFeeDecimalTokens: new anchor.BN(entryFee),
-          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
-        },
-      },
-    }, true);
+      }
+    );
+    await new Promise((r) => setTimeout(r, 1000));
+    await setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContext
+    );
 
     const gameState: GameState = (
       await getGame(newGameContext.gameAddress, program)
@@ -338,30 +375,379 @@ describe.only("LeaveGame Instruction Tests", () => {
     // to the holding bucket. When the second player leaves, they take their proportion
     // of the bucket they were in and leave the remaining balance to the other
     // players.
-    assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), entryFee);
-    assert.strictEqual(
-      gameState.buckets[1].decimalTokens.toNumber(),
-      entryFee
+    assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), 0);
+    assert.strictEqual(gameState.buckets[1].decimalTokens.toNumber(), entryFee);
+    assert.strictEqual(gameState.buckets[2].decimalTokens.toNumber(), 0);
+  });
+
+  it("leave game > token pool balance remains consistent", async () => {
+    const entryFee: number = 1 * Math.pow(10, MINT_DECIMALS);
+    const spillRate: number = Number.MAX_SAFE_INTEGER;
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+      gameConfig: {
+        nBuckets: new anchor.BN(2),
+        entryFeeDecimalTokens: new anchor.BN(entryFee),
+        spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+      },
+    });
+    const enterGameContext: EnterGameContext = await setUpEnterGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      {
+        playerBucketIndex: 2,
+      }
     );
+    await new Promise((r) => setTimeout(r, 1000));
+    await setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContext
+    );
+    await setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContext,
+      {
+        playerStateAddress: newGameContext.playerStateAddress,
+        playerTokenAccount: newGameContext.playerTokenAccount,
+        playerWallet: newGameContext.playerWallet,
+      }
+    );
+
+    // the player who just left should take all the winnings in their bucket, which
+    // amounts to half the total pool, which is the same as the entry fee
     assert.strictEqual(
-      gameState.buckets[2].decimalTokens.toNumber(),
-      0
+      await getTokenPoolBalanceWithDecimals(
+        newGameContext.createPool.mint.publicKey,
+        program.programId,
+        program.provider.connection
+      ),
+      entryFee
     );
   });
 
-  it("leave game > token pool balance remains consistent", async () => {});
+  it(
+    "leave game > last player to leave > gets remaining tokens",
+    repeat(5, async () => {
+      const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
+      const totalPlayers: number = Math.round(Math.random() * 10) + 2;
+      const enterGameContexts: EnterGameContext[] = [
+        {
+          ...newGameContext,
+          playerBucketIndex: 1,
+        },
+      ];
+      // first player has already entered the game, so start with additional players
+      // entering the game (player index i=1)
+      for (let i = 1; i < totalPlayers; i++) {
+        enterGameContexts.push(
+          await setUpEnterGame(
+            program,
+            newGameContext.createPool,
+            newGameContext
+          )
+        );
+      }
 
-  it("leave game > last player to leave > gets remaining tokens", async () => {});
+      // have every player but the last one leave so we can get the game state
+      // to figure out how much the last player should receive
+      for (let i = 0; i < totalPlayers - 1; i++) {
+        await setUpLeaveGame(
+          program,
+          newGameContext.createPool,
+          newGameContext,
+          enterGameContexts[i]
+        );
+      }
 
-  it("leave game > last player to leave > game is closed and rent returned to creator", async () => {});
+      const tokenPoolBalanceBeforeLastPlayerLeaves: number =
+        await getTokenPoolBalanceWithDecimals(
+          newGameContext.createPool.mint.publicKey,
+          program.programId,
+          program.provider.connection
+        );
 
-  it("leave game > game creator is only one to play > gets remaining tokens", async () => {});
+      const lastPlayerBalanceBeforeTheyLeave: number =
+        await getTokenBalanceWithDecimals(
+          enterGameContexts[totalPlayers - 1].playerWallet.publicKey,
+          newGameContext.createPool.mint.publicKey,
+          program.provider.connection
+        );
 
-  it("leave game > game creator is only one to play > game is closed and rent returned to creator", async () => {});
+      await setUpLeaveGame(
+        program,
+        newGameContext.createPool,
+        newGameContext,
+        enterGameContexts[totalPlayers - 1]
+      );
 
-  it("leave game > non-last player to leave > gets proportion of their bucket tokens", async () => {});
+      const tokenPoolBalanceAtEnd: number =
+        await getTokenPoolBalanceWithDecimals(
+          newGameContext.createPool.mint.publicKey,
+          program.programId,
+          program.provider.connection
+        );
 
-  it("leave game > player state account is closed and rent returned to payer", async () => {});
+      assert.strictEqual(tokenPoolBalanceAtEnd, 0);
+
+      const lastPlayerBalanceAfterTheyLeave: number =
+        await getTokenBalanceWithDecimals(
+          enterGameContexts[totalPlayers - 1].playerWallet.publicKey,
+          newGameContext.createPool.mint.publicKey,
+          program.provider.connection
+        );
+
+      assert.approximately(
+        lastPlayerBalanceAfterTheyLeave - lastPlayerBalanceBeforeTheyLeave,
+        tokenPoolBalanceBeforeLastPlayerLeaves,
+        Math.pow(1, -MINT_DECIMALS)
+      );
+    })
+  );
+
+  it("leave game > last player to leave > game is closed and rent returned to creator", async () => {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
+    const totalPlayers: number = Math.round(Math.random() * 10) + 2;
+    const enterGameContexts: EnterGameContext[] = [
+      {
+        ...newGameContext,
+        playerBucketIndex: 1,
+      },
+    ];
+    // first player has already entered the game, so start with additional players
+    // entering the game (player index i=1)
+    for (let i = 1; i < totalPlayers; i++) {
+      enterGameContexts.push(
+        await setUpEnterGame(program, newGameContext.createPool, newGameContext)
+      );
+    }
+
+    // have every player but the last one leave so we can get the game state
+    // to figure out how much the last player should receive
+    for (let i = 0; i < totalPlayers - 1; i++) {
+      await setUpLeaveGame(
+        program,
+        newGameContext.createPool,
+        newGameContext,
+        enterGameContexts[i]
+      );
+    }
+
+    assert.isNotNull(
+      await program.provider.connection.getAccountInfo(
+        newGameContext.gameAddress
+      )
+    );
+    const creatorSolBalanceBeforeGameEnd: number =
+      await program.provider.connection.getBalance(
+        newGameContext.playerWallet.publicKey
+      );
+
+    await setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContexts[totalPlayers - 1]
+    );
+
+    assert.isNull(
+      await program.provider.connection.getAccountInfo(
+        newGameContext.gameAddress
+      )
+    );
+
+    const creatorSolBalanceAfterGameEnd: number =
+      await program.provider.connection.getBalance(
+        newGameContext.playerWallet.publicKey
+      );
+
+    // would be better to check the exact rent returned but that's more difficult than
+    // the test really commands, given transaction costs etc
+    assert(creatorSolBalanceBeforeGameEnd < creatorSolBalanceAfterGameEnd);
+  });
+
+  it("leave game > game creator is only one to play > gets remaining tokens", async () => {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
+    const creatorTokenBalanceBeforeTheyLeave: number =
+      await getTokenBalanceWithDecimals(
+        newGameContext.playerWallet.publicKey,
+        newGameContext.createPool.mint.publicKey,
+        program.provider.connection
+      );
+
+    await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
+      ...newGameContext,
+      playerBucketIndex: 1,
+    });
+
+    const creatorTokenBalanceAfterTheyLeave: number =
+      await getTokenBalanceWithDecimals(
+        newGameContext.playerWallet.publicKey,
+        newGameContext.createPool.mint.publicKey,
+        program.provider.connection
+      );
+
+    assert.strictEqual(
+      creatorTokenBalanceAfterTheyLeave,
+      creatorTokenBalanceBeforeTheyLeave +
+        newGameContext.gameConfig.entryFeeDecimalTokens.toNumber()
+    );
+  });
+
+  it("leave game > game creator is only one to play > game is closed and rent returned to creator", async () => {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
+
+    assert.isNotNull(
+      await program.provider.connection.getAccountInfo(
+        newGameContext.gameAddress
+      )
+    );
+    const creatorSolBalanceBeforeGameEnd: number =
+      await program.provider.connection.getBalance(
+        newGameContext.playerWallet.publicKey
+      );
+
+    await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
+      ...newGameContext,
+      playerBucketIndex: 1,
+    });
+
+    assert.isNull(
+      await program.provider.connection.getAccountInfo(
+        newGameContext.gameAddress
+      )
+    );
+
+    const creatorSolBalanceAfterGameEnd: number =
+      await program.provider.connection.getBalance(
+        newGameContext.playerWallet.publicKey
+      );
+
+    // would be better to check the exact rent returned but that's more difficult than
+    // the test really commands, given transaction costs etc
+    assert(creatorSolBalanceBeforeGameEnd < creatorSolBalanceAfterGameEnd);
+  });
+
+  it("leave game > non-last player to leave > gets proportion of their bucket tokens", async () => {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
+    const totalPlayers: number = Math.round(Math.random() * 10) + 2;
+    const enterGameContexts: EnterGameContext[] = [
+      {
+        ...newGameContext,
+        playerBucketIndex: 1,
+      },
+    ];
+    // first player has already entered the game, so start with additional players
+    // entering the game (player index i=1)
+    for (let i = 1; i < totalPlayers; i++) {
+      enterGameContexts.push(
+        await setUpEnterGame(program, newGameContext.createPool, newGameContext)
+      );
+    }
+
+    // have every player but the last one leave so we can get the game state
+    // to figure out how much the last player should receive
+    const playerToCheckIndex: number = Math.floor(Math.random() * totalPlayers);
+    for (let i = 0; i < playerToCheckIndex; i++) {
+      await setUpLeaveGame(
+        program,
+        newGameContext.createPool,
+        newGameContext,
+        enterGameContexts[i]
+      );
+    }
+
+    const playerBalanceBeforeTheyLeave: number =
+      await getTokenBalanceWithDecimals(
+        enterGameContexts[playerToCheckIndex].playerWallet.publicKey,
+        newGameContext.createPool.mint.publicKey,
+        program.provider.connection
+      );
+
+    // need to get bucket balances to equilibrium
+    await setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContexts[playerToCheckIndex]
+    );
+
+    const playerBalanceAfterTheyLeave: number =
+      await getTokenBalanceWithDecimals(
+        enterGameContexts[playerToCheckIndex].playerWallet.publicKey,
+        newGameContext.createPool.mint.publicKey,
+        program.provider.connection
+      );
+
+    // ideally we'd check exactly the amount the player gets in winnings, but because of the
+    // time-based spillover, that's very hard to do. Instead, we'll just check that the player gets
+    // something. Other tests check that the correct balances occur in simpler scenarios
+    assert(playerBalanceAfterTheyLeave > playerBalanceBeforeTheyLeave);
+  });
+
+  it("leave game > player state account is closed and rent returned to payer", async () => {
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
+    const totalPlayers: number = Math.round(Math.random() * 10) + 2;
+    const enterGameContexts: EnterGameContext[] = [
+      {
+        ...newGameContext,
+        playerBucketIndex: 1,
+      },
+    ];
+    // first player has already entered the game, so start with additional players
+    // entering the game (player index i=1)
+    for (let i = 1; i < totalPlayers; i++) {
+      enterGameContexts.push(
+        await setUpEnterGame(program, newGameContext.createPool, newGameContext)
+      );
+    }
+
+    // have every player but the last one leave so we can get the game state
+    // to figure out how much the last player should receive
+    const playerToCheckIndex: number = Math.floor(Math.random() * totalPlayers);
+    for (let i = 0; i < playerToCheckIndex; i++) {
+      await setUpLeaveGame(
+        program,
+        newGameContext.createPool,
+        newGameContext,
+        enterGameContexts[i]
+      );
+    }
+
+    assert.isNotNull(
+      await program.provider.connection.getAccountInfo(
+        enterGameContexts[playerToCheckIndex].playerStateAddress
+      )
+    );
+
+    const playerSolBalanceBeforeTheyLeave: number =
+      await program.provider.connection.getBalance(
+        enterGameContexts[playerToCheckIndex].playerWallet.publicKey
+      );
+
+    await setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContexts[playerToCheckIndex]
+    );
+
+    assert.isNull(
+      await program.provider.connection.getAccountInfo(
+        enterGameContexts[playerToCheckIndex].playerStateAddress
+      )
+    );
+
+    const playerSolBalanceAfterTheyLeave: number =
+      await program.provider.connection.getBalance(
+        enterGameContexts[playerToCheckIndex].playerWallet.publicKey
+      );
+
+    assert(playerSolBalanceBeforeTheyLeave < playerSolBalanceAfterTheyLeave);
+  });
 });
 
 export interface LeaveGameEtcSetupArgs extends LeaveGameSetupArgs {
@@ -396,7 +782,7 @@ export async function setUpLeaveGameEtc(
     program,
     customSetup?.createPool,
     debug
-  )
+  );
 
   const newGameContext: NewGameContext = await setUpNewGame(
     program,
@@ -444,7 +830,11 @@ async function setUpLeaveGame(
   if (customSetup?.playerStateAddress) {
     playerStateAddress = playerStateAddress;
   } else if (customSetup?.playerWallet) {
-    playerStateAddress = await getPlayerStateAddress(newGameContext.gameAddress, customSetup!.playerWallet.publicKey, program.programId);
+    playerStateAddress = await getPlayerStateAddress(
+      newGameContext.gameAddress,
+      customSetup!.playerWallet.publicKey,
+      program.programId
+    );
   } else {
     playerStateAddress = enterGameContext.playerStateAddress;
   }
@@ -453,14 +843,17 @@ async function setUpLeaveGame(
   if (customSetup?.playerTokenAccount) {
     playerTokenAccount = customSetup.playerTokenAccount;
   } else if (customSetup?.playerWallet) {
-    playerTokenAccount = await getAssociatedTokenAddress(createPoolContext.mint.publicKey, customSetup?.playerWallet.publicKey);
+    playerTokenAccount = await getAssociatedTokenAddress(
+      createPoolContext.mint.publicKey,
+      customSetup?.playerWallet.publicKey
+    );
   } else {
     playerTokenAccount = enterGameContext.playerTokenAccount;
   }
 
   try {
     await program.methods
-      .leaveGame(createPoolContext.poolManagerAddress)
+      .leaveGame()
       .accountsStrict({
         game: customSetup?.gameAddress ?? newGameContext.gameAddress,
         gameCreator:
@@ -468,14 +861,17 @@ async function setUpLeaveGame(
         player: playerStateAddress,
         winningsDestinationAccount: playerTokenAccount,
         poolManager: createPoolContext.poolManagerAddress,
-        tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
-        payer: customSetup?.playerWallet?.publicKey ?? enterGameContext.playerWallet.publicKey,
+        tokenPool:
+          customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
+        payer:
+          customSetup?.playerWallet?.publicKey ??
+          enterGameContext.playerWallet.publicKey,
         associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
         tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([customSetup?.playerWallet ?? enterGameContext.playerWallet])
-      .rpc();
+      .rpc({ skipPreflight: true });
   } catch (e) {
     if (debug) {
       console.log(JSON.stringify(e, undefined, 2));

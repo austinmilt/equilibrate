@@ -45,7 +45,7 @@ export async function getTokenPoolAddress(
     [
       anchor.utils.bytes.utf8.encode(POOL_SEED),
       mint.toBuffer(),
-      (await getPoolManagerAddress(mint, programId)).toBuffer()
+      (await getPoolManagerAddress(mint, programId))[0].toBuffer()
     ],
     programId
   ))[0];
@@ -55,14 +55,14 @@ export async function getTokenPoolAddress(
 export async function getPoolManagerAddress(
   mint: PublicKey,
   programId: PublicKey
-): Promise<PublicKey> {
+): Promise<[PublicKey, number]> {
   return (await PublicKey.findProgramAddress(
     [
       anchor.utils.bytes.utf8.encode(POOL_MANAGER_SEED),
       mint.toBuffer(),
     ],
     programId
-  ))[0];
+  ));
 }
 
 

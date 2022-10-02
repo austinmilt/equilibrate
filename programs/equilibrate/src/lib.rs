@@ -13,11 +13,16 @@ declare_id!("Equi1CUTu17WagNVmpFq4SvcqvrEeNYWqqgzw4MppmjS");
 pub mod equilibrate {
     use super::*;
 
-    pub fn create_pool(ctx: Context<CreatePool>) -> Result<()> {
-        instructions::create_pool(ctx)
+    pub fn create_pool(ctx: Context<CreatePool>, pool_manager_bump: u8) -> Result<()> {
+        instructions::create_pool(ctx, pool_manager_bump)
     }
 
-    pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64, pool_manager: Pubkey) -> Result<()> {
+    pub fn new_game(
+        ctx: Context<NewGame>,
+        config: GameConfig,
+        game_id: u64,
+        pool_manager: Pubkey,
+    ) -> Result<()> {
         instructions::new_game(ctx, config, game_id, pool_manager)
     }
 
@@ -29,7 +34,7 @@ pub mod equilibrate {
         instructions::move_buckets(ctx, bucket)
     }
 
-    pub fn leave_game(ctx: Context<LeaveGame>, pool_manager: Pubkey) -> Result<()> {
-        instructions::leave_game(ctx, pool_manager)
+    pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
+        instructions::leave_game(ctx)
     }
 }

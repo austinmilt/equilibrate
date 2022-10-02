@@ -66,7 +66,12 @@ pub struct NewGame<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn new_game(ctx: Context<NewGame>, config: GameConfig, game_id: u64, pool_manager: Pubkey) -> Result<()> {
+pub fn new_game(
+    ctx: Context<NewGame>,
+    config: GameConfig,
+    game_id: u64,
+    pool_manager: Pubkey,
+) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     require_gt!(

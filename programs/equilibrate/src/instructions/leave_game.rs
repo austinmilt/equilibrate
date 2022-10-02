@@ -12,7 +12,6 @@ use crate::{
 };
 
 #[derive(Accounts)]
-#[instruction(pool_manager: Pubkey)]
 pub struct LeaveGame<'info> {
     #[account(
         mut,
@@ -41,11 +40,10 @@ pub struct LeaveGame<'info> {
     #[account(
         mut,
         token::mint = game.config.mint,
-        token::authority = player.key(),
+        token::authority = payer,
     )]
     pub winnings_destination_account: Account<'info, TokenAccount>,
 
-    #[account()]
     pub pool_manager: Account<'info, PoolManager>,
 
     #[account(
@@ -62,7 +60,7 @@ pub struct LeaveGame<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn leave_game(ctx: Context<LeaveGame>, pool_manager: Pubkey) -> Result<()> {
+pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     // check constraints
@@ -73,7 +71,11 @@ pub fn leave_game(ctx: Context<LeaveGame>, pool_manager: Pubkey) -> Result<()> {
     // leave it in for completeness.
     require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
 
-    PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, ctx.accounts.game.config.mint)?;
+    PoolManager::validate_token_pool(
+        &ctx.accounts.token_pool,
+        ctx.accounts.pool_manager.key(),
+        ctx.accounts.game.config.mint,
+    )?;
 
     // update bucket balances and remove player and their winnings from their bucket
     let winnings: u64;
@@ -87,6 +89,10 @@ pub fn leave_game(ctx: Context<LeaveGame>, pool_manager: Pubkey) -> Result<()> {
         winnings = game.state.buckets[i_current]
             .decimal_tokens
             .checked_div(game.state.buckets[i_current].players.into())
+            .unwrap();
+        game.state.buckets[i_current].decimal_tokens = game.state.buckets[i_current]
+            .decimal_tokens
+            .checked_sub(winnings)
             .unwrap();
         game.state.buckets[0].players = game.state.buckets[0].players.checked_sub(1).unwrap();
         game.state.buckets[i_current].players = game.state.buckets[i_current]

@@ -3,7 +3,6 @@ import * as spl from "@solana/spl-token";
 import { Equilibrate } from "../target/types/equilibrate";
 import {
   generateMint,
-  getTokenBalanceWithoutDecimals,
   makeAndFundWallet,
   makeAndFundWalletWithTokens,
   MINT_DECIMALS,
@@ -135,7 +134,7 @@ describe("CreatePool Instruction Tests", () => {
     const connection: Connection = program.provider.connection;
     const authority: Keypair = await makeAndFundWallet(5, connection);
     const mint: Keypair = await generateMint(authority, connection);
-    const poolManagerAddress: PublicKey = await getPoolManagerAddress(mint.publicKey, program.programId);
+    const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
     const tokenPoolAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
@@ -152,6 +151,7 @@ describe("CreatePool Instruction Tests", () => {
         mint: mint,
         mintAuthority: authority,
         poolManagerAddress: poolManagerAddress,
+        poolManagerBump: poolManagerBump,
         tokenPoolAddress: tokenPoolAddress
       })
     );
@@ -161,7 +161,7 @@ describe("CreatePool Instruction Tests", () => {
     const connection: Connection = program.provider.connection;
     const authority: Keypair = await makeAndFundWallet(5, connection);
     const mint: Keypair = await generateMint(authority, connection);
-    const poolManagerAddress: PublicKey = await getPoolManagerAddress(mint.publicKey, program.programId);
+    const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
     const tokenPoolAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
@@ -178,6 +178,7 @@ describe("CreatePool Instruction Tests", () => {
         mint: mint,
         mintAuthority: authority,
         poolManagerAddress: poolManagerAddress,
+        poolManagerBump: poolManagerBump,
         tokenPoolAddress: tokenPoolAddress
       })
     );
@@ -187,7 +188,7 @@ describe("CreatePool Instruction Tests", () => {
     const connection: Connection = program.provider.connection;
     const authority: Keypair = await makeAndFundWallet(5, connection);
     const mint: Keypair = await generateMint(authority, connection);
-    const poolManagerAddress: PublicKey = await getPoolManagerAddress(mint.publicKey, program.programId);
+    const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
     const tokenPoolAddress: PublicKey = (
       await PublicKey.findProgramAddress(
         [
@@ -204,6 +205,7 @@ describe("CreatePool Instruction Tests", () => {
         mint: mint,
         mintAuthority: authority,
         poolManagerAddress: poolManagerAddress,
+        poolManagerBump: poolManagerBump,
         tokenPoolAddress: tokenPoolAddress
       })
     );
@@ -215,6 +217,7 @@ export interface CreatePoolSetupArgs {
   mint?: Keypair;
   tokenPoolAddress?: PublicKey;
   poolManagerAddress?: PublicKey;
+  poolManagerBump?: number;
 }
 
 export interface CreatePoolContext {
@@ -236,9 +239,17 @@ export async function setUpCreatePool(
   const mint =
     customSetup?.mint ?? (await generateMint(mintAuthority, connection));
 
-  const poolManagerAddress: PublicKey =
-    customSetup?.poolManagerAddress ??
-    (await getPoolManagerAddress(mint.publicKey, program.programId));
+  let poolManagerAddress: PublicKey;
+  let poolManagerBump: number;
+  if (customSetup?.poolManagerAddress) {
+    if (customSetup?.poolManagerBump == null) {
+      throw new Error('Must provide poolManagerBump if you provide poolManagerAddress');
+    }
+    poolManagerAddress = customSetup.poolManagerAddress;
+    poolManagerBump = customSetup.poolManagerBump;
+  } else {
+    [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
+  }
 
   const tokenPoolAddress: PublicKey =
     customSetup?.tokenPoolAddress ??
@@ -248,7 +259,7 @@ export async function setUpCreatePool(
 
   try {
     await program.methods
-      .createPool()
+      .createPool(poolManagerBump)
       .accountsStrict({
         poolManager: poolManagerAddress,
         gameMint: mint.publicKey,

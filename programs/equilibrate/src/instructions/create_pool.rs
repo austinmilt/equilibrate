@@ -48,6 +48,8 @@ pub struct CreatePool<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn create_pool(_: Context<CreatePool>) -> Result<()> {
+pub fn create_pool(ctx: Context<CreatePool>, pool_manager_bump: u8) -> Result<()> {
+    ctx.accounts.pool_manager.bump = pool_manager_bump;
+
     Ok(())
 }

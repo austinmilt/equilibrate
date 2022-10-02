@@ -48,7 +48,6 @@ pub struct EnterGame<'info> {
     #[account(
         mut,
         token::mint = game.config.mint,
-        // token::authority = pool_manager,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
