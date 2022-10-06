@@ -159,7 +159,7 @@ pub fn new_game(
     let player = &mut ctx.accounts.first_player;
     player.set_inner(PlayerState {
         // first player always goes into the first bucket
-        bucket: 0,
+        bucket: 1,
     });
     player.log_make();
 

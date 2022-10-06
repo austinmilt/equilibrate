@@ -17,7 +17,6 @@ import {
   NewGameContext,
   NewGameEtcContext,
   NewGameSetupArgs,
-  setUpNewGame,
   setUpNewGameEtc,
 } from "./newGame";
 import { testIsReady } from "./setup";
@@ -32,7 +31,6 @@ import { assertAsyncThrows } from "./helpers/test";
 import {
   CreatePoolContext,
   CreatePoolSetupArgs,
-  setUpCreatePool,
 } from "./createPool";
 
 describe("MoveBuckets Instruction Tests", () => {
@@ -240,7 +238,11 @@ describe("MoveBuckets Instruction Tests", () => {
 
   it("move buckets > player tries to move to the same bucket > fails", async () => {
     const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
-      program);
+      program, {newGame: {
+        gameConfig: {
+          nBuckets: new anchor.BN(Math.ceil(Math.random()*5 + 2))
+        }
+      }});
 
     await assertAsyncThrows(() =>
       setUpMoveBuckets(
@@ -257,7 +259,12 @@ describe("MoveBuckets Instruction Tests", () => {
   });
 
   it("move buckets > player tries to move to a bucket that doesnt exist > fails", async () => {
-    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(program);
+    const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+      program, {newGame: {
+        gameConfig: {
+          nBuckets: new anchor.BN(Math.ceil(Math.random()*5 + 2))
+        }
+      }});
 
     await assertAsyncThrows(() =>
       setUpMoveBuckets(
@@ -275,7 +282,11 @@ describe("MoveBuckets Instruction Tests", () => {
 
   it("move buckets > player tries to move to holding bucket > fails", async () => {
     const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
-      program);
+      program, {newGame: {
+        gameConfig: {
+          nBuckets: new anchor.BN(Math.ceil(Math.random()*5 + 2))
+        }
+      }});
 
     await assertAsyncThrows(() =>
       setUpMoveBuckets(
@@ -393,50 +404,7 @@ export interface MoveBucketsEtcContext extends MoveBucketsContext {
   enterGame: EnterGameContext;
 }
 
-export async function setUpLeaveGameEtc(
-  program: anchor.Program<Equilibrate>,
-  customSetup?: MoveBucketsEtcSetupArgs,
-  debug: boolean = false
-): Promise<MoveBucketsEtcContext> {
-  const createPoolContext: CreatePoolContext = await setUpCreatePool(
-    program,
-    customSetup?.createPool,
-    debug
-  );
-
-  const newGameContext: NewGameContext = await setUpNewGame(
-    program,
-    createPoolContext,
-    customSetup?.newGame,
-    debug
-  );
-
-  const enterGameContext: EnterGameContext = await setUpEnterGame(
-    program,
-    createPoolContext,
-    newGameContext,
-    customSetup?.enterGame,
-    debug
-  );
-
-  const leaveGameContext: MoveBucketsContext = await setUpMoveBuckets(
-    program,
-    createPoolContext,
-    newGameContext,
-    enterGameContext,
-    customSetup,
-    debug
-  );
-
-  return {
-    ...leaveGameContext,
-    createPool: createPoolContext,
-    newGame: newGameContext,
-    enterGame: enterGameContext,
-  };
-}
-
-async function setUpMoveBuckets(
+export async function setUpMoveBuckets(
   program: anchor.Program<Equilibrate>,
   createPoolContext: CreatePoolContext,
   newGameContext: NewGameContext,
@@ -459,11 +427,17 @@ async function setUpMoveBuckets(
     playerStateAddress = enterGameContext.playerStateAddress;
   }
 
-  const newBucketIndex: number =
-    customSetup?.newBucketIndex ??
-    Math.floor(
-      Math.random() * (newGameContext.gameConfig.nBuckets.toNumber() - 1) + 1
-    );
+  let newBucketIndex: number;
+  if (customSetup?.newBucketIndex != null) {
+    newBucketIndex = customSetup.newBucketIndex;
+  } else {
+    newBucketIndex = enterGameContext.playerBucketIndex;
+    while (newBucketIndex === enterGameContext.playerBucketIndex) {
+      newBucketIndex = Math.floor(
+        Math.random() * (newGameContext.gameConfig.nBuckets.toNumber() - 1) + 1
+      );
+    }
+  }
 
   try {
     await program.methods

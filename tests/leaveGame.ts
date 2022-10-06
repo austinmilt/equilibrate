@@ -814,7 +814,7 @@ export async function setUpLeaveGameEtc(
   };
 }
 
-async function setUpLeaveGame(
+export async function setUpLeaveGame(
   program: anchor.Program<Equilibrate>,
   createPoolContext: CreatePoolContext,
   newGameContext: NewGameContext,

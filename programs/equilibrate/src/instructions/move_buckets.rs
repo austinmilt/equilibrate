@@ -46,6 +46,7 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
     );
 
     require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
+    msg!("new bucket {}", i_bucket);
 
     let game_player_count: u64 = ctx
         .accounts
