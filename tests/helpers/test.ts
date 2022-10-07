@@ -42,3 +42,8 @@ export function repeat<T>(
     return result;
   }
 }
+
+
+export async function sleep(durationMs: number): Promise<void> {
+  return await new Promise((r) => setTimeout(r, durationMs));
+}

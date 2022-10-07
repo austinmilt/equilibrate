@@ -88,7 +88,7 @@ describe("NewGame Instruction Tests", () => {
       playerStateAddress,
       program
     );
-    assert.strictEqual(firstPlayerState.bucket.toNumber(), 0);
+    assert.strictEqual(firstPlayerState.bucket.toNumber(), 1);
   });
 
   it("create a new game > all good > program fee is transferred", async () => {

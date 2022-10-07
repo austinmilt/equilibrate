@@ -19,8 +19,8 @@ impl PoolManager {
         1 // manager bump
     }
 
-    pub fn validate_token_pool<'info>(
-        token_pool: &Account<'info, TokenAccount>,
+    pub fn validate_token_pool(
+        token_pool: &Account<'_, TokenAccount>,
         manager_address: Pubkey,
         game_mint: Pubkey,
     ) -> Result<()> {

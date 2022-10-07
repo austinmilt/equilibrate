@@ -9,6 +9,7 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct MoveBuckets<'info> {
+    /// game account of the game being played
     #[account(
         mut,
         seeds = [GAME_SEED.as_ref(), &game.id.to_le_bytes()],
@@ -16,6 +17,7 @@ pub struct MoveBuckets<'info> {
     )]
     pub game: Account<'info, Game>,
 
+    /// player state account of the moving player
     #[account(
         mut,
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
@@ -24,6 +26,7 @@ pub struct MoveBuckets<'info> {
     )]
     pub player: Account<'info, PlayerState>,
 
+    /// payer for paying moving transaction fee
     #[account(mut)]
     pub payer: Signer<'info>,
 }

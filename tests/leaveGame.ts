@@ -35,7 +35,7 @@ import {
   setUpEnterGameEtc,
   EnterGameEtcContext,
 } from "./enterGame";
-import { assertAsyncThrows, repeat } from "./helpers/test";
+import { assertAsyncThrows, repeat, sleep } from "./helpers/test";
 import {
   CreatePoolContext,
   CreatePoolSetupArgs,
@@ -100,7 +100,7 @@ describe("LeaveGame Instruction Tests", () => {
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(GAME_SEED),
-          new anchor.BN(generateGameId()).toArrayLike(Buffer, "le", 8),
+          new anchor.BN(gameId + 1).toArrayLike(Buffer, "le", 8),
         ],
         program.programId
       )
@@ -305,7 +305,7 @@ describe("LeaveGame Instruction Tests", () => {
         setUpLeaveGame(program, context, newGameContext, enterGameContext, {
           tokenPoolAddress: context2.tokenPoolAddress,
         }),
-      "ConstraintTokenOwner"
+      "ConstraintTokenMint"
     );
   });
 
@@ -333,7 +333,7 @@ describe("LeaveGame Instruction Tests", () => {
             tokenPoolAddress: wrongTokenPool,
           }
         ),
-      "ConstraintTokenOwner"
+      "InvalidTokenPool"
     );
   });
 
@@ -355,7 +355,8 @@ describe("LeaveGame Instruction Tests", () => {
         playerBucketIndex: 2,
       }
     );
-    await new Promise((r) => setTimeout(r, 1000));
+
+    await sleep(1000);
     await setUpLeaveGame(
       program,
       newGameContext.createPool,
@@ -396,23 +397,12 @@ describe("LeaveGame Instruction Tests", () => {
         playerBucketIndex: 2,
       }
     );
-    await new Promise((r) => setTimeout(r, 1000));
+    await sleep(1000);
     await setUpLeaveGame(
       program,
       newGameContext.createPool,
       newGameContext,
       enterGameContext
-    );
-    await setUpLeaveGame(
-      program,
-      newGameContext.createPool,
-      newGameContext,
-      enterGameContext,
-      {
-        playerStateAddress: newGameContext.playerStateAddress,
-        playerTokenAccount: newGameContext.playerTokenAccount,
-        playerWallet: newGameContext.playerWallet,
-      }
     );
 
     // the player who just left should take all the winnings in their bucket, which
@@ -864,7 +854,6 @@ export async function setUpLeaveGame(
         payer:
           customSetup?.playerWallet?.publicKey ??
           enterGameContext.playerWallet.publicKey,
-        associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
         tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
       })

@@ -1,8 +1,5 @@
 use anchor_lang::{prelude::*, system_program};
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{self, Token, TokenAccount, Transfer},
-};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS},
@@ -14,6 +11,7 @@ use crate::{
 #[derive(Accounts)]
 #[instruction(pool_manager: Pubkey)]
 pub struct EnterGame<'info> {
+    /// game account of the game being played
     #[account(
         mut,
         seeds = [GAME_SEED.as_ref(), &game.id.to_le_bytes()],
@@ -21,6 +19,7 @@ pub struct EnterGame<'info> {
     )]
     pub game: Account<'info, Game>,
 
+    /// player state account of the new player
     #[account(
         init,
         payer = payer,
@@ -39,25 +38,32 @@ pub struct EnterGame<'info> {
     )]
     pub program_fee_destination: AccountInfo<'info>,
 
+    /// player's token acount from which their entry deposit is taken
     #[account(
         mut,
         token::mint = game.config.mint
     )]
     pub deposit_source_account: Account<'info, TokenAccount>,
 
+    /// token pool of the mint/game
     #[account(
         mut,
         token::mint = game.config.mint,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
+    /// payer for creating player state, must be the player
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// standard SPL token program, for transferring token deposit
     pub token_program: Program<'info, Token>,
-    pub system_program: Program<'info, System>,
+
+    /// standard rent sysvar, for determining rent for created accounts
     pub rent: Sysvar<'info, Rent>,
+
+    /// standard system program, for creating accounts
+    pub system_program: Program<'info, System>,
 }
 
 pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64, pool_manager: Pubkey) -> Result<()> {

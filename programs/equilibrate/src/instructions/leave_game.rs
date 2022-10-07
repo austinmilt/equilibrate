@@ -1,8 +1,5 @@
 use anchor_lang::{prelude::*, AccountsClose};
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token::{self, Token, TokenAccount, Transfer},
-};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED, POOL_MANAGER_SEED},
@@ -13,6 +10,7 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct LeaveGame<'info> {
+    /// game account of the game being played
     #[account(
         mut,
         seeds = [GAME_SEED.as_ref(), &game.id.to_le_bytes()],
@@ -28,6 +26,8 @@ pub struct LeaveGame<'info> {
     )]
     pub game_creator: AccountInfo<'info>,
 
+    /// player state account of the leaving player; rent will be returned
+    /// to the payer (who must be the player)
     #[account(
         mut,
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
@@ -37,6 +37,8 @@ pub struct LeaveGame<'info> {
     )]
     pub player: Account<'info, PlayerState>,
 
+    /// player's token acount to which their winnings are transferred;
+    /// owner/authority must be the payer
     #[account(
         mut,
         token::mint = game.config.mint,
@@ -44,19 +46,25 @@ pub struct LeaveGame<'info> {
     )]
     pub winnings_destination_account: Account<'info, TokenAccount>,
 
+    /// token pool manager that signs the transaction to transfer
+    /// winnings to the player
     pub pool_manager: Account<'info, PoolManager>,
 
+    /// token pool of the mint/game
     #[account(
         mut,
         token::mint = game.config.mint,
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
+    /// transaction fee payer; receives rent of closed player account
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    pub associated_token_program: Program<'info, AssociatedToken>,
+    /// standard SPL token program, for transferring winnings
     pub token_program: Program<'info, Token>,
+
+    /// standard system program, for closing accounts
     pub system_program: Program<'info, System>,
 }
 

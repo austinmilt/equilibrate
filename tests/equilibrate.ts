@@ -4,7 +4,7 @@ import { Program } from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import { CreatePoolContext, setUpCreatePool } from "./createPool";
 import { EnterGameContext, setUpEnterGame } from "./enterGame";
-import { generateGameConfig } from "./helpers/game";
+import { generateGameConfig, generateGameId } from "./helpers/game";
 import {
   generateMint,
   getTokenPoolBalanceWithDecimals,
@@ -14,7 +14,7 @@ import { GameConfig } from "./helpers/types";
 import { LeaveGameContext, setUpLeaveGame } from "./leaveGame";
 import { MoveBucketsContext, setUpMoveBuckets } from "./moveBuckets";
 import { NewGameContext, setUpNewGame } from "./newGame";
-import { repeat } from "./helpers/test";
+import { repeat, sleep } from "./helpers/test";
 import { getPoolManagerAddress, getTokenPoolAddress } from "./helpers/address";
 import { assert } from "chai";
 
@@ -36,11 +36,16 @@ describe("Game simulation tests", () => {
 
   it("concurrent games of same mint dont steal tokens from one another", async () => {
     const gameA: GameRunner = await GameRunner.random(program);
-    const games: GameRunner[] = [gameA, ...Array(9).fill(null).map(() => gameA.withSameConfig())]
+    const games: GameRunner[] = [
+      gameA,
+      ...Array(9)
+        .fill(null)
+        .map(() => gameA.withSameConfig()),
+    ];
     await games[0].start();
-    await Promise.all(games.slice(1).map(g => g.start()));
-    await Promise.all(games.map(g => g.step(5)));
-    await Promise.all(games.map(g => g.finish()));
+    await Promise.all(games.slice(1).map((g) => g.start()));
+    await Promise.all(games.map((g) => g.step(5)));
+    await Promise.all(games.map((g) => g.finish()));
 
     const newGameContext: NewGameContext = gameA.getNewGameContext();
 
@@ -184,6 +189,7 @@ class GameRunner {
       this.createPoolContext,
       {
         gameConfig: this.gameConfig,
+        gameId: generateGameId() + Math.round(Math.random() * 1000000000),
       },
       this.debug
     );

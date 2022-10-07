@@ -10,6 +10,7 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct CreatePool<'info> {
+    /// account that signs for token payouts from the token pool
     #[account(
         init,
         seeds = [
@@ -24,6 +25,7 @@ pub struct CreatePool<'info> {
     )]
     pub pool_manager: Account<'info, PoolManager>,
 
+    /// token pool for all games played with `game_mint`
     #[account(
         init,
         seeds = [
@@ -38,13 +40,20 @@ pub struct CreatePool<'info> {
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
+    /// payer to create the token pool and pool manager accounts
     #[account(mut)]
     pub payer: Signer<'info>,
 
+    /// mint of the token pool for all games of this mint
     pub game_mint: Account<'info, Mint>,
 
+    /// standard SPL token program, for creating the token pool
     pub token_program: Program<'info, Token>,
+
+    /// standard rent sysvar, for determining rent for created accounts
     pub rent: Sysvar<'info, Rent>,
+
+    /// standard system program, for creating accounts
     pub system_program: Program<'info, System>,
 }
 

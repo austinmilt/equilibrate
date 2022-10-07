@@ -27,7 +27,7 @@ import {
   setUpEnterGameEtc,
   EnterGameEtcContext,
 } from "./enterGame";
-import { assertAsyncThrows } from "./helpers/test";
+import { assertAsyncThrows, sleep } from "./helpers/test";
 import {
   CreatePoolContext,
   CreatePoolSetupArgs,
@@ -87,7 +87,7 @@ describe("MoveBuckets Instruction Tests", () => {
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(GAME_SEED),
-          new anchor.BN(generateGameId()).toArrayLike(Buffer, "le", 8),
+          new anchor.BN(gameId + 1).toArrayLike(Buffer, "le", 8),
         ],
         program.programId
       )
@@ -363,7 +363,7 @@ describe("MoveBuckets Instruction Tests", () => {
         playerBucketIndex: 2,
       }
     );
-    await new Promise((r) => setTimeout(r, 1000));
+    await sleep(1000);
     await setUpMoveBuckets(
       program,
       newGameContext.createPool,

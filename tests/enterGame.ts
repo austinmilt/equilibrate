@@ -673,7 +673,6 @@ export async function setUpEnterGame(
           tokenPool:
             customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
           payer: player.publicKey,
-          associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
           tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
