@@ -5,3 +5,27 @@ target
 **/*.rs.bk
 node_modules
 test-ledger
+
+# Logs
+app/logs
+*.log
+app/npm-debug.log*
+app/yarn-debug.log*
+app/yarn-error.log*
+app/pnpm-debug.log*
+app/lerna-debug.log*
+
+app/dist
+app/dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
