@@ -18,7 +18,10 @@ pub enum EquilibrateError {
     InvalidSpillRate,
 
     #[msg("Game must allow more than 1 player")]
-    InvalidMaxPlayers,
+    MaxPlayersTooSmall,
+
+    #[msg("Game cannot have more than 10,000 players")]
+    MaxPlayersTooLarge,
 
     #[msg("Attempted to enter a bucket that doesnt exist")]
     BucketDoesNotExist,

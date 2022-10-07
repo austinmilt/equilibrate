@@ -6,7 +6,8 @@ use anchor_spl::{
 
 use crate::{
     constants::{
-        GAME_MAX_BUCKETS, GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS,
+        GAME_MAX_BUCKETS, GAME_MAX_PLAYERS, GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION,
+        PROGRAM_FEE_LAMPORTS,
     },
     model::EquilibrateError,
     state::{
@@ -90,7 +91,12 @@ pub fn new_game(
         0,
         EquilibrateError::InvalidSpillRate
     );
-    require_gt!(config.max_players, 1, EquilibrateError::InvalidMaxPlayers);
+    require_gt!(config.max_players, 1, EquilibrateError::MaxPlayersTooSmall);
+    require_gte!(
+        GAME_MAX_PLAYERS,
+        config.max_players,
+        EquilibrateError::MaxPlayersTooLarge
+    );
 
     PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 

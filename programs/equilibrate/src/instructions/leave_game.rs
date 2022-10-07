@@ -72,12 +72,12 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     // check constraints
-    let game_player_count: u64 = ctx.accounts.game.get_player_count();
+    let game_player_count = ctx.accounts.game.get_player_count();
 
     // This is untestable since the last person leaving the game
     // also results in the game account being deleted. However, we'll
     // leave it in for completeness.
-    require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
+    require_gt!(game_player_count, 0, EquilibrateError::GameIsOver);
 
     PoolManager::validate_token_pool(
         &ctx.accounts.token_pool,

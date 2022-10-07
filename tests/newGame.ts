@@ -72,8 +72,8 @@ describe("NewGame Instruction Tests", () => {
       gameConfig.nBuckets + 1
     );
     assert.strictEqual(
-      game.config.maxPlayers.toNumber(),
-      gameConfig.maxPlayers.toNumber()
+      game.config.maxPlayers,
+      gameConfig.maxPlayers
     );
     assert.strictEqual(game.state.buckets[0].players, 1);
     assert.strictEqual(
@@ -448,7 +448,7 @@ export interface NewGameSetupArgs {
     entryFeeDecimalTokens?: anchor.BN;
     spillRateDecimalTokensPerSecondPerPlayer?: anchor.BN;
     nBuckets?: number;
-    maxPlayers?: anchor.BN;
+    maxPlayers?: number;
   };
   gameId?: number;
   gameAddress?: PublicKey;

@@ -78,12 +78,12 @@ impl Game {
         }
     }
 
-    pub fn get_player_count(&self) -> u64 {
+    pub fn get_player_count(&self) -> u16 {
         self.state
             .buckets
             .iter()
-            .map(|b| b.players as u64)
-            .sum::<u64>()
+            .map(|b| b.players)
+            .sum::<u16>()
             .checked_div(2) // with the holding bucket we are double-counting players
             .unwrap()
     }
@@ -111,7 +111,7 @@ pub struct GameConfig {
     pub entry_fee_decimal_tokens: u64,
     pub spill_rate_decimal_tokens_per_second_per_player: u64,
     pub n_buckets: u8,
-    pub max_players: u64,
+    pub max_players: u16,
 }
 
 impl GameConfig {

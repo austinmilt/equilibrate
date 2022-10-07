@@ -232,7 +232,7 @@ describe("EnterGame Instruction Tests", () => {
           otherPlayers: maxPlayers,
           newGame: {
             gameConfig: {
-              maxPlayers: new anchor.BN(maxPlayers),
+              maxPlayers: maxPlayers,
             },
           },
         }),
@@ -554,9 +554,7 @@ export async function setUpEnterGameEtc(
     customSetup = customSetup ?? {};
     customSetup.newGame = customSetup.newGame ?? {};
     customSetup.newGame.gameConfig = customSetup.newGame.gameConfig ?? {};
-    customSetup.newGame.gameConfig.maxPlayers = new anchor.BN(
-      customSetup.otherPlayers * 10
-    );
+    customSetup.newGame.gameConfig.maxPlayers = customSetup.otherPlayers * 10;
   }
 
   const createPoolContext: CreatePoolContext = await setUpCreatePool(

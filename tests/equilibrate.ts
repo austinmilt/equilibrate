@@ -219,7 +219,7 @@ class GameRunner {
         return;
       }
       const event: Event = chooseEvent(
-        this.playerContexts.length < this.gameConfig.maxPlayers.toNumber()
+        this.playerContexts.length < this.gameConfig.maxPlayers
       );
       if (event === Event.ENTER) {
         await this.playerEnters();

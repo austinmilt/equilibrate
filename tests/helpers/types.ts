@@ -13,7 +13,7 @@ export interface GameConfig {
     entryFeeDecimalTokens: anchor.BN;
     spillRateDecimalTokensPerSecondPerPlayer: anchor.BN;
     nBuckets: number;
-    maxPlayers: anchor.BN;
+    maxPlayers: number;
 }
 
 export interface GameState {

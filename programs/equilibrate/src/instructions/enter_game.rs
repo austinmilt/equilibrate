@@ -79,16 +79,16 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u8, pool_manager: Pubkey) -
         EquilibrateError::BucketDoesNotExist
     );
 
-    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
+    require_gt!(i_bucket, 0u8, EquilibrateError::CannotEnterHoldingBucket);
 
     PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 
     // This is untestable since the last person leaving the game
     // also results in the game account being deleted. However, we'll
     // leave it in for completeness.
-    let game_player_count: u64 = ctx.accounts.game.get_player_count();
+    let game_player_count = ctx.accounts.game.get_player_count();
 
-    require_gt!(game_player_count, 0u64, EquilibrateError::GameIsOver);
+    require_gt!(game_player_count, 0, EquilibrateError::GameIsOver);
 
     require_gt!(
         config.max_players,
