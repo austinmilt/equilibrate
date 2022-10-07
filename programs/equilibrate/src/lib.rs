@@ -30,13 +30,13 @@ pub mod equilibrate {
     }
 
     /// Enters the player into an existing game
-    pub fn enter_game(ctx: Context<EnterGame>, bucket: u64, pool_manager: Pubkey) -> Result<()> {
+    pub fn enter_game(ctx: Context<EnterGame>, bucket: u8, pool_manager: Pubkey) -> Result<()> {
         instructions::enter_game(ctx, bucket, pool_manager)
     }
 
     /// Moves the player from one bucket into another. Trying to move into the same
     /// bucket the player is already in will result in a failure.
-    pub fn move_buckets(ctx: Context<MoveBuckets>, bucket: u64) -> Result<()> {
+    pub fn move_buckets(ctx: Context<MoveBuckets>, bucket: u8) -> Result<()> {
         instructions::move_buckets(ctx, bucket)
     }
 

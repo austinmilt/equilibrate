@@ -1,9 +1,7 @@
 import * as anchor from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import { generateGameId, getGame, getPlayerState } from "./helpers/game";
-import {
-  MINT_DECIMALS,
-} from "./helpers/token";
+import { MINT_DECIMALS } from "./helpers/token";
 import { GameState, PlayerState } from "./helpers/types";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import {
@@ -28,10 +26,7 @@ import {
   EnterGameEtcContext,
 } from "./enterGame";
 import { assertAsyncThrows, sleep } from "./helpers/test";
-import {
-  CreatePoolContext,
-  CreatePoolSetupArgs,
-} from "./createPool";
+import { CreatePoolContext, CreatePoolSetupArgs } from "./createPool";
 
 describe("MoveBuckets Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
@@ -63,16 +58,17 @@ describe("MoveBuckets Instruction Tests", () => {
       }
     );
 
-    await assertAsyncThrows(() =>
-      setUpMoveBuckets(
-        program,
-        enterEtcContext.createPool,
-        enterEtcContext.newGame,
-        enterEtcContext,
-        {
-          gameAddress: badGameAddress,
-        }
-      ),
+    await assertAsyncThrows(
+      () =>
+        setUpMoveBuckets(
+          program,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
+          {
+            gameAddress: badGameAddress,
+          }
+        ),
       "AccountNotInitialized"
     );
   });
@@ -238,86 +234,102 @@ describe("MoveBuckets Instruction Tests", () => {
 
   it("move buckets > player tries to move to the same bucket > fails", async () => {
     const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
-      program, {newGame: {
-        gameConfig: {
-          nBuckets: new anchor.BN(Math.ceil(Math.random()*5 + 2))
-        }
-      }});
+      program,
+      {
+        newGame: {
+          gameConfig: {
+            nBuckets: Math.ceil(Math.random() * 5 + 2),
+          },
+        },
+      }
+    );
 
-    await assertAsyncThrows(() =>
-      setUpMoveBuckets(
-        program,
-        enterEtcContext.createPool,
-        enterEtcContext.newGame,
-        enterEtcContext,
-        {
-          newBucketIndex: enterEtcContext.playerBucketIndex
-        }
-      ),
+    await assertAsyncThrows(
+      () =>
+        setUpMoveBuckets(
+          program,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
+          {
+            newBucketIndex: enterEtcContext.playerBucketIndex,
+          }
+        ),
       "AlreadyInBucket"
     );
   });
 
   it("move buckets > player tries to move to a bucket that doesnt exist > fails", async () => {
     const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
-      program, {newGame: {
-        gameConfig: {
-          nBuckets: new anchor.BN(Math.ceil(Math.random()*5 + 2))
-        }
-      }});
+      program,
+      {
+        newGame: {
+          gameConfig: {
+            nBuckets: Math.ceil(Math.random() * 5 + 2),
+          },
+        },
+      }
+    );
 
-    await assertAsyncThrows(() =>
-      setUpMoveBuckets(
-        program,
-        enterEtcContext.createPool,
-        enterEtcContext.newGame,
-        enterEtcContext,
-        {
-          newBucketIndex: enterEtcContext.newGame.gameConfig.nBuckets.toNumber() + 1
-        }
-      ),
+    await assertAsyncThrows(
+      () =>
+        setUpMoveBuckets(
+          program,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
+          {
+            newBucketIndex: enterEtcContext.newGame.gameConfig.nBuckets + 1,
+          }
+        ),
       "BucketDoesNotExist"
     );
   });
 
   it("move buckets > player tries to move to holding bucket > fails", async () => {
     const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
-      program, {newGame: {
-        gameConfig: {
-          nBuckets: new anchor.BN(Math.ceil(Math.random()*5 + 2))
-        }
-      }});
+      program,
+      {
+        newGame: {
+          gameConfig: {
+            nBuckets: Math.ceil(Math.random() * 5 + 2),
+          },
+        },
+      }
+    );
 
-    await assertAsyncThrows(() =>
-      setUpMoveBuckets(
-        program,
-        enterEtcContext.createPool,
-        enterEtcContext.newGame,
-        enterEtcContext,
-        {
-          newBucketIndex: 0
-        }
-      ),
+    await assertAsyncThrows(
+      () =>
+        setUpMoveBuckets(
+          program,
+          enterEtcContext.createPool,
+          enterEtcContext.newGame,
+          enterEtcContext,
+          {
+            newBucketIndex: 0,
+          }
+        ),
       "CannotEnterHoldingBucket"
     );
   });
 
   it("move buckets > all good > player is moved to desired bucket", async () => {
-    const nBuckets: number = Math.round(Math.random()*10) + 2;
+    const nBuckets: number = Math.round(Math.random() * 10) + 2;
     const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
-      program, {
+      program,
+      {
         newGame: {
           gameConfig: {
-            nBuckets: new anchor.BN(nBuckets)
-          }
-        }
+            nBuckets: nBuckets,
+          },
+        },
       }
     );
 
     const bucketIndexBeforeMove: number = enterEtcContext.playerBucketIndex;
-    let newBucketIndex: number = Math.ceil(Math.random()*nBuckets);
+    let newBucketIndex: number = Math.ceil(Math.random() * nBuckets);
     while (bucketIndexBeforeMove === newBucketIndex) {
-      newBucketIndex = Math.ceil(Math.random()*nBuckets);
+      newBucketIndex = Math.ceil(Math.random() * nBuckets);
     }
 
     const gameStateBeforeMove: GameState = (
@@ -330,19 +342,28 @@ describe("MoveBuckets Instruction Tests", () => {
       enterEtcContext.newGame,
       enterEtcContext,
       {
-        newBucketIndex: newBucketIndex
+        newBucketIndex: newBucketIndex,
       }
-    )
+    );
 
     const gameStateAfterMove: GameState = (
       await getGame(enterEtcContext.newGame.gameAddress, program)
     ).state;
 
-    const playerState: PlayerState = await getPlayerState(enterEtcContext.playerStateAddress, program);
+    const playerState: PlayerState = await getPlayerState(
+      enterEtcContext.playerStateAddress,
+      program
+    );
 
-    assert.strictEqual(gameStateAfterMove.buckets[bucketIndexBeforeMove].players, gameStateBeforeMove.buckets[bucketIndexBeforeMove].players - 1);
-    assert.strictEqual(gameStateAfterMove.buckets[newBucketIndex].players, gameStateBeforeMove.buckets[newBucketIndex].players + 1);
-    assert.strictEqual(playerState.bucket.toNumber(), newBucketIndex);
+    assert.strictEqual(
+      gameStateAfterMove.buckets[bucketIndexBeforeMove].players,
+      gameStateBeforeMove.buckets[bucketIndexBeforeMove].players - 1
+    );
+    assert.strictEqual(
+      gameStateAfterMove.buckets[newBucketIndex].players,
+      gameStateBeforeMove.buckets[newBucketIndex].players + 1
+    );
+    assert.strictEqual(playerState.bucket, newBucketIndex);
   });
 
   it("move buckets > bucket balances update correctly", async () => {
@@ -350,7 +371,7 @@ describe("MoveBuckets Instruction Tests", () => {
     const spillRate: number = Number.MAX_SAFE_INTEGER;
     const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
       gameConfig: {
-        nBuckets: new anchor.BN(2),
+        nBuckets: 2,
         entryFeeDecimalTokens: new anchor.BN(entryFee),
         spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
       },
@@ -434,14 +455,14 @@ export async function setUpMoveBuckets(
     newBucketIndex = enterGameContext.playerBucketIndex;
     while (newBucketIndex === enterGameContext.playerBucketIndex) {
       newBucketIndex = Math.floor(
-        Math.random() * (newGameContext.gameConfig.nBuckets.toNumber() - 1) + 1
+        Math.random() * (newGameContext.gameConfig.nBuckets - 1) + 1
       );
     }
   }
 
   try {
     await program.methods
-      .moveBuckets(new anchor.BN(newBucketIndex))
+      .moveBuckets(newBucketIndex)
       .accountsStrict({
         game: customSetup?.gameAddress ?? newGameContext.gameAddress,
         player: playerStateAddress,
@@ -458,5 +479,5 @@ export async function setUpMoveBuckets(
     throw e;
   }
 
-  return {newBucketIndex: newBucketIndex};
+  return { newBucketIndex: newBucketIndex };
 }

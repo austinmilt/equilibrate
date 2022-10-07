@@ -1,4 +1,4 @@
-pub const GAME_MAX_BUCKETS: u64 = 64;
+pub const GAME_MAX_BUCKETS: u8 = 64;
 pub const PROGRAM_FEE_LAMPORTS: u64 = 15000000;
 // PubKey("EQui1fSdC2HetpETDAoaLaPYvYR7xVuXmLyUiiEvfA2h").as_ref()
 // or (in ts) new PublicKey("EQui1fSdC2HetpETDAoaLaPYvYR7xVuXmLyUiiEvfA2h").toBuffer()

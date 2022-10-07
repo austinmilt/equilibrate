@@ -74,7 +74,7 @@ describe("EnterGame Instruction Tests", () => {
     );
     const game: Game = await getGame(context.newGame.gameAddress, program);
 
-    assert.strictEqual(playerState.bucket.toNumber(), playerBucketIndex);
+    assert.strictEqual(playerState.bucket, playerBucketIndex);
     assert.strictEqual(
       game.state.buckets[playerBucketIndex].players,
       gameBeforePlayerEnters.state.buckets[playerBucketIndex].players + 1
@@ -167,7 +167,7 @@ describe("EnterGame Instruction Tests", () => {
       playerBucketIndex: 2,
       newGame: {
         gameConfig: {
-          nBuckets: new anchor.BN(2),
+          nBuckets: 2,
           entryFeeDecimalTokens: new anchor.BN(entryFee),
           spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
         },
@@ -284,7 +284,7 @@ describe("EnterGame Instruction Tests", () => {
       await PublicKey.findProgramAddress(
         [
           anchor.utils.bytes.utf8.encode(GAME_SEED),
-          new anchor.BN(gameId+1).toArrayLike(Buffer, "le", 8),
+          new anchor.BN(gameId + 1).toArrayLike(Buffer, "le", 8),
         ],
         program.programId
       )
@@ -480,7 +480,7 @@ describe("EnterGame Instruction Tests", () => {
     await assertAsyncThrows(
       () =>
         setUpEnterGame(program, newGameContext.createPool, newGameContext, {
-          playerBucketIndex: newGameContext.gameConfig.nBuckets.toNumber() + 1,
+          playerBucketIndex: newGameContext.gameConfig.nBuckets + 1,
         }),
       "BucketDoesNotExist"
     );
@@ -655,15 +655,12 @@ export async function setUpEnterGame(
 
     bucketIndex =
       customSetup?.playerBucketIndex == null
-        ? chooseBucket(newGameContext.gameConfig.nBuckets.toNumber())
+        ? chooseBucket(newGameContext.gameConfig.nBuckets)
         : customSetup?.playerBucketIndex;
 
     try {
       await program.methods
-        .enterGame(
-          new anchor.BN(bucketIndex),
-          createPoolContext.poolManagerAddress
-        )
+        .enterGame(bucketIndex, createPoolContext.poolManagerAddress)
         .accountsStrict({
           game: customSetup?.gameAddress ?? newGameContext.gameAddress,
           player: playerStateAddress,

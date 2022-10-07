@@ -12,7 +12,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn get_space(n_buckets_configured: u64) -> usize {
+    pub fn get_space(n_buckets_configured: u8) -> usize {
         8 + // account discriminator
         GameConfig::get_space() +
         GameState::get_space(n_buckets_configured) +
@@ -27,10 +27,11 @@ impl Game {
 
         // compute the spillover from each bucket, then
         // equally distribute that across other buckets
-        let n_buckets = self.state.buckets.len();
-        let mut inflow: Vec<u64> = vec![0; n_buckets];
+        let n_buckets_including_holding = self.state.buckets.len();
+        let n_buckets_playable = (n_buckets_including_holding as u64) - 1;
+        let mut inflow: Vec<u64> = vec![0; n_buckets_including_holding];
         let buckets = &mut self.state.buckets;
-        for i in 0..n_buckets {
+        for i in 0..n_buckets_including_holding {
             let bucket = &mut buckets[i];
             let spillover_i_desired = bucket.compute_spillover(
                 self.config.spill_rate_decimal_tokens_per_second_per_player,
@@ -39,8 +40,8 @@ impl Game {
             let spillover_to_j = match i {
                 // the holding bucket spills into every other bucket, but self.config.n_buckets
                 // does not include the holding bucket (so add 1)
-                0 => spillover_div_peers(spillover_i_desired, self.config.n_buckets + 1),
-                _ => spillover_div_peers(spillover_i_desired, self.config.n_buckets),
+                0 => spillover_div_peers(spillover_i_desired, n_buckets_playable + 1),
+                _ => spillover_div_peers(spillover_i_desired, n_buckets_playable),
             };
             // Ideally spillover_i_desired and spillover_i would be equal. However, because
             // spillover_to_j uses integer division, the cumulative spillover from i to other
@@ -48,12 +49,10 @@ impl Game {
             // (spillover_i_desired). Thus, the final spillover_i should take into account
             // how  much is actually going into other buckets.
             let spillover_i = match i {
-                0 => spillover_to_j.checked_mul(self.config.n_buckets).unwrap(),
-                _ => spillover_to_j
-                    .checked_mul(self.config.n_buckets - 1)
-                    .unwrap(),
+                0 => spillover_to_j.checked_mul(n_buckets_playable).unwrap(),
+                _ => spillover_to_j.checked_mul(n_buckets_playable - 1).unwrap(),
             };
-            for j in (i + 1)..n_buckets {
+            for j in (i + 1)..n_buckets_including_holding {
                 let bucket = &mut buckets[j];
                 let spillover_j = bucket.compute_spillover(
                     self.config.spill_rate_decimal_tokens_per_second_per_player,
@@ -62,7 +61,7 @@ impl Game {
                 let spillover_to_i = match i {
                     // the holding bucket only flows out, not in (except for getting the entry fees)
                     0 => 0,
-                    _ => spillover_div_peers(spillover_j, self.config.n_buckets),
+                    _ => spillover_div_peers(spillover_j, n_buckets_playable),
                 };
                 let inflow_i = inflow[i].checked_add(spillover_to_i).unwrap();
                 let inflow_j = inflow[j].checked_add(spillover_to_j).unwrap();
@@ -98,11 +97,11 @@ impl Game {
     }
 }
 
-fn spillover_div_peers(spillover: u64, n_buckets_configured: u64) -> u64 {
+fn spillover_div_peers(spillover: u64, n_peers: u64) -> u64 {
     spillover
         // computing spillover to other buckets players can enter, i.e.
         // this doesnt include the holding bucket
-        .checked_div(n_buckets_configured.checked_sub(1).unwrap())
+        .checked_div(n_peers.checked_sub(1).unwrap())
         .unwrap()
 }
 
@@ -111,7 +110,7 @@ pub struct GameConfig {
     pub mint: Pubkey,
     pub entry_fee_decimal_tokens: u64,
     pub spill_rate_decimal_tokens_per_second_per_player: u64,
-    pub n_buckets: u64,
+    pub n_buckets: u8,
     pub max_players: u64,
 }
 
@@ -120,7 +119,7 @@ impl GameConfig {
         32 + // token
         8 + // entry_fee_decimal_tokens
         8 + // spill_rate_decimal_tokens_per_second_per_player
-        8 + // n_buckets
+        1 + // n_buckets
         8 // max_players
     }
 }
@@ -132,7 +131,7 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn get_space(n_buckets_configured: u64) -> usize {
+    pub fn get_space(n_buckets_configured: u8) -> usize {
         // add 1 to the number of buckets to include the holding bucket
         4 + Bucket::get_space()*((n_buckets_configured.checked_add(1).unwrap()) as usize) + // buckets
         8 // last_update_epoch_ms

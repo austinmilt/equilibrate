@@ -33,7 +33,7 @@ export function generateGameConfig(mint: PublicKey): GameConfig {
     mint: mint,
     entryFeeDecimalTokens: new anchor.BN(entryFeeDecimalTokens),
     spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
-    nBuckets: new anchor.BN(nBuckets),
+    nBuckets: nBuckets,
     maxPlayers: new anchor.BN(maxPlayers)
   };
 }

@@ -81,7 +81,7 @@ describe("LeaveGame Instruction Tests", () => {
           enterEtcContext,
           {
             gameAddress: badGameAddress,
-          },
+          }
         ),
       // there's not really a situation where we can try to leave a game
       // that already exists but then provide a bad seeded game address, so
@@ -342,7 +342,7 @@ describe("LeaveGame Instruction Tests", () => {
     const spillRate: number = Number.MAX_SAFE_INTEGER;
     const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
       gameConfig: {
-        nBuckets: new anchor.BN(2),
+        nBuckets: 2,
         entryFeeDecimalTokens: new anchor.BN(entryFee),
         spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
       },
@@ -384,7 +384,7 @@ describe("LeaveGame Instruction Tests", () => {
     const spillRate: number = Number.MAX_SAFE_INTEGER;
     const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
       gameConfig: {
-        nBuckets: new anchor.BN(2),
+        nBuckets: 2,
         entryFeeDecimalTokens: new anchor.BN(entryFee),
         spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
       },

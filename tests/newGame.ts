@@ -55,10 +55,7 @@ describe("NewGame Instruction Tests", () => {
       game.config.entryFeeDecimalTokens.toNumber(),
       gameConfig.entryFeeDecimalTokens.toNumber()
     );
-    assert.strictEqual(
-      game.config.nBuckets.toNumber(),
-      gameConfig.nBuckets.toNumber()
-    );
+    assert.strictEqual(game.config.nBuckets, gameConfig.nBuckets);
     assert.strictEqual(
       game.config.spillRateDecimalTokensPerSecondPerPlayer.toNumber(),
       gameConfig.spillRateDecimalTokensPerSecondPerPlayer.toNumber()
@@ -72,7 +69,7 @@ describe("NewGame Instruction Tests", () => {
     assert.strictEqual(
       game.state.buckets.length,
       // account for the holding bucket (bucket 0)
-      gameConfig.nBuckets.toNumber() + 1
+      gameConfig.nBuckets + 1
     );
     assert.strictEqual(
       game.config.maxPlayers.toNumber(),
@@ -88,7 +85,7 @@ describe("NewGame Instruction Tests", () => {
       playerStateAddress,
       program
     );
-    assert.strictEqual(firstPlayerState.bucket.toNumber(), 1);
+    assert.strictEqual(firstPlayerState.bucket, 1);
   });
 
   it("create a new game > all good > program fee is transferred", async () => {
@@ -124,8 +121,12 @@ describe("NewGame Instruction Tests", () => {
 
   it("create a new game > all good > game tokens are transfered", async () => {
     const connection: Connection = program.provider.connection;
-    const { playerWallet, createPool: {mint}, gameConfig, playerStartingTokens } =
-      await setUpNewGameEtc(program);
+    const {
+      playerWallet,
+      createPool: { mint },
+      gameConfig,
+      playerStartingTokens,
+    } = await setUpNewGameEtc(program);
 
     const playerTokenBalance: number = await getTokenBalanceWithoutDecimals(
       playerWallet.publicKey,
@@ -365,7 +366,7 @@ describe("NewGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpNewGameEtc(program, {
         gameConfig: {
-          nBuckets: new anchor.BN(1),
+          nBuckets: 1,
         },
       })
     );
@@ -375,9 +376,7 @@ describe("NewGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpNewGameEtc(program, {
         gameConfig: {
-          nBuckets: new anchor.BN(
-            Math.ceil(Math.random() * 1000 + MAX_GAME_BUCKETS)
-          ),
+          nBuckets: Math.ceil(Math.random() * 1000 + MAX_GAME_BUCKETS),
         },
       })
     );
@@ -387,41 +386,52 @@ describe("NewGame Instruction Tests", () => {
     await assertAsyncThrows(() =>
       setUpNewGameEtc(program, {
         gameConfig: {
-          nBuckets: new anchor.BN(1),
+          nBuckets: 1,
         },
       })
     );
   });
 
   it("create a new game > spill rate is non-positive > fails", async () => {
-    await assertAsyncThrows(() =>
-      setUpNewGameEtc(program, {
-        gameConfig: {
-          spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(0),
-        },
-      }),
+    await assertAsyncThrows(
+      () =>
+        setUpNewGameEtc(program, {
+          gameConfig: {
+            spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(0),
+          },
+        }),
       "InvalidSpillRate"
     );
   });
 
   it("create a new game > wrong pool manager address > fails", async () => {
-    const createPoolContext1: CreatePoolContext = await setUpCreatePool(program);
-    const createPoolContext2: CreatePoolContext = await setUpCreatePool(program);
-    await assertAsyncThrows(() =>
-      setUpNewGame(program, createPoolContext1, {
-        poolManager: createPoolContext2.poolManagerAddress,
-      }),
+    const createPoolContext1: CreatePoolContext = await setUpCreatePool(
+      program
+    );
+    const createPoolContext2: CreatePoolContext = await setUpCreatePool(
+      program
+    );
+    await assertAsyncThrows(
+      () =>
+        setUpNewGame(program, createPoolContext1, {
+          poolManager: createPoolContext2.poolManagerAddress,
+        }),
       "ConstraintTokenOwner"
     );
   });
 
   it("create a new game > wrong token pool address > fails", async () => {
-    const createPoolContext1: CreatePoolContext = await setUpCreatePool(program);
-    const createPoolContext2: CreatePoolContext = await setUpCreatePool(program);
-    await assertAsyncThrows(() =>
-      setUpNewGame(program, createPoolContext1, {
-        tokenPoolAddress: createPoolContext2.tokenPoolAddress
-      }),
+    const createPoolContext1: CreatePoolContext = await setUpCreatePool(
+      program
+    );
+    const createPoolContext2: CreatePoolContext = await setUpCreatePool(
+      program
+    );
+    await assertAsyncThrows(
+      () =>
+        setUpNewGame(program, createPoolContext1, {
+          tokenPoolAddress: createPoolContext2.tokenPoolAddress,
+        }),
       "ConstraintTokenOwner"
     );
   });
@@ -437,7 +447,7 @@ export interface NewGameSetupArgs {
   gameConfig?: {
     entryFeeDecimalTokens?: anchor.BN;
     spillRateDecimalTokensPerSecondPerPlayer?: anchor.BN;
-    nBuckets?: anchor.BN;
+    nBuckets?: number;
     maxPlayers?: anchor.BN;
   };
   gameId?: number;
@@ -500,7 +510,9 @@ export async function setUpNewGame(
   if (!testIsReady()) throw new Error("not ready");
   const connection: Connection = program.provider.connection;
 
-  const config: GameConfig = generateGameConfig(createPoolContext.mint.publicKey);
+  const config: GameConfig = generateGameConfig(
+    createPoolContext.mint.publicKey
+  );
   if (customSetup?.gameConfig?.entryFeeDecimalTokens != null) {
     config.entryFeeDecimalTokens =
       customSetup?.gameConfig?.entryFeeDecimalTokens;
@@ -567,14 +579,19 @@ export async function setUpNewGame(
 
   try {
     await program.methods
-      .newGame(config, new anchor.BN(gameId), customSetup?.poolManager ?? createPoolContext.poolManagerAddress)
+      .newGame(
+        config,
+        new anchor.BN(gameId),
+        customSetup?.poolManager ?? createPoolContext.poolManagerAddress
+      )
       .accountsStrict({
         game: gameAddress,
         firstPlayer: playerStateAddress,
         programFeeDestination:
           customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
         depositSourceAccount: playerTokenAccount,
-        tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
+        tokenPool:
+          customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
         payer: player.publicKey,
         associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
         tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,

@@ -31,7 +31,7 @@ pub struct MoveBuckets<'info> {
     pub payer: Signer<'info>,
 }
 
-pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
+pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u8) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     // check constraints
@@ -44,11 +44,11 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u64) -> Result<()> {
     require_gt!(
         // there is one more bucket than the creator configures: the holding bucket
         ctx.accounts.game.state.buckets.len() as u64,
-        i_bucket,
+        i_bucket as u64,
         EquilibrateError::BucketDoesNotExist
     );
 
-    require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
+    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
     msg!("new bucket {}", i_bucket);
 
     let game_player_count: u64 = ctx

@@ -12,7 +12,7 @@ export interface GameConfig {
     mint: PublicKey;
     entryFeeDecimalTokens: anchor.BN;
     spillRateDecimalTokensPerSecondPerPlayer: anchor.BN;
-    nBuckets: anchor.BN;
+    nBuckets: number;
     maxPlayers: anchor.BN;
 }
 
@@ -28,7 +28,7 @@ export interface Bucket {
 
 
 export interface PlayerState {
-    bucket: anchor.BN;
+    bucket: number;
 }
 
 

@@ -259,9 +259,7 @@ class GameRunner {
     let newBucketIndex: number = currentBucketIndex;
     while (currentBucketIndex === newBucketIndex) {
       newBucketIndex = Math.floor(
-        Math.random() *
-          (this.newGameContext.gameConfig.nBuckets.toNumber() - 1) +
-          1
+        Math.random() * (this.newGameContext.gameConfig.nBuckets - 1) + 1
       );
     }
     const context: MoveBucketsContext = await setUpMoveBuckets(

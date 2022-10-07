@@ -3,13 +3,13 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(Debug, Copy, PartialEq)]
 pub struct PlayerState {
-    pub bucket: u64,
+    pub bucket: u8,
 }
 
 impl PlayerState {
     pub fn get_space() -> usize {
         8 + // account discriminator
-        8 // bucket
+        1 // bucket
     }
 
     pub fn log_make(&self) {

@@ -66,7 +66,7 @@ pub struct EnterGame<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64, pool_manager: Pubkey) -> Result<()> {
+pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u8, pool_manager: Pubkey) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     let config = &ctx.accounts.game.config.clone();
@@ -79,7 +79,7 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u64, pool_manager: Pubkey) 
         EquilibrateError::BucketDoesNotExist
     );
 
-    require_gt!(i_bucket, 0u64, EquilibrateError::CannotEnterHoldingBucket);
+    require_gt!(i_bucket, 0, EquilibrateError::CannotEnterHoldingBucket);
 
     PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 
