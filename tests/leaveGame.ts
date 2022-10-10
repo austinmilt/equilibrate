@@ -42,7 +42,7 @@ import {
   setUpCreatePool,
 } from "./createPool";
 
-describe("LeaveGame Instruction Tests", () => {
+describe.only("LeaveGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
@@ -736,6 +736,68 @@ describe("LeaveGame Instruction Tests", () => {
 
     assert(playerSolBalanceBeforeTheyLeave < playerSolBalanceAfterTheyLeave);
   });
+
+  it("leave game > player will lose tokens - cancel on loss > fails", async () => {
+    const spillRate: number = Number.MAX_SAFE_INTEGER;
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+      gameConfig: {
+        spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+      },
+    });
+    const enterGameContext: EnterGameContext = await setUpEnterGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      {
+        playerBucketIndex: 1,
+      }
+    );
+    await sleep(1000);
+
+    assertAsyncThrows(() =>
+    setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContext,
+      {
+        cancelOnLoss: true
+      }
+    ), "AbortLeaveOnLoss"
+    )
+  });
+
+  it("leave game > player will gain tokens - cancel on loss > succeeds", async () => {
+    const spillRate: number = Number.MAX_SAFE_INTEGER;
+    const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+      gameConfig: {
+        entryFeeDecimalTokens: new anchor.BN(Math.pow(1, MINT_DECIMALS)),
+        spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+      },
+    });
+    await setUpEnterGame(program, newGameContext.createPool, newGameContext, {playerBucketIndex: 1});
+    await setUpEnterGame(program, newGameContext.createPool, newGameContext, {playerBucketIndex: 1});
+    await setUpEnterGame(program, newGameContext.createPool, newGameContext, {playerBucketIndex: 1});
+    const enterGameContext: EnterGameContext = await setUpEnterGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      {
+        playerBucketIndex: 2,
+      },
+    );
+    await sleep(1000);
+
+    setUpLeaveGame(
+      program,
+      newGameContext.createPool,
+      newGameContext,
+      enterGameContext,
+      {
+        cancelOnLoss: true
+      }
+    )
+  });
 });
 
 export interface LeaveGameEtcSetupArgs extends LeaveGameSetupArgs {
@@ -751,6 +813,7 @@ export interface LeaveGameSetupArgs {
   playerWallet?: Keypair;
   playerTokenAccount?: PublicKey;
   tokenPoolAddress?: PublicKey;
+  cancelOnLoss?: boolean
 }
 
 export interface LeaveGameContext {}
@@ -841,7 +904,7 @@ export async function setUpLeaveGame(
 
   try {
     await program.methods
-      .leaveGame()
+      .leaveGame(customSetup?.cancelOnLoss === true)
       .accountsStrict({
         game: customSetup?.gameAddress ?? newGameContext.gameAddress,
         gameCreator:

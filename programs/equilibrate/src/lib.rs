@@ -42,7 +42,7 @@ pub mod equilibrate {
 
     /// Leaves the game, transferring any winnings into the player's token account
     /// The last player to leave gets all the unclaimed tokens in the game.
-    pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
-        instructions::leave_game(ctx)
+    pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
+        instructions::leave_game(ctx, cancel_on_loss)
     }
 }

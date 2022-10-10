@@ -64,4 +64,7 @@ pub enum EquilibrateError {
 
     #[msg("Given gameCreator doesnt match the one that created the game")]
     GameCreatorMismatch,
+
+    #[msg("Player chose to abort leaving rather than lose tokens")]
+    AbortLeaveOnLoss,
 }

@@ -68,7 +68,7 @@ pub struct LeaveGame<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
+pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
     let now_epoch_seconds = Clock::get().unwrap().unix_timestamp;
 
     // check constraints
@@ -109,6 +109,14 @@ pub fn leave_game(ctx: Context<LeaveGame>) -> Result<()> {
             .unwrap();
     }
     game.state.last_update_epoch_seconds = now_epoch_seconds;
+
+    if cancel_on_loss {
+        require_gte!(
+            winnings,
+            game.config.entry_fee_decimal_tokens,
+            EquilibrateError::AbortLeaveOnLoss
+        )
+    }
 
     // transfer game tokens from pool account
     let winnings_transfer_accounts = Transfer {
