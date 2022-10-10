@@ -775,9 +775,16 @@ describe.only("LeaveGame Instruction Tests", () => {
         spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
       },
     });
-    await setUpEnterGame(program, newGameContext.createPool, newGameContext, {playerBucketIndex: 1});
-    await setUpEnterGame(program, newGameContext.createPool, newGameContext, {playerBucketIndex: 1});
-    await setUpEnterGame(program, newGameContext.createPool, newGameContext, {playerBucketIndex: 1});
+    for (let i = 0; i < 3; i++) {
+      await setUpEnterGame(
+        program,
+        newGameContext.createPool,
+        newGameContext,
+        {
+          playerBucketIndex: 1
+        }
+      );
+    }
     const enterGameContext: EnterGameContext = await setUpEnterGame(
       program,
       newGameContext.createPool,
