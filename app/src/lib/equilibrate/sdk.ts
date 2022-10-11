@@ -3,8 +3,15 @@ import { Connection, PublicKey, Transaction, TransactionInstruction } from "@sol
 import { Equilibrate } from "../../../../target/types/equilibrate";
 import {
     ASSOCIATED_TOKEN_PROGRAM_ID,
+    ENTRY_FEE_MIN_EXCLUSIVE,
+    GAME_BUCKETS_MAX,
+    GAME_BUCKETS_MIN,
+    GAME_MAX_PLAYERS_MAX,
+    GAME_MAX_PLAYERS_MIN,
+    PLAYER_BUCKET_INDEX_MIN,
     PROGRAM_FEE_DESTINATION,
     RENT_SYSVAR,
+    SPILL_RATE_MIN_EXCLUSIVE,
     SYSTEM_PROGRAM_ID,
     TOKEN_PROGRAM_ID
 } from "./constants";
@@ -13,6 +20,7 @@ import {
     getAssociatedTokenAddress,
     getGame,
     getGameAddress,
+    getMintDecimals,
     getPlayerStateAddress,
     getPoolManagerAddress,
     getTokenPoolAddress
@@ -22,6 +30,10 @@ export interface SignerFunction {
   (transaction: Transaction): Promise<Transaction>;
 }
 
+/**
+ * SDK for interacting with the on-chain program. You should not need any other
+ * solana dependencies for any actions associated with the game.
+ */
 export class EquilibrateSdk {
     // we allow these to be undefined so that on startup we
     // dont have to deal with null checks
@@ -39,10 +51,22 @@ export class EquilibrateSdk {
         this.sign = sign;
     }
 
+
+    /**
+     * @returns an instantiated but uninitialized SDK instance, e.g. for app startup before
+     * the user has signed in
+     */
     public static dummy(): EquilibrateSdk {
         return new EquilibrateSdk(undefined, undefined, undefined);
     }
 
+
+    /**
+     * @param program game program
+     * @param payer payer for all transactions
+     * @param sign signer method for prompting the payer to sign all transactions
+     * @returns instantiated SDK ready to be used
+     */
     public static from(
         program: anchor.Program<Equilibrate>,
         payer: PublicKey,
@@ -51,10 +75,18 @@ export class EquilibrateSdk {
         return new EquilibrateSdk(program, payer, sign);
     }
 
+
+    /**
+     * @returns true if the SDK is ready to be used to make requests
+     */
     public isReady(): boolean {
         return this.program != null && this.payer != null && this.sign != null;
     }
 
+
+    /**
+     * @returns a new request builder for a single request (multiple instructions) to the chain
+     */
     public request(): EquilibrateRequest {
         Assert.notNullish(this.program, "program");
         Assert.notNullish(this.payer, "payer");
@@ -63,6 +95,20 @@ export class EquilibrateSdk {
     }
 }
 
+
+/**
+ * Request builder and runner for single requests to the chain. Use like
+ *
+ * ```
+ * const transactionId: string = await sdk.request()
+ *    .setMint(mintAddress)
+ *    .setPlayerBucketIndex(bucketIndex)
+ *    .setGameId(gameId)
+ *    .withInstructions(...someArbitraryInstructions)
+ *    .withEnterGame()
+ *    .signAndSend();
+ * ```
+ */
 export class EquilibrateRequest {
     private readonly program: anchor.Program<Equilibrate>;
     private readonly connection: Connection;
@@ -71,8 +117,8 @@ export class EquilibrateRequest {
     private readonly sign: SignerFunction;
     private readonly config: {
         mint?: PublicKey;
-        entryFeeDecimalTokens?: anchor.BN;
-        spillRateDecimalTokensPerSecondPerPlayer?: anchor.BN;
+        entryFee?: number;
+        spillRateTokensPerSecondPerPlayer?: number;
         nBuckets?: number;
         maxPlayers?: number;
     } = {};
@@ -99,49 +145,139 @@ export class EquilibrateRequest {
         return new EquilibrateRequest(program, payer, sign);
     }
 
+
+    /**
+     * Sets the game mint.
+     *
+     * @param mint game mint
+     * @returns this request
+     */
     public setMint(mint: PublicKey): EquilibrateRequest {
         this.config.mint = mint;
         return this;
     }
 
-    public setEntryFee(entryFeeDecimalTokens: anchor.BN): EquilibrateRequest {
-        this.config.entryFeeDecimalTokens = entryFeeDecimalTokens;
+
+    /**
+     * Sets the entry fee for a new game.
+     *
+     * @param entryFee entry fee in normal units (not whole-number decimal units)
+     * @returns this request
+     * @throws if the entry fee is too small
+     */
+    public setEntryFee(entryFee: number): EquilibrateRequest {
+        Assert.greaterThan(entryFee, ENTRY_FEE_MIN_EXCLUSIVE, "entryFee");
+        this.config.entryFee = entryFee;
         return this;
     }
 
-    public setSpillRate(spillRateDecimalTokensPerSecondPerPlayer: anchor.BN): EquilibrateRequest {
-        this.config.spillRateDecimalTokensPerSecondPerPlayer = spillRateDecimalTokensPerSecondPerPlayer;
+
+    /**
+     * Sets the spill rate for a new game.
+     *
+     * @param spillRateTokensPerSecondPerPlayer spill rate in normal units (not whole-number decimal units) of
+     * tokens per second per player (in a bucket)
+     * @returns this request
+     * @throws if the spill rate is too low
+     */
+    public setSpillRate(spillRateTokensPerSecondPerPlayer: number): EquilibrateRequest {
+        Assert.greaterThan(
+            spillRateTokensPerSecondPerPlayer,
+            SPILL_RATE_MIN_EXCLUSIVE,
+            "spillRateTokensPerSecondPerPlayer"
+        );
+        this.config.spillRateTokensPerSecondPerPlayer = spillRateTokensPerSecondPerPlayer;
         return this;
     }
 
+
+    /**
+     * Sets the number of buckets for a new game.
+     *
+     * @param nBuckets number of buckets
+     * @returns this request
+     * @throws if the number of buckets is too small or too large
+     */
     public setNumberOfBuckets(nBuckets: number): EquilibrateRequest {
+        Assert.greaterThanOrEqualTo(nBuckets, GAME_BUCKETS_MIN, "nBuckets");
+        Assert.lessThanOrEqualTo(nBuckets, GAME_BUCKETS_MAX, "nBuckets");
         this.config.nBuckets = nBuckets;
         return this;
     }
 
+
+    /**
+     * Sets the maximum number of players for a new game.
+     *
+     * @param maxPlayers
+     * @returns this request
+     * @throws if the value is too low or too high
+     */
     public setMaxPlayers(maxPlayers: number): EquilibrateRequest {
+        Assert.greaterThanOrEqualTo(maxPlayers, GAME_MAX_PLAYERS_MIN, "maxPlayers");
+        Assert.lessThanOrEqualTo(maxPlayers, GAME_MAX_PLAYERS_MAX, "maxPlayers");
         this.config.maxPlayers = maxPlayers;
         return this;
     }
 
+
+    /**
+     * Sets the player bucket index for the player to enter or move to.
+     *
+     * Note this does not validate that the player attempts to enter a bucket
+     * beyond the last one, but the program will do so. The upper bound should
+     * be limited externally to this SDK.
+     *
+     * Note: the player cannot enter the 0th-bucket, which is a reserved bucket
+     *
+     * @param bucketIndex bucket index for the player to enter
+     * @returns this request
+     * @throws if the value is too low
+     */
     public setPlayerBucketIndex(bucketIndex: number): EquilibrateRequest {
+        Assert.greaterThanOrEqualTo(bucketIndex, PLAYER_BUCKET_INDEX_MIN, "bucketIndex");
         this.bucketIndex = bucketIndex;
         return this;
     }
 
+
+    /**
+     * Sets the game ID to the game being played.
+     *
+     * @param gameId game ID of the game being played
+     * @returns this request
+     */
     public setGameId(gameId: number): EquilibrateRequest {
         this.gameId = gameId;
         return this;
     }
 
+
+    /**
+     * Sets the flag indicating if leaving the game should be aborted if the
+     * player would lose tokens.
+     *
+     * @param cancelOnLoss set to true to abort leaving the game if the player would lose tokens
+     * @returns this request
+     */
     public setCancelOnLoss(cancelOnLoss: boolean): EquilibrateRequest {
         this.cancelOnLoss = cancelOnLoss;
         return this;
     }
 
+
+    /**
+     * Adds instruction to create a new game. Will also add an instruction to create
+     * the token pool/manager if one doesnt already exist.
+     *
+     * @returns this request
+     * @throws if any of the following have not been set: `mint`, `entryFeeDecimalTokens`,
+     * `spillRateDecimalTokensPerSecondPerPlayer`, `nBuckets`, `maxPlayers`
+     */
     public withCreateNewGame(): EquilibrateRequest {
-        const config: GameConfig = this.finalizeConfig();
+        this.validateConfig();
         this.steps.push(async () => {
+            const config: GameConfig = await this.finalizeConfig();
             // first determine if we need to create the token pool/manager
             // before making the game
             const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(
@@ -216,6 +352,51 @@ export class EquilibrateRequest {
         return this;
     }
 
+
+    private validateConfig(): void {
+        Assert.notNullish(this.config.mint, "mint");
+        Assert.notNullish(this.config.entryFee, "entryFee");
+        Assert.notNullish(
+            this.config.spillRateTokensPerSecondPerPlayer,
+            "spillRateTokensPerSecondPerPlayer"
+        );
+        Assert.notNullish(this.config.nBuckets, "nBuckets");
+        Assert.notNullish(this.config.maxPlayers, "maxPlayers");
+    }
+
+
+    private async finalizeConfig(): Promise<GameConfig> {
+        Assert.notNullish(this.config.mint, "mint");
+        Assert.notNullish(this.config.entryFee, "entryFee");
+        Assert.notNullish(
+            this.config.spillRateTokensPerSecondPerPlayer,
+            "spillRateTokensPerSecondPerPlayer"
+        );
+        Assert.notNullish(this.config.nBuckets, "nBuckets");
+        Assert.notNullish(this.config.maxPlayers, "maxPlayers");
+        const mintDecimals: number = await getMintDecimals(this.config.mint, this.connection);
+        const mintToDecimalMultiplier: number = Math.pow(10, mintDecimals);
+        const entryFeeWithDecimals: anchor.BN = new anchor.BN(this.config.entryFee * mintToDecimalMultiplier);
+        const spillRateWithDecimals: anchor.BN = new anchor.BN(
+            this.config.spillRateTokensPerSecondPerPlayer * mintToDecimalMultiplier
+        );
+
+        return {
+            mint: this.config.mint,
+            entryFeeDecimalTokens: entryFeeWithDecimals,
+            spillRateDecimalTokensPerSecondPerPlayer: spillRateWithDecimals,
+            nBuckets: this.config.nBuckets,
+            maxPlayers: this.config.maxPlayers
+        };
+    }
+
+
+    /**
+     * Adds instruction to enter an existing game as a new player.
+     *
+     * @returns this request
+     * @throws if any of the following have not been set: `mint`, `bucketIndex`, `gameId`
+     */
     public withEnterGame(): EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
         Assert.notNullish(this.config.mint, "mint");
@@ -261,6 +442,13 @@ export class EquilibrateRequest {
         return this;
     }
 
+
+    /**
+     * Adds instruction to move to a new bucket within a game.
+     *
+     * @returns this request
+     * @throws if any of the following have not been set: `bucketIndex`, `gameId`
+     */
     public withMoveBucket(): EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
         Assert.notNullish(this.gameId, "gameId");
@@ -289,6 +477,13 @@ export class EquilibrateRequest {
         return this;
     }
 
+
+    /**
+     * Adds instruction to leave an existing game.
+     *
+     * @returns this request
+     * @throws if any of the following have not been set: `mint`, `gameId`, `cancelOnLoss`
+     */
     public withLeaveGame(): EquilibrateRequest {
         Assert.notNullish(this.config.mint, "mint");
         Assert.notNullish(this.gameId, "gameId");
@@ -332,11 +527,24 @@ export class EquilibrateRequest {
         return this;
     }
 
+
+    /**
+     * Add arbitrary instructions to be executed atomically with others in this request.
+     *
+     * @param instructions instructions to add to the transaction
+     * @returns this request
+     */
     public withInstructions(...instructions: TransactionInstruction[]): EquilibrateRequest {
         this.steps.push(async () => instructions);
         return this;
     }
 
+
+    /**
+     * Signs and submits the request (collection of transaction instructions) to the chain
+     *
+     * @returns the transaction
+     */
     public async signAndSend(): Promise<string> {
         Assert.notNullish(this.payer, "payer");
         const transaction: Transaction = new Transaction();
@@ -360,24 +568,6 @@ export class EquilibrateRequest {
         // making games sequentially ordered
         return new Date().getTime();
     }
-
-    private finalizeConfig(): GameConfig {
-        Assert.notNullish(this.config.mint, "mint");
-        Assert.notNullish(this.config.entryFeeDecimalTokens, "entryFeeDecimalTokens");
-        Assert.notNullish(
-            this.config.spillRateDecimalTokensPerSecondPerPlayer,
-            "spillRateDecimalTokensPerSecondPerPlayer"
-        );
-        Assert.notNullish(this.config.nBuckets, "nBuckets");
-        Assert.notNullish(this.config.maxPlayers, "maxPlayers");
-        return {
-            mint: this.config.mint,
-            entryFeeDecimalTokens: this.config.entryFeeDecimalTokens,
-            spillRateDecimalTokensPerSecondPerPlayer: this.config.spillRateDecimalTokensPerSecondPerPlayer,
-            nBuckets: this.config.nBuckets,
-            maxPlayers: this.config.maxPlayers
-        };
-    }
 }
 
 class Assert {
@@ -387,5 +577,25 @@ class Assert {
 
     public static notNullish<T>(arg: T, name: string): asserts arg is NonNullable<T> & void {
         if (arg == null) throw new Error("Must define " + name);
+    }
+
+    public static lessThan(arg: number, lessThanThis: number, name: string): void {
+        if (arg >= lessThanThis) throw new Error(`${arg} (${name}) must be less than ${lessThanThis}`);
+    }
+
+    public static lessThanOrEqualTo(arg: number, lessThanOrEqualToThis: number, name: string): void {
+        if (arg > lessThanOrEqualToThis) {
+            throw new Error(`${arg} (${name}) must be less than or equal to ${lessThanOrEqualToThis}`);
+        }
+    }
+
+    public static greaterThan(arg: number, greaterThanThis: number, name: string): void {
+        if (arg <= greaterThanThis) throw new Error(`${arg} (${name}) must be greater than ${greaterThanThis}`);
+    }
+
+    public static greaterThanOrEqualTo(arg: number, greaterOrEqualToThis: number, name: string): void {
+        if (arg < greaterOrEqualToThis) {
+            throw new Error(`${arg} (${name}) must be greater than or equal to ${greaterOrEqualToThis}`);
+        }
     }
 }

@@ -1,4 +1,4 @@
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import * as spl from "@solana/spl-token";
 import { GAME_SEED, PLAYER_SEED, POOL_SEED, POOL_MANAGER_SEED } from "./constants";
@@ -71,4 +71,9 @@ export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKe
 
 export async function getGame(gameAddress: PublicKey, program: anchor.Program<Equilibrate>): Promise<Game> {
     return (await program.account.game.fetch(gameAddress)) as Game;
+}
+
+
+export async function getMintDecimals(mint: PublicKey, connection: Connection): Promise<number> {
+    return (await connection.getTokenSupply(mint)).value.decimals;
 }
