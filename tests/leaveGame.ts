@@ -42,7 +42,7 @@ import {
   setUpCreatePool,
 } from "./createPool";
 
-describe.only("LeaveGame Instruction Tests", () => {
+describe("LeaveGame Instruction Tests", () => {
   anchor.setProvider(anchor.AnchorProvider.env());
   const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 

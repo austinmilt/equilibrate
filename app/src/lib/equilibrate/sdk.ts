@@ -34,7 +34,7 @@ export interface SignerFunction {
  * SDK for interacting with the on-chain program. You should not need any other
  * solana dependencies for any actions associated with the game.
  */
-export class EquilibrateSdk {
+export class EquilibrateSDK {
     // we allow these to be undefined so that on startup we
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
@@ -56,8 +56,8 @@ export class EquilibrateSdk {
      * @returns an instantiated but uninitialized SDK instance, e.g. for app startup before
      * the user has signed in
      */
-    public static dummy(): EquilibrateSdk {
-        return new EquilibrateSdk(undefined, undefined, undefined);
+    public static dummy(): EquilibrateSDK {
+        return new EquilibrateSDK(undefined, undefined, undefined);
     }
 
 
@@ -71,8 +71,8 @@ export class EquilibrateSdk {
         program: anchor.Program<Equilibrate>,
         payer: PublicKey,
         sign: SignerFunction
-    ): EquilibrateSdk {
-        return new EquilibrateSdk(program, payer, sign);
+    ): EquilibrateSDK {
+        return new EquilibrateSDK(program, payer, sign);
     }
 
 
@@ -92,6 +92,35 @@ export class EquilibrateSdk {
         Assert.notNullish(this.payer, "payer");
         Assert.notNullish(this.sign, "sign");
         return EquilibrateRequest.new(this.program, this.payer, this.sign);
+    }
+
+
+    /**
+     * Subscribes to changes to the given game, calling the callback whenever an update is received.
+     *
+     * @param gameAddress game to start watching
+     * @param callback callback to call with game state whenever an update is received
+     * @throws if the game is already being watched
+     * @throws if this is a dummy SDK instance
+     */
+    public watchGame(gameAddress: PublicKey, callback: (game: Game) => void): void {
+        Assert.notNullish(this.program, "program");
+        const emitter = this.program.account.game.subscribe(gameAddress);
+        //TODO figure out what the emitter actually produces and how to convert this into a Game to send in the callback
+    }
+
+
+    /**
+     * Stops watching the given game.
+     *
+     * Does nothing if the game isnt being watched.
+     *
+     * @param gameAddress game to stop watching
+     * @throws if this is a dummy SDK instance
+     */
+    public async stopWatchingGame(gameAddress: PublicKey): Promise<void> {
+        Assert.notNullish(this.program, "program");
+        this.program.account.game.unsubscribe(gameAddress);
     }
 }
 
@@ -391,6 +420,15 @@ export class EquilibrateRequest {
     }
 
 
+    private generateGameId(): number {
+        // All we need is to ensure that each game is unique,
+        // and using the epoch time in milliseconds will with very high
+        // likelihood produce this result, while also conveniently
+        // making games sequentially ordered
+        return new Date().getTime();
+    }
+
+
     /**
      * Adds instruction to enter an existing game as a new player.
      *
@@ -559,14 +597,6 @@ export class EquilibrateRequest {
 
         const signed: Transaction = await this.sign(transaction);
         return await connection.sendRawTransaction(signed.serialize());
-    }
-
-    private generateGameId(): number {
-        // All we need is to ensure that each game is unique,
-        // and using the epoch time in milliseconds will with very high
-        // likelihood produce this result, while also conveniently
-        // making games sequentially ordered
-        return new Date().getTime();
     }
 }
 

@@ -5,6 +5,8 @@ target
 **/*.rs.bk
 node_modules
 test-ledger
+!target/idl
+!target/types
 
 # Logs
 app/logs
@@ -20,7 +22,7 @@ app/dist-ssr
 *.local
 
 # Editor directories and files
-.vscode/*
+.vscode
 !.vscode/extensions.json
 .idea
 .DS_Store

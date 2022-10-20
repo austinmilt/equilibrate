@@ -72,6 +72,25 @@ describe("Game simulation tests", () => {
       await game.finish();
     })
   );
+
+  //TODO figure out why `anchor test` results in transaction simulation failure
+  // then use this to see how to subscribe to events correctly. It may be that
+  // you have to create your own events rather than subscribe to the "change"
+  // even described in the doscstring of `subscribe`
+  // For custom events, see https://github.com/coral-xyz/anchor/blob/master/tests/events/tests/events.js
+  it.only(
+    "watch a game", async () => {
+      const game: GameRunner = await GameRunner.random(program, true);
+      const listener = program.account.game.subscribe(game.getNewGameContext().gameAddress);
+      listener.addListener("change", (event, slot) => {
+        console.log("new event", event, slot)
+      })
+      await game.start();
+      await game.step(100);
+      await game.finish();
+      listener.removeAllListeners();
+    }
+  );
 });
 
 interface PlayerContext {

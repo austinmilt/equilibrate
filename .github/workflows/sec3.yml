@@ -2,8 +2,6 @@ name: Sec3 Pro Audit
 on:
   push:
     branches: master
-  pull_request:
-    branches: "*"
 jobs:
   audit:
     runs-on: ubuntu-latest
