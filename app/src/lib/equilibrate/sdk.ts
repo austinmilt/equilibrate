@@ -15,7 +15,7 @@ import {
     SYSTEM_PROGRAM_ID,
     TOKEN_PROGRAM_ID
 } from "./constants";
-import { Game, GameConfig } from "./types";
+import { Bucket, Game, GameConfig } from "./types";
 import {
     getAssociatedTokenAddress,
     getGame,
@@ -25,10 +25,38 @@ import {
     getPoolManagerAddress,
     getTokenPoolAddress
 } from "./utils";
+import { EventEmitter } from "node:events";
 
 export interface SignerFunction {
   (transaction: Transaction): Promise<Transaction>;
 }
+
+const GAME_EVENT_KEY = "game";
+export interface GameEvent {
+    game: Game | null;
+    new?: boolean;
+    enter?: {
+        bucketIndex: number;
+    };
+    move?: {
+        oldBucketIndex: number;
+        newBucketIndex: number;
+    };
+    leave?: {
+        bucketIndex: number;
+        winningsDecimalTokens: number;
+    };
+    end?: {
+        bucketIndex: number;
+        winningsDecimalTokens: number;
+    };
+}
+
+interface Subscription {
+    emitter: EventEmitter;
+    id: number;
+}
+
 
 /**
  * SDK for interacting with the on-chain program. You should not need any other
@@ -40,6 +68,8 @@ export class EquilibrateSDK {
     private readonly program: anchor.Program<Equilibrate> | undefined;
     private readonly payer: PublicKey | undefined;
     private readonly sign: SignerFunction | undefined;
+    private readonly subscriptions: Map<string, Subscription> = new Map<string, Subscription>();
+    private readonly games: Map<string, Game> = new Map<string, Game>();
 
     private constructor(
         program: anchor.Program<Equilibrate> | undefined,
@@ -103,10 +133,112 @@ export class EquilibrateSDK {
      * @throws if the game is already being watched
      * @throws if this is a dummy SDK instance
      */
-    public watchGame(gameAddress: PublicKey, callback: (game: Game) => void): void {
+    public watchGame(gameAddress: PublicKey, callback: (event: GameEvent) => void): void {
+        const subscription: Subscription = this.addSubscription(gameAddress);
+        subscription.emitter.addListener(GAME_EVENT_KEY, callback);
+    }
+
+
+    private addSubscription(gameAddress: PublicKey): Subscription {
         Assert.notNullish(this.program, "program");
-        const emitter = this.program.account.game.subscribe(gameAddress);
-        //TODO figure out what the emitter actually produces and how to convert this into a Game to send in the callback
+        const gameAddressString: string = gameAddress.toBase58();
+        if (this.subscriptions.has(gameAddressString)) {
+            throw new Error(`Already watching game ${gameAddressString}`);
+        }
+        const program: anchor.Program<Equilibrate> = this.program;
+        const connection: Connection = this.program.provider.connection;
+        const emitter: EventEmitter = new EventEmitter();
+        const listenerId: number = connection.onAccountChange(gameAddress, (buffer) => {
+            let game: Game | null = null;
+            if (buffer != null && buffer.data.length > 0) {
+                game = program.coder.accounts.decode<Game>("Game", buffer.data);
+            }
+            this.processAndEmitGameEvent(gameAddress, game, emitter);
+        });
+        const subscription: Subscription = { emitter: emitter, id: listenerId };
+        this.subscriptions.set(gameAddressString, subscription);
+        return subscription;
+    }
+
+
+    private processAndEmitGameEvent(gameAddress: PublicKey, game: Game | null, emitter: EventEmitter): void {
+        const gameAddressString: string = gameAddress.toBase58();
+        const gameBefore: Game | undefined = this.games.get(gameAddressString);
+        const event: GameEvent = { game: game };
+        if (game === null) {
+            if (gameBefore === undefined) {
+                throw new Error(`Game ${gameAddressString} never existed.`);
+            }
+            const winnings: number = gameBefore.state.buckets.reduce((sum, bucket) =>
+                sum + bucket.decimalTokens.toNumber(), 0
+            );
+            const playerIndexZeroed: number = gameBefore.state.buckets.slice(1).findIndex(b => b.players > 0);
+            if (playerIndexZeroed === -1) {
+                throw new Error("Unable to determine the bucket of the last player.");
+            }
+            event.end = {
+                // the zero-th bucket is the holding bucket which keeps track of the total
+                // number of players in the game. We skip that looking for the player, but
+                // want to start with the playable buckets at index 1, so add that back in
+                // (see `slice` above where we omit the holding bucket.)
+                bucketIndex: playerIndexZeroed + 1,
+                winningsDecimalTokens: winnings,
+            };
+            // the game is over, so stop keeping track of it
+            this.games.delete(gameAddressString);
+
+        } else if (gameBefore === undefined) {
+            event.new = true;
+            this.games.set(gameAddressString, game);
+
+        } else {
+            const bucketsBefore: Bucket[] = gameBefore.state.buckets;
+            const bucketsNow: Bucket[] = game.state.buckets;
+            const playerCountChange: number = bucketsNow[0].players - bucketsBefore[0].players;
+            const bucketPlayerCountChanges: number[] = bucketsNow.map((b, i) => b.players - bucketsBefore[i].players);
+            if (playerCountChange === 0) {
+                const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
+                const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
+                event.move = {
+                    newBucketIndex: bucketEnteredIndex,
+                    oldBucketIndex: bucketLeftIndex
+                };
+            } else if (playerCountChange > 0) {
+                const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
+                event.enter = {
+                    bucketIndex: bucketEnteredIndex
+                };
+            } else {
+                const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
+                const balanceBefore: number = bucketsBefore[bucketLeftIndex].decimalTokens.toNumber();
+                const balanceNow: number = bucketsNow[bucketLeftIndex].decimalTokens.toNumber();
+                const winnings: number = balanceBefore - balanceNow;
+                event.leave = {
+                    bucketIndex: bucketLeftIndex,
+                    winningsDecimalTokens: winnings
+                };
+            }
+            this.games.set(gameAddressString, game);
+        }
+        emitter.emit(GAME_EVENT_KEY, event);
+    }
+
+
+    private getBucketLeftIndex(bucketPlayerCountChanges: number[]): number {
+        const index: number = bucketPlayerCountChanges.findIndex(c => c < 0);
+        if (index === -1) {
+            throw new Error("Unable to determine bucket left");
+        }
+        return index;
+    }
+
+
+    private getBucketEnteredIndex(bucketPlayerCountChanges: number[]): number {
+        const index: number = bucketPlayerCountChanges.findIndex(c => c > 0);
+        if (index === -1) {
+            throw new Error("Unable to determine bucket entered");
+        }
+        return index;
     }
 
 
@@ -120,7 +252,14 @@ export class EquilibrateSDK {
      */
     public async stopWatchingGame(gameAddress: PublicKey): Promise<void> {
         Assert.notNullish(this.program, "program");
-        this.program.account.game.unsubscribe(gameAddress);
+        const gameAddressString: string = gameAddress.toBase58();
+        const subscription: Subscription | undefined = this.subscriptions.get(gameAddressString);
+        if (subscription === undefined) {
+            throw new Error(`Tried to stop watching unwatched game ${gameAddressString}`);
+        }
+        subscription.emitter.removeAllListeners();
+        this.program.provider.connection.removeAccountChangeListener(subscription.id);
+        this.subscriptions.delete(gameAddressString);
     }
 }
 
