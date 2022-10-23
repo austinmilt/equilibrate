@@ -19,12 +19,10 @@ describe("CreatePool Instruction Tests", () => {
     // eslint-disable-next-line import/namespace
     const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
 
-    it.only("create pool > all good > able to transfer tokens into pool", async () => {
-        console.log("1");
+    it("create pool > all good > able to transfer tokens into pool", async () => {
         const context: CreatePoolContext = await setUpCreatePool(program);
         const playerTokens: number = Math.round(Math.random() * 100) + 10;
         const transferAmount: number = Math.ceil(Math.random() * playerTokens);
-        console.log("2");
         const { wallet, tokenAccount } = await makeAndFundWalletWithTokens(
             1,
             playerTokens,
@@ -32,7 +30,6 @@ describe("CreatePool Instruction Tests", () => {
             context.mintAuthority,
             program.provider.connection
         );
-        console.log("3");
         await spl.transfer(
             program.provider.connection,
             wallet,
@@ -42,7 +39,6 @@ describe("CreatePool Instruction Tests", () => {
             withDecimals(transferAmount, MINT_DECIMALS)
         );
 
-        console.log("4");
         const balance = await program.provider.connection.getTokenAccountBalance(
             context.tokenPoolAddress
         );

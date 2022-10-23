@@ -1,5 +1,5 @@
 import * as anchor from "@project-serum/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, Connection } from "@solana/web3.js";
 import { Program } from "@project-serum/anchor";
 import { Equilibrate } from "../target/types/equilibrate";
 import { CreatePoolContext, setUpCreatePool } from "./createPool";
@@ -9,12 +9,14 @@ import {
     generateMint,
     getTokenPoolBalanceWithDecimals,
     makeAndFundWallet,
+    MINT_DECIMALS,
+    withoutDecimals,
 } from "./helpers/token";
-import { GameConfig } from "./helpers/types";
+import { Bucket, Game, GameConfig } from "./helpers/types";
 import { LeaveGameContext, setUpLeaveGame } from "./leaveGame";
 import { MoveBucketsContext, setUpMoveBuckets } from "./moveBuckets";
 import { NewGameContext, setUpNewGame } from "./newGame";
-import { repeat } from "./helpers/test";
+import { repeat, sleep } from "./helpers/test";
 import { getPoolManagerAddress, getTokenPoolAddress } from "./helpers/address";
 import { assert } from "chai";
 
@@ -74,22 +76,48 @@ describe("Game simulation tests", () => {
         })
     );
 
-    //TODO figure out why `anchor test` results in transaction simulation failure
-    // then use this to see how to subscribe to events correctly. It may be that
-    // you have to create your own events rather than subscribe to the "change"
-    // even described in the doscstring of `subscribe`
-    // For custom events, see https://github.com/coral-xyz/anchor/blob/master/tests/events/tests/events.js
-    it.only(
+    it(
         "watch a game", async () => {
             const game: GameRunner = await GameRunner.random(program, true);
-            const listener = program.account.game.subscribe(game.getNewGameContext().gameAddress);
-            listener.addListener("change", (event, slot) => {
-                console.log("new event", event, slot);
-            });
             await game.start();
-            await game.step(100);
+            const connection: Connection = program.provider.connection;
+            let changeCount: number = 0;
+            // we have to use
+            const listenerId: number = connection.onAccountChange(
+                game.getNewGameContext().gameAddress,
+                (acc) => {
+                    changeCount += 1;
+                    // decode the game to make sure we're actually getting
+                    // game data
+                    let game: Game | null = null;
+                    if (acc != null && acc.data.length > 0) {
+                        game = program.coder.accounts.decode<Game>(
+                            "Game",
+                            acc.data
+                        );
+                    }
+                    // uncomment to see a printout of game progress
+                    // if (game === null) {
+                    // console.log("Game ended");
+
+                    // } else {
+                    // const holdingBucket: Bucket = game.state.buckets[0];
+                    // const holdingBalance: number = withoutDecimals(holdingBucket.decimalTokens.toNumber(), MINT_DECIMALS);
+                    // console.log(`\n${holdingBucket.players} players, ${holdingBalance} held`);
+                    // game.state.buckets.slice(1).forEach((b, i) => {
+                    //     const balance: number = withoutDecimals(b.decimalTokens.toNumber(), MINT_DECIMALS);
+                    //     console.log(`Bucket ${i} has ${b.players} player${b.players === 1 ? "" : "s"} and ${balance} tokens`);
+                    // });
+                    // }
+                },
+                "confirmed"
+            );
+            await game.step(5);
             await game.finish();
-            listener.removeAllListeners();
+            // sleep to give time for the finish to propagate to the listener
+            await sleep(500);
+            await connection.removeAccountChangeListener(listenerId);
+            assert(changeCount > 0, "Expected at least one game event to happen.");
         }
     );
 });
@@ -241,7 +269,9 @@ class GameRunner {
             const event: Event = chooseEvent(
                 this.playerContexts.length < this.gameConfig.maxPlayers
             );
-            if (event === Event.ENTER) {
+            if (event === Event.WAIT) {
+                await sleep(1000);
+            } else if (event === Event.ENTER) {
                 await this.playerEnters();
             } else if (event === Event.MOVE) {
                 await this.playerMoves(choose(activePlayers));
@@ -346,10 +376,11 @@ enum Event {
   ENTER,
   MOVE,
   LEAVE,
+  WAIT
 }
 
-const EVENTS: Event[] = [Event.ENTER, Event.MOVE, Event.LEAVE];
-const EVENTS_WITHOUT_ENTER: Event[] = [Event.MOVE, Event.LEAVE];
+const EVENTS: Event[] = [Event.ENTER, Event.MOVE, Event.LEAVE, Event.WAIT];
+const EVENTS_WITHOUT_ENTER: Event[] = [Event.MOVE, Event.LEAVE, Event.WAIT];
 
 function chooseEvent(allowEnter: boolean = true): Event {
     return choose(allowEnter ? EVENTS : EVENTS_WITHOUT_ENTER);
