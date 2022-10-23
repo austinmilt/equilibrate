@@ -15,6 +15,7 @@ import {
     SYSTEM_PROGRAM_ID,
     TOKEN_PROGRAM_ID
 } from "./constants";
+import { EventCallback, EventEmitter } from "./events";
 import { Bucket, Game, GameConfig } from "./types";
 import {
     getAssociatedTokenAddress,
@@ -25,13 +26,11 @@ import {
     getPoolManagerAddress,
     getTokenPoolAddress
 } from "./utils";
-import { EventEmitter } from "node:events";
 
 export interface SignerFunction {
   (transaction: Transaction): Promise<Transaction>;
 }
 
-const GAME_EVENT_KEY = "game";
 export interface GameEvent {
     game: Game | null;
     new?: boolean;
@@ -52,13 +51,10 @@ export interface GameEvent {
     };
 }
 
+export type GameEventCallback = EventCallback<GameEvent>
 
-export interface GameEventCallback {
-    (event: GameEvent): void
-}
-
-interface Subscription {
-    emitter: EventEmitter;
+interface Subscription<T> {
+    emitter: EventEmitter<T>;
     id: number;
 }
 
@@ -73,7 +69,7 @@ export class EquilibrateSDK {
     private readonly program: anchor.Program<Equilibrate> | undefined;
     private readonly payer: PublicKey | undefined;
     private readonly sign: SignerFunction | undefined;
-    private readonly subscriptions: Map<string, Subscription> = new Map<string, Subscription>();
+    private readonly subscriptions: Map<string, Subscription<GameEvent>> = new Map<string, Subscription<GameEvent>>();
     private readonly games: Map<string, Game> = new Map<string, Game>();
 
     private constructor(
@@ -137,23 +133,23 @@ export class EquilibrateSDK {
      * @param callback callback to call with game state whenever an update is received
      * @throws if this is a dummy SDK instance
      */
-    public watchGame(gameAddress: PublicKey, callback: GameEventCallback): void {
-        const subscription: Subscription = this.addOrGetSubscription(gameAddress);
-        subscription.emitter.addListener(GAME_EVENT_KEY, callback);
+    public watchGame(gameAddress: PublicKey, callback: GameEventCallback): () => void {
+        const subscription: Subscription<GameEvent> = this.addOrGetSubscription(gameAddress);
+        return subscription.emitter.subscribe(callback);
     }
 
 
-    private addOrGetSubscription(gameAddress: PublicKey): Subscription {
+    private addOrGetSubscription(gameAddress: PublicKey): Subscription<GameEvent> {
         Assert.notNullish(this.program, "program");
         const gameAddressString: string = gameAddress.toBase58();
-        let subscription: Subscription | undefined = this.subscriptions.get(gameAddressString);
+        let subscription: Subscription<GameEvent> | undefined = this.subscriptions.get(gameAddressString);
         if (subscription !== undefined) {
             return subscription;
         }
 
         const program: anchor.Program<Equilibrate> = this.program;
         const connection: Connection = this.program.provider.connection;
-        const emitter: EventEmitter = new EventEmitter();
+        const emitter: EventEmitter<GameEvent> = new EventEmitter();
         const listenerId: number = connection.onAccountChange(gameAddress, (buffer) => {
             let game: Game | null = null;
             if (buffer != null && buffer.data.length > 0) {
@@ -167,7 +163,7 @@ export class EquilibrateSDK {
     }
 
 
-    private processAndEmitGameEvent(gameAddress: PublicKey, game: Game | null, emitter: EventEmitter): void {
+    private processAndEmitGameEvent(gameAddress: PublicKey, game: Game | null, emitter: EventEmitter<GameEvent>): void {
         const gameAddressString: string = gameAddress.toBase58();
         const gameBefore: Game | undefined = this.games.get(gameAddressString);
         const event: GameEvent = { game: game };
@@ -226,7 +222,7 @@ export class EquilibrateSDK {
             }
             this.games.set(gameAddressString, game);
         }
-        emitter.emit(GAME_EVENT_KEY, event);
+        emitter.emit(event);
     }
 
 
@@ -249,22 +245,19 @@ export class EquilibrateSDK {
 
 
     /**
-     * Stops watching the given game.
+     * Stops watching the given game, meaning all registered callbacks will cease to work.
      *
      * Does nothing if the game isnt being watched.
      *
      * @param gameAddress game to stop watching
      * @throws if this is a dummy SDK instance
      */
-    public async stopWatchingGame(gameAddress: PublicKey, callback: GameEventCallback): Promise<void> {
+    public async stopWatchingGame(gameAddress: PublicKey): Promise<void> {
         Assert.notNullish(this.program, "program");
         const gameAddressString: string = gameAddress.toBase58();
-        const subscription: Subscription | undefined = this.subscriptions.get(gameAddressString);
-        if (subscription === undefined) {
-            throw new Error(`Tried to stop watching unwatched game ${gameAddressString}`);
-        }
-        subscription.emitter.removeListener(GAME_EVENT_KEY, callback);
-        if (subscription.emitter.listenerCount(GAME_EVENT_KEY) === 0) {
+        const subscription: Subscription<GameEvent> | undefined = this.subscriptions.get(gameAddressString);
+        if (subscription !== undefined) {
+            subscription.emitter.unsubscribeAll();
             await this.program.provider.connection.removeAccountChangeListener(subscription.id);
             this.subscriptions.delete(gameAddressString);
         }
