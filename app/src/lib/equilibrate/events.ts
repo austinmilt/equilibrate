@@ -2,6 +2,10 @@ export interface EventCallback<T> {
     (event: T): void;
 }
 
+/**
+ * Utility for calling callbacks when an event happens. Unlike `NodeJS.EventEmitter`,
+ * this emitter only emits a single type of event.
+ */
 export class EventEmitter<T> {
     private readonly listeners: Set<EventCallback<T>> = new Set<EventCallback<T>>();
 

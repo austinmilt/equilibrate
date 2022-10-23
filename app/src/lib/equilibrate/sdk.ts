@@ -31,22 +31,73 @@ export interface SignerFunction {
   (transaction: Transaction): Promise<Transaction>;
 }
 
+/**
+ * Event emitted to listeners when a watched game receives an update.
+ */
 export interface GameEvent {
+    /**
+     * Current game account.
+     */
     game: Game | null;
+
+    /**
+     * Will be defined and `true` when the current event is a new game.
+     */
     new?: boolean;
+
+    /**
+     * Will be defined when the current event is a player entering the game.
+     */
     enter?: {
+        /**
+         * Bucket index that the player entered.
+         */
         bucketIndex: number;
     };
+
+    /**
+     * Will be defined when the current event is a player moving buckets.
+     */
     move?: {
+        /**
+         * Bucket index the player moved from.
+         */
         oldBucketIndex: number;
+
+        /**
+         * Bucket index the player moved to.
+         */
         newBucketIndex: number;
     };
+
+    /**
+     * Will be defined when the current event is a player leaving the game.
+     */
     leave?: {
+
+        /**
+         * Bucket index of the bucket the player left.
+         */
         bucketIndex: number;
+
+        /**
+         * Token winnings the player took with them.
+         */
         winningsDecimalTokens: number;
     };
+
+    /**
+     * Will be defined when the current event is the game being ended (last player leaves).
+     */
     end?: {
+        /**
+         * Bucket index of the bucket the last player was in.
+         */
         bucketIndex: number;
+
+        /**
+         * Token winnings the player took with them.
+         */
         winningsDecimalTokens: number;
     };
 }
