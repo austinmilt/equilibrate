@@ -9,10 +9,8 @@ import {
     generateMint,
     getTokenPoolBalanceWithDecimals,
     makeAndFundWallet,
-    MINT_DECIMALS,
-    withoutDecimals,
 } from "./helpers/token";
-import { Bucket, Game, GameConfig } from "./helpers/types";
+import { Game, GameConfig } from "./helpers/types";
 import { LeaveGameContext, setUpLeaveGame } from "./leaveGame";
 import { MoveBucketsContext, setUpMoveBuckets } from "./moveBuckets";
 import { NewGameContext, setUpNewGame } from "./newGame";
@@ -96,6 +94,7 @@ describe("Game simulation tests", () => {
                             acc.data
                         );
                     }
+                    game;
                     // uncomment to see a printout of game progress
                     // if (game === null) {
                     // console.log("Game ended");

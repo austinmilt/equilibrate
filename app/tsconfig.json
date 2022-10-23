@@ -22,8 +22,7 @@
   },
   "include": [
     "src",
-    "../target/types",
-    "../target/idl"
+    "../target/types"
   ],
   "references": [
     {
