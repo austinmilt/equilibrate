@@ -9,8 +9,10 @@ import {
     generateMint,
     getTokenPoolBalanceWithDecimals,
     makeAndFundWallet,
+    MINT_DECIMALS,
+    withoutDecimals,
 } from "./helpers/token";
-import { Game, GameConfig } from "./helpers/types";
+import { Bucket, Game, GameConfig } from "./helpers/types";
 import { LeaveGameContext, setUpLeaveGame } from "./leaveGame";
 import { MoveBucketsContext, setUpMoveBuckets } from "./moveBuckets";
 import { NewGameContext, setUpNewGame } from "./newGame";
@@ -76,13 +78,13 @@ describe("Game simulation tests", () => {
 
     it(
         "watch a game", async () => {
-            const game: GameRunner = await GameRunner.random(program, true);
-            await game.start();
+            const runner: GameRunner = await GameRunner.random(program);
+            await runner.start();
             const connection: Connection = program.provider.connection;
             let changeCount: number = 0;
             // we have to use
             const listenerId: number = connection.onAccountChange(
-                game.getNewGameContext().gameAddress,
+                runner.getNewGameContext().gameAddress,
                 (acc) => {
                     changeCount += 1;
                     // decode the game to make sure we're actually getting
@@ -94,25 +96,28 @@ describe("Game simulation tests", () => {
                             acc.data
                         );
                     }
-                    game;
-                    // uncomment to see a printout of game progress
-                    // if (game === null) {
-                    // console.log("Game ended");
+                    if (runner.isDebug()) {
+                        if (game === null) {
+                            console.log("Game ended");
 
-                    // } else {
-                    // const holdingBucket: Bucket = game.state.buckets[0];
-                    // const holdingBalance: number = withoutDecimals(holdingBucket.decimalTokens.toNumber(), MINT_DECIMALS);
-                    // console.log(`\n${holdingBucket.players} players, ${holdingBalance} held`);
-                    // game.state.buckets.slice(1).forEach((b, i) => {
-                    //     const balance: number = withoutDecimals(b.decimalTokens.toNumber(), MINT_DECIMALS);
-                    //     console.log(`Bucket ${i} has ${b.players} player${b.players === 1 ? "" : "s"} and ${balance} tokens`);
-                    // });
-                    // }
+                        } else {
+                            const holdingBucket: Bucket = game.state.buckets[0];
+                            const holdingBalance: number = withoutDecimals(
+                                holdingBucket.decimalTokens.toNumber(),
+                                MINT_DECIMALS
+                            );
+                            console.log(`\n${holdingBucket.players} players, ${holdingBalance} held`);
+                            game.state.buckets.slice(1).forEach((b, i) => {
+                                const balance: number = withoutDecimals(b.decimalTokens.toNumber(), MINT_DECIMALS);
+                                console.log(`Bucket ${i} has ${b.players} players and ${balance} tokens`);
+                            });
+                        }
+                    }
                 },
                 "confirmed"
             );
-            await game.step(5);
-            await game.finish();
+            await runner.step(5);
+            await runner.finish();
             // sleep to give time for the finish to propagate to the listener
             await sleep(500);
             await connection.removeAccountChangeListener(listenerId);
@@ -368,6 +373,10 @@ class GameRunner {
 
     public getNewGameContext(): NewGameContext {
         return this.newGameContext;
+    }
+
+    public isDebug(): boolean {
+        return this.debug;
     }
 }
 
