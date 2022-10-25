@@ -15,7 +15,8 @@ import {
     SYSTEM_PROGRAM_ID,
     TOKEN_PROGRAM_ID
 } from "./constants";
-import { Game, GameConfig } from "./types";
+import { EventCallback, EventEmitter } from "./events";
+import { Bucket, Game, GameConfig } from "./types";
 import {
     getAssociatedTokenAddress,
     getGame,
@@ -31,15 +32,96 @@ export interface SignerFunction {
 }
 
 /**
+ * Event emitted to listeners when a watched game receives an update.
+ */
+export interface GameEvent {
+    /**
+     * Current game account.
+     */
+    game: Game | null;
+
+    /**
+     * Will be defined and `true` when the current event is a new game.
+     */
+    new?: boolean;
+
+    /**
+     * Will be defined when the current event is a player entering the game.
+     */
+    enter?: {
+        /**
+         * Bucket index that the player entered.
+         */
+        bucketIndex: number;
+    };
+
+    /**
+     * Will be defined when the current event is a player moving buckets.
+     */
+    move?: {
+        /**
+         * Bucket index the player moved from.
+         */
+        oldBucketIndex: number;
+
+        /**
+         * Bucket index the player moved to.
+         */
+        newBucketIndex: number;
+    };
+
+    /**
+     * Will be defined when the current event is a player leaving the game.
+     */
+    leave?: {
+
+        /**
+         * Bucket index of the bucket the player left.
+         */
+        bucketIndex: number;
+
+        /**
+         * Token winnings the player took with them.
+         */
+        winningsDecimalTokens: number;
+    };
+
+    /**
+     * Will be defined when the current event is the game being ended (last player leaves).
+     */
+    end?: {
+        /**
+         * Bucket index of the bucket the last player was in.
+         */
+        bucketIndex: number;
+
+        /**
+         * Token winnings the player took with them.
+         */
+        winningsDecimalTokens: number;
+    };
+}
+
+export type GameEventCallback = EventCallback<GameEvent>
+
+interface Subscription<T> {
+    emitter: EventEmitter<T>;
+    id: number;
+}
+
+
+/**
  * SDK for interacting with the on-chain program. You should not need any other
  * solana dependencies for any actions associated with the game.
  */
-export class EquilibrateSdk {
+export class EquilibrateSDK {
     // we allow these to be undefined so that on startup we
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
     private readonly payer: PublicKey | undefined;
     private readonly sign: SignerFunction | undefined;
+    private readonly subscriptions: Map<string, Subscription<GameEvent>> = new Map<string, Subscription<GameEvent>>();
+    private readonly games: Map<string, Game> = new Map<string, Game>();
 
     private constructor(
         program: anchor.Program<Equilibrate> | undefined,
@@ -56,8 +138,8 @@ export class EquilibrateSdk {
      * @returns an instantiated but uninitialized SDK instance, e.g. for app startup before
      * the user has signed in
      */
-    public static dummy(): EquilibrateSdk {
-        return new EquilibrateSdk(undefined, undefined, undefined);
+    public static dummy(): EquilibrateSDK {
+        return new EquilibrateSDK(undefined, undefined, undefined);
     }
 
 
@@ -71,8 +153,8 @@ export class EquilibrateSdk {
         program: anchor.Program<Equilibrate>,
         payer: PublicKey,
         sign: SignerFunction
-    ): EquilibrateSdk {
-        return new EquilibrateSdk(program, payer, sign);
+    ): EquilibrateSDK {
+        return new EquilibrateSDK(program, payer, sign);
     }
 
 
@@ -92,6 +174,144 @@ export class EquilibrateSdk {
         Assert.notNullish(this.payer, "payer");
         Assert.notNullish(this.sign, "sign");
         return EquilibrateRequest.new(this.program, this.payer, this.sign);
+    }
+
+
+    /**
+     * Subscribes to changes to the given game, calling the callback whenever an update is received.
+     *
+     * @param gameAddress game to start watching
+     * @param callback callback to call with game state whenever an update is received
+     * @throws if this is a dummy SDK instance
+     */
+    public watchGame(gameAddress: PublicKey, callback: GameEventCallback): () => void {
+        const subscription: Subscription<GameEvent> = this.addOrGetSubscription(gameAddress);
+        return subscription.emitter.subscribe(callback);
+    }
+
+
+    private addOrGetSubscription(gameAddress: PublicKey): Subscription<GameEvent> {
+        Assert.notNullish(this.program, "program");
+        const gameAddressString: string = gameAddress.toBase58();
+        let subscription: Subscription<GameEvent> | undefined = this.subscriptions.get(gameAddressString);
+        if (subscription !== undefined) {
+            return subscription;
+        }
+
+        const program: anchor.Program<Equilibrate> = this.program;
+        const connection: Connection = this.program.provider.connection;
+        const emitter: EventEmitter<GameEvent> = new EventEmitter();
+        const listenerId: number = connection.onAccountChange(gameAddress, (buffer) => {
+            let game: Game | null = null;
+            if (buffer != null && buffer.data.length > 0) {
+                game = program.coder.accounts.decode<Game>("Game", buffer.data);
+            }
+            this.processAndEmitGameEvent(gameAddress, game, emitter);
+        });
+        subscription = { emitter: emitter, id: listenerId };
+        this.subscriptions.set(gameAddressString, subscription);
+        return subscription;
+    }
+
+
+    private processAndEmitGameEvent(gameAddress: PublicKey, game: Game | null, emitter: EventEmitter<GameEvent>): void {
+        const gameAddressString: string = gameAddress.toBase58();
+        const gameBefore: Game | undefined = this.games.get(gameAddressString);
+        const event: GameEvent = { game: game };
+        if (game === null) {
+            if (gameBefore === undefined) {
+                throw new Error(`Game ${gameAddressString} never existed.`);
+            }
+            const winnings: number = gameBefore.state.buckets.reduce((sum, bucket) =>
+                sum + bucket.decimalTokens.toNumber(), 0
+            );
+            const playerIndexZeroed: number = gameBefore.state.buckets.slice(1).findIndex(b => b.players > 0);
+            if (playerIndexZeroed === -1) {
+                throw new Error("Unable to determine the bucket of the last player.");
+            }
+            event.end = {
+                // the zero-th bucket is the holding bucket which keeps track of the total
+                // number of players in the game. We skip that looking for the player, but
+                // want to start with the playable buckets at index 1, so add that back in
+                // (see `slice` above where we omit the holding bucket.)
+                bucketIndex: playerIndexZeroed + 1,
+                winningsDecimalTokens: winnings,
+            };
+            // the game is over, so stop keeping track of it
+            this.games.delete(gameAddressString);
+
+        } else if (gameBefore === undefined) {
+            event.new = true;
+            this.games.set(gameAddressString, game);
+
+        } else {
+            const bucketsBefore: Bucket[] = gameBefore.state.buckets;
+            const bucketsNow: Bucket[] = game.state.buckets;
+            const playerCountChange: number = bucketsNow[0].players - bucketsBefore[0].players;
+            const bucketPlayerCountChanges: number[] = bucketsNow.map((b, i) => b.players - bucketsBefore[i].players);
+            if (playerCountChange === 0) {
+                const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
+                const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
+                event.move = {
+                    newBucketIndex: bucketEnteredIndex,
+                    oldBucketIndex: bucketLeftIndex
+                };
+            } else if (playerCountChange > 0) {
+                const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
+                event.enter = {
+                    bucketIndex: bucketEnteredIndex
+                };
+            } else {
+                const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
+                const balanceBefore: number = bucketsBefore[bucketLeftIndex].decimalTokens.toNumber();
+                const balanceNow: number = bucketsNow[bucketLeftIndex].decimalTokens.toNumber();
+                const winnings: number = balanceBefore - balanceNow;
+                event.leave = {
+                    bucketIndex: bucketLeftIndex,
+                    winningsDecimalTokens: winnings
+                };
+            }
+            this.games.set(gameAddressString, game);
+        }
+        emitter.emit(event);
+    }
+
+
+    private getBucketLeftIndex(bucketPlayerCountChanges: number[]): number {
+        const index: number = bucketPlayerCountChanges.findIndex(c => c < 0);
+        if (index === -1) {
+            throw new Error("Unable to determine bucket left");
+        }
+        return index;
+    }
+
+
+    private getBucketEnteredIndex(bucketPlayerCountChanges: number[]): number {
+        const index: number = bucketPlayerCountChanges.findIndex(c => c > 0);
+        if (index === -1) {
+            throw new Error("Unable to determine bucket entered");
+        }
+        return index;
+    }
+
+
+    /**
+     * Stops watching the given game, meaning all registered callbacks will cease to work.
+     *
+     * Does nothing if the game isnt being watched.
+     *
+     * @param gameAddress game to stop watching
+     * @throws if this is a dummy SDK instance
+     */
+    public async stopWatchingGame(gameAddress: PublicKey): Promise<void> {
+        Assert.notNullish(this.program, "program");
+        const gameAddressString: string = gameAddress.toBase58();
+        const subscription: Subscription<GameEvent> | undefined = this.subscriptions.get(gameAddressString);
+        if (subscription !== undefined) {
+            subscription.emitter.unsubscribeAll();
+            await this.program.provider.connection.removeAccountChangeListener(subscription.id);
+            this.subscriptions.delete(gameAddressString);
+        }
     }
 }
 
@@ -391,6 +611,15 @@ export class EquilibrateRequest {
     }
 
 
+    private generateGameId(): number {
+        // All we need is to ensure that each game is unique,
+        // and using the epoch time in milliseconds will with very high
+        // likelihood produce this result, while also conveniently
+        // making games sequentially ordered
+        return new Date().getTime();
+    }
+
+
     /**
      * Adds instruction to enter an existing game as a new player.
      *
@@ -559,14 +788,6 @@ export class EquilibrateRequest {
 
         const signed: Transaction = await this.sign(transaction);
         return await connection.sendRawTransaction(signed.serialize());
-    }
-
-    private generateGameId(): number {
-        // All we need is to ensure that each game is unique,
-        // and using the epoch time in milliseconds will with very high
-        // likelihood produce this result, while also conveniently
-        // making games sequentially ordered
-        return new Date().getTime();
     }
 }
 

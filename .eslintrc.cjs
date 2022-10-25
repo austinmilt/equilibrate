@@ -23,7 +23,6 @@ module.exports = {
         },
     },
     rules: {
-        "no-console": ["warn", { allow: ["error", "warn"] }],
         camelcase: "warn",
         "@typescript-eslint/no-inferrable-types": "off",
         quotes: ["error", "double"],
