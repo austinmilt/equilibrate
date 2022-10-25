@@ -30,6 +30,6 @@ module.exports = {
         "semi": ["error", "always"],
         "indent": ["error", 4],
         "no-multi-spaces": ["error"],
-        "max-len": ["warn", 120]
+        "max-len": ["warn", 120],
     },
 };

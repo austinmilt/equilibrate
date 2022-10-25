@@ -16,8 +16,9 @@ export default function App(): JSX.Element {
         >
             <SolanaProvider>
                 <EquilibrateProgramProvider>
-                    <Text>Welcome to Equilibrate</Text>
-                    <Viewport/>
+                    <div className="app">
+                        <Viewport/>
+                    </div>
                 </EquilibrateProgramProvider>
             </SolanaProvider>
         </MantineProvider>
