@@ -189,7 +189,10 @@ export class EquilibrateSDK {
         const listenerId: number = connection.onAccountChange(gameAddress, (buffer) => {
             let game: Game | null = null;
             if (buffer != null && buffer.data.length > 0) {
-                game = program.coder.accounts.decode<Game>("Game", buffer.data);
+                // The string "game" here matches the name of the game state account in the rust program.
+                // For some reason we have to use a lowercase "game" here but an uppercase "Game"
+                // in tests
+                game = program.coder.accounts.decode<Game>("game", buffer.data);
             }
             this.processAndEmitGameEvent(gameAddress, game, emitter);
         });
@@ -272,15 +275,18 @@ export class EquilibrateSDK {
             .toNumber();
 
         const buckets: Bucket[] = game.state.buckets;
-        const bucketSpillRateToOthers: number[] = buckets.map(
+        const bucketOutflowRate: number[] = buckets.map(
             bucket => bucket.players * spillRateDecimalTokensPerSecondPerPlayer,
         );
-        const cumulativeSpillRate: number = bucketSpillRateToOthers.reduce((sum, spillRate) => sum + spillRate, 0);
+        const cumulativeOutflowRate: number = bucketOutflowRate.reduce((sum, spillRate) => sum + spillRate, 0);
         const bucketsEnriched: BucketEnriched[] = buckets.map((bucket, i) => {
-            const netSpillRate: number = cumulativeSpillRate - bucketSpillRateToOthers[i];
+            // playable buckets only spill into other playable buckets, whereas the
+            // holding bucket only spill into playable buckets
+            const bucketInflowRate: number = i === 0 ? 0 : cumulativeOutflowRate - bucketOutflowRate[i];
+            const netInflowRate: number = bucketInflowRate - bucketOutflowRate[i];
             return {
                 ...bucket,
-                netSpillRateDecimalTokensPerSecond: netSpillRate
+                netSpillRateDecimalTokensPerSecond: netInflowRate
             };
         });
         const gameStateEnriched: GameStateEnriched = {
@@ -495,11 +501,12 @@ export class EquilibrateRequest {
      * Adds instruction to create a new game. Will also add an instruction to create
      * the token pool/manager if one doesnt already exist.
      *
+     * @param finalizedCallback callback to call when the game config has been finalized
      * @returns this request
      * @throws if any of the following have not been set: `mint`, `entryFeeDecimalTokens`,
      * `spillRateDecimalTokensPerSecondPerPlayer`, `nBuckets`, `maxPlayers`
      */
-    public withCreateNewGame(): EquilibrateRequest {
+    public withCreateNewGame(finalizedCallback?: (gameAddress: PublicKey) => void): EquilibrateRequest {
         this.validateConfig();
         Assert.notNullish(this.program.provider.publicKey, "player");
         const player: PublicKey = this.program.provider.publicKey;
@@ -544,9 +551,9 @@ export class EquilibrateRequest {
             }
 
             const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
-
             const gameId: number = this.gameId ?? this.generateGameId();
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
+            if (finalizedCallback !== undefined) finalizedCallback(gameAddress);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
                 player,
@@ -652,6 +659,8 @@ export class EquilibrateRequest {
      * have enough to play the game, and we can let the transaction simulation handle that error
      * case.
      *
+     * https://spl.solana.com/token#example-wrapping-sol-in-a-token
+     *
      * @param instructions instructions to append to
      * @returns boolean flag if the instructions should be followed up with an unwrap instruction
      */
@@ -722,6 +731,7 @@ export class EquilibrateRequest {
     }
 
 
+    // https://spl.solana.com/token#example-wrapping-sol-in-a-token
     private async addCloseTokenAccountInstruction(instructions: TransactionInstruction[]): Promise<void> {
         Assert.notNullish(this.program.provider.publicKey, "player");
         Assert.notNullish(this.config.mint, "mint");
@@ -774,13 +784,7 @@ export class EquilibrateRequest {
         this.steps.push(async () => {
             const instructions: TransactionInstruction[] = [];
 
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
-            const shouldCreateAndCloseTokenAccount = !this.accountExists(playerTokenAccount);
-            if (shouldCreateAndCloseTokenAccount) {
-                // really the only time we should get here is if playing with SOL, such that we
-                // already created and closed the wrapped SOL account to create or enter the game
-                instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
-            }
+            const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
 
             const poolManagerAddress: PublicKey = (await getPoolManagerAddress(mint, this.program.programId))[0];
             const tokenPoolAddress: PublicKey = await getTokenPoolAddress(
@@ -793,6 +797,7 @@ export class EquilibrateRequest {
                 player,
                 this.program.programId
             );
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
             const instruction: TransactionInstruction = await this.program
                 .methods
                 .enterGame(
@@ -814,7 +819,7 @@ export class EquilibrateRequest {
 
             instructions.push(instruction);
 
-            if (shouldCreateAndCloseTokenAccount) {
+            if (shouldAddUnwrapSolInstruction) {
                 this.addCloseTokenAccountInstruction(instructions);
             }
 
@@ -880,7 +885,13 @@ export class EquilibrateRequest {
         this.steps.push(async () => {
             const instructions: TransactionInstruction[] = [];
 
-            const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const shouldCreateAndCloseTokenAccount = !this.accountExists(playerTokenAccount);
+            if (shouldCreateAndCloseTokenAccount) {
+                // really the only time we should get here is if playing with SOL, such that we
+                // already created and closed the wrapped SOL account to create or enter the game
+                instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+            }
 
             const poolManagerAddress: PublicKey = (await getPoolManagerAddress(mint, this.program.programId))[0];
             const tokenPoolAddress: PublicKey = await getTokenPoolAddress(
@@ -893,7 +904,6 @@ export class EquilibrateRequest {
                 player,
                 this.program.programId
             );
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
             const game: Game = await getGame(gameAddress, this.program);
             const leaveInstruction: TransactionInstruction = await this.program
                 .methods
@@ -913,7 +923,7 @@ export class EquilibrateRequest {
 
             instructions.push(leaveInstruction);
 
-            if (shouldAddUnwrapSolInstruction) {
+            if (shouldCreateAndCloseTokenAccount) {
                 this.addCloseTokenAccountInstruction(instructions);
             }
 
