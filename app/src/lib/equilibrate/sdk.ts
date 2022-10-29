@@ -16,10 +16,19 @@ import {
     TOKEN_PROGRAM_ID
 } from "./constants";
 import { EventCallback, EventEmitter } from "./events";
-import { Bucket, BucketEnriched, Game, GameConfig, GameEnriched, GameStateEnriched } from "./types";
 import {
+    Bucket,
+    BucketEnriched,
+    Game,
+    GameConfig,
+    GameConfigEnriched,
+    GameEnriched,
+    GameStateEnriched,
+    GameWithEnrichedConfig
+} from "./types";
+import {
+    accountExists,
     getAssociatedTokenAddress,
-    getGame,
     getGameAddress,
     getMintDecimals,
     getPlayerStateAddress,
@@ -105,6 +114,16 @@ export interface GameEvent {
 
 export type GameEventCallback = EventCallback<GameEvent>
 
+export interface GamesListEntry {
+    account: GameWithEnrichedConfig;
+    publicKey: PublicKey;
+
+    /**
+     * Will be undefined if the user's wallet isnt connected.
+     */
+    userIsPlaying: boolean | undefined;
+}
+
 interface Subscription<T> {
     emitter: EventEmitter<T>;
     id: number;
@@ -162,6 +181,87 @@ export class EquilibrateSDK {
     }
 
 
+    //TODO figure out how to fetch this without the user wallet being connected
+    /**
+     * @returns all active games
+     */
+    public async getGamesList(): Promise<GamesListEntry[]> {
+        Assert.notNullish(this.program, "program");
+        const program: anchor.Program<Equilibrate> = this.program;
+
+        // get the mint decimals for all mints in all games
+        const connection: Connection = program.provider.connection;
+        const gamesListRaw = await program.account.game.all();
+        const mints: Set<PublicKey> = new Set<PublicKey>();
+        const mintDecimals: Map<string, number> = new Map<string, number>();
+        gamesListRaw.forEach(r => mints.add(r.account.config.mint));
+        await Promise.allSettled([...mints].map(mint =>
+            getMintDecimals(mint, connection)
+                .then(decimals => mintDecimals.set(mint.toBase58(), decimals))
+                .catch(e => {
+                    console.error(`Unable to retrieve mint decimals for ${mint}`, e);
+                })
+        ));
+
+        // figure out which games the user is playing
+        const player: PublicKey | undefined = program.provider.publicKey;
+        const userIsPlaying: Map<string, boolean> = new Map<string, boolean>();
+        if (player !== undefined) {
+            await Promise.all(gamesListRaw.map(async (entry) => {
+                try {
+                    const playerStateAddress: PublicKey = await getPlayerStateAddress(
+                        entry.publicKey,
+                        player,
+                        program.programId
+                    );
+                    const playingThisGame: boolean = await accountExists(
+                        playerStateAddress,
+                        program.provider.connection
+                    );
+                    userIsPlaying.set(entry.publicKey.toBase58(), playingThisGame);
+
+                } catch (e) {
+                    console.error("Unable to determine if player is playing game.", e);
+                }
+            }));
+        }
+
+        // enrich the game objects
+        const result: GamesListEntry[] = [];
+        for (const rawGameContext of gamesListRaw) {
+            const mint: PublicKey = rawGameContext.account.config.mint;
+            const mintString: string = mint.toBase58();
+            const thisMintDecimals: number | undefined = mintDecimals.get(mintString);
+            const configEnriched: GameConfigEnriched = {
+                ...rawGameContext.account.config,
+                mintDecimals: thisMintDecimals ?? null
+            };
+            const accountEnriched: GameWithEnrichedConfig = {
+                ...(rawGameContext.account as Game),
+                config: configEnriched
+            };
+
+            result.push({
+                ...rawGameContext,
+                account: accountEnriched,
+                userIsPlaying: userIsPlaying.get(rawGameContext.publicKey.toBase58())
+            });
+        }
+
+        return result;
+    }
+
+
+    /**
+     * @param address game to check
+     * @returns true if the game exists
+     */
+    public async gameExists(address: PublicKey): Promise<boolean> {
+        Assert.notNullish(this.program, "program");
+        return await accountExists(address, this.program.provider.connection);
+    }
+
+
     /**
      * Subscribes to changes to the given game, calling the callback whenever an update is received.
      *
@@ -169,9 +269,15 @@ export class EquilibrateSDK {
      * @param callback callback to call with game state whenever an update is received
      * @throws if this is a dummy SDK instance
      */
-    public watchGame(gameAddress: PublicKey, callback: GameEventCallback): () => void {
+    public watchGame(gameAddress: PublicKey, callback: GameEventCallback, fetchNow: boolean = false): void {
         const subscription: Subscription<GameEvent> = this.addOrGetSubscription(gameAddress);
-        return subscription.emitter.subscribe(callback);
+        subscription.emitter.subscribe(callback);
+
+        if (fetchNow) {
+            Assert.notNullish(this.program, "program");
+            getGame(gameAddress, this.program)
+                .then(game => this.processAndEmitGameEvent(gameAddress, game, subscription.emitter));
+        }
     }
 
 
@@ -186,7 +292,7 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
         const connection: Connection = this.program.provider.connection;
         const emitter: EventEmitter<GameEvent> = new EventEmitter();
-        const listenerId: number = connection.onAccountChange(gameAddress, (buffer) => {
+        const listenerId: number = connection.onAccountChange(gameAddress, async (buffer) => {
             let game: Game | null = null;
             if (buffer != null && buffer.data.length > 0) {
                 // The string "game" here matches the name of the game state account in the rust program.
@@ -194,7 +300,7 @@ export class EquilibrateSDK {
                 // in tests
                 game = program.coder.accounts.decode<Game>("game", buffer.data);
             }
-            this.processAndEmitGameEvent(gameAddress, game, emitter);
+            await this.processAndEmitGameEvent(gameAddress, game, emitter);
         });
         subscription = { emitter: emitter, id: listenerId };
         this.subscriptions.set(gameAddressString, subscription);
@@ -202,10 +308,14 @@ export class EquilibrateSDK {
     }
 
 
-    private processAndEmitGameEvent(gameAddress: PublicKey, game: Game | null, emitter: EventEmitter<GameEvent>): void {
+    private async processAndEmitGameEvent(
+        gameAddress: PublicKey,
+        game: Game | null,
+        emitter: EventEmitter<GameEvent>
+    ): Promise<void> {
         const gameAddressString: string = gameAddress.toBase58();
         const gameBefore: GameEnriched | undefined = this.games.get(gameAddressString);
-        const gameNow: GameEnriched | null = this.enrichGameObject(game);
+        const gameNow: GameEnriched | null = await this.enrichGameObject(gameBefore, game);
         const event: GameEvent = { game: gameNow };
         if (gameNow === null) {
             if (gameBefore === undefined) {
@@ -265,16 +375,27 @@ export class EquilibrateSDK {
         emitter.emit(event);
     }
 
+
     // similar to program update_bucket_balances
-    private enrichGameObject(game: Game | null): GameEnriched | null {
-        if (game === null) {
+    private async enrichGameObject(
+        gameBefore: GameEnriched | undefined,
+        gameNow: Game | null
+    ): Promise<GameEnriched | null> {
+
+        if (gameNow === null) {
             return null;
         }
-        const spillRateDecimalTokensPerSecondPerPlayer: number = game.config
+
+        const gameConfigEnriched: GameConfigEnriched = {
+            ...gameNow.config,
+            mintDecimals: await this.getGameMintDecimals(gameBefore, gameNow)
+        };
+
+        const spillRateDecimalTokensPerSecondPerPlayer: number = gameNow.config
             .spillRateDecimalTokensPerSecondPerPlayer
             .toNumber();
 
-        const buckets: Bucket[] = game.state.buckets;
+        const buckets: Bucket[] = gameNow.state.buckets;
         const bucketOutflowRate: number[] = buckets.map(
             bucket => bucket.players * spillRateDecimalTokensPerSecondPerPlayer,
         );
@@ -290,13 +411,32 @@ export class EquilibrateSDK {
             };
         });
         const gameStateEnriched: GameStateEnriched = {
-            ...game.state,
+            ...gameNow.state,
             buckets: bucketsEnriched
         };
+
         return {
-            ...game,
+            ...gameNow,
+            config: gameConfigEnriched,
             state: gameStateEnriched
         };
+    }
+
+
+    private async getGameMintDecimals(gameBefore: GameEnriched | undefined, gameNow: Game | null): Promise<number> {
+        Assert.notNullish(this.program, "program");
+        let result: number;
+        // avoid making a network call if we can get from the existing game state
+        if ((gameBefore === undefined) || (gameBefore.config.mintDecimals === null)) {
+            if (gameNow === null) {
+                throw new Error("Game never existed.");
+            }
+            result = await getMintDecimals(gameNow.config.mint, this.program.provider.connection);
+
+        } else {
+            result = gameBefore.config.mintDecimals;
+        }
+        return result;
     }
 
 
@@ -676,7 +816,10 @@ export class EquilibrateRequest {
             const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
             const mintToDecimalMultiplier: number = await this.computeMintToDecimalMultiplier();
             const entryFeeWithDecimals: anchor.BN = await this.computeEntryFeeDecimalTokens(mintToDecimalMultiplier);
-            const nativeTokenAccountExists: boolean = await this.accountExists(playerTokenAccount);
+            const nativeTokenAccountExists: boolean = await accountExists(
+                playerTokenAccount,
+                this.program.provider.connection
+            );
 
             if (!nativeTokenAccountExists) {
                 instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
@@ -706,63 +849,6 @@ export class EquilibrateRequest {
             result = !nativeTokenAccountExists;
         }
         return result;
-    }
-
-
-    private async makeCreateTokenAccountInstruction(
-        mint: PublicKey,
-        owner: PublicKey,
-        tokenAccount: PublicKey
-    ): Promise<TransactionInstruction> {
-        return await anchor.Spl
-            .associatedToken(this.program.provider)
-            .methods
-            .create()
-            .accountsStrict({
-                mint: mint,
-                owner: owner,
-                authority: owner,
-                associatedAccount: tokenAccount,
-                tokenProgram: TOKEN_PROGRAM_ID,
-                rent: RENT_SYSVAR,
-                systemProgram: SYSTEM_PROGRAM_ID
-            })
-            .instruction();
-    }
-
-
-    // https://spl.solana.com/token#example-wrapping-sol-in-a-token
-    private async addCloseTokenAccountInstruction(instructions: TransactionInstruction[]): Promise<void> {
-        Assert.notNullish(this.program.provider.publicKey, "player");
-        Assert.notNullish(this.config.mint, "mint");
-        const mint: PublicKey = this.config.mint;
-
-        if (mint.toBase58() === NATIVE_MINT.toBase58()) {
-            Assert.notNullish(this.program.provider.publicKey, "player");
-            Assert.notNullish(this.config.entryFee, "entryFee");
-            const player: PublicKey = this.program.provider.publicKey;
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
-            const instruction: TransactionInstruction = await anchor.Spl
-                .token(this.program.provider)
-                .methods
-                .closeAccount()
-                .accountsStrict({
-                    authority: player,
-                    account: playerTokenAccount,
-                    destination: player
-                })
-                .instruction();
-
-            instructions.push(instruction);
-        }
-    }
-
-
-    private async accountExists(account: PublicKey): Promise<boolean> {
-        const tokenAccountInfo: anchor.web3.AccountInfo<Buffer> | null = await this.connection
-            .getAccountInfo(account);
-
-        return (tokenAccountInfo !== null) && (tokenAccountInfo.data.length > 0);
     }
 
 
@@ -886,7 +972,11 @@ export class EquilibrateRequest {
             const instructions: TransactionInstruction[] = [];
 
             const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
-            const shouldCreateAndCloseTokenAccount = !this.accountExists(playerTokenAccount);
+            const shouldCreateAndCloseTokenAccount = !await accountExists(
+                playerTokenAccount,
+                this.program.provider.connection
+            );
+
             if (shouldCreateAndCloseTokenAccount) {
                 // really the only time we should get here is if playing with SOL, such that we
                 // already created and closed the wrapped SOL account to create or enter the game
@@ -934,6 +1024,52 @@ export class EquilibrateRequest {
     }
 
 
+    private async makeCreateTokenAccountInstruction(
+        mint: PublicKey,
+        owner: PublicKey,
+        tokenAccount: PublicKey
+    ): Promise<TransactionInstruction> {
+        return await anchor.Spl
+            .associatedToken(this.program.provider)
+            .methods
+            .create()
+            .accountsStrict({
+                mint: mint,
+                owner: owner,
+                authority: owner,
+                associatedAccount: tokenAccount,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                rent: RENT_SYSVAR,
+                systemProgram: SYSTEM_PROGRAM_ID
+            })
+            .instruction();
+    }
+
+
+    // https://spl.solana.com/token#example-wrapping-sol-in-a-token
+    private async addCloseTokenAccountInstruction(instructions: TransactionInstruction[]): Promise<void> {
+        Assert.notNullish(this.program.provider.publicKey, "player");
+        Assert.notNullish(this.config.mint, "mint");
+
+        const mint: PublicKey = this.config.mint;
+        const player: PublicKey = this.program.provider.publicKey;
+        const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+
+        const instruction: TransactionInstruction = await anchor.Spl
+            .token(this.program.provider)
+            .methods
+            .closeAccount()
+            .accountsStrict({
+                authority: player,
+                account: playerTokenAccount,
+                destination: player
+            })
+            .instruction();
+
+        instructions.push(instruction);
+    }
+
+
     /**
      * Add arbitrary instructions to be executed atomically with others in this request.
      *
@@ -963,22 +1099,29 @@ export class EquilibrateRequest {
             Assert.notNullish(this.program.provider.publicKey, "player");
             transaction.feePayer = this.program.provider.publicKey;
             const simulationResult = await this.program.provider.connection.simulateTransaction(transaction);
+            //TODO replace with something the (dev) user can look at
             // debugging only
             // eslint-disable-next-line no-console
             console.log(simulationResult);
 
         } else {
+            //TODO this isnt always throwing when there's a program error (AnchorError only?). How to make
+            // it throw?
             result = await this.program.provider.sendAndConfirm(
                 transaction,
                 undefined,
                 { commitment: "confirmed" }
             );
-            //TODO replace with something the user can look at
-            console.log("Transaction", result);
         }
         return result;
     }
 }
+
+
+async function getGame(address: PublicKey, program: anchor.Program<Equilibrate>): Promise<Game> {
+    return (await program.account.game.fetch(address)) as Game;
+}
+
 
 class Assert {
     private constructor() {
