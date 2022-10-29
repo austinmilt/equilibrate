@@ -26,9 +26,10 @@ import {
     getPoolManagerAddress,
     getTokenPoolAddress
 } from "./utils";
+import { NATIVE_MINT } from "@solana/spl-token";
 
-export interface SignerFunction {
-  (transaction: Transaction): Promise<Transaction>;
+export interface SubmitTransactionFunction {
+  (transaction: Transaction, connection: Connection): Promise<string>;
 }
 
 /**
@@ -118,19 +119,11 @@ export class EquilibrateSDK {
     // we allow these to be undefined so that on startup we
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
-    private readonly payer: PublicKey | undefined;
-    private readonly sign: SignerFunction | undefined;
     private readonly subscriptions: Map<string, Subscription<GameEvent>> = new Map<string, Subscription<GameEvent>>();
     private readonly games: Map<string, Game> = new Map<string, Game>();
 
-    private constructor(
-        program: anchor.Program<Equilibrate> | undefined,
-        payer: PublicKey | undefined,
-        sign: SignerFunction | undefined
-    ) {
+    private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
-        this.payer = payer;
-        this.sign = sign;
     }
 
 
@@ -139,22 +132,16 @@ export class EquilibrateSDK {
      * the user has signed in
      */
     public static dummy(): EquilibrateSDK {
-        return new EquilibrateSDK(undefined, undefined, undefined);
+        return new EquilibrateSDK(undefined);
     }
 
 
     /**
      * @param program game program
-     * @param payer payer for all transactions
-     * @param sign signer method for prompting the payer to sign all transactions
      * @returns instantiated SDK ready to be used
      */
-    public static from(
-        program: anchor.Program<Equilibrate>,
-        payer: PublicKey,
-        sign: SignerFunction
-    ): EquilibrateSDK {
-        return new EquilibrateSDK(program, payer, sign);
+    public static from(program: anchor.Program<Equilibrate>): EquilibrateSDK {
+        return new EquilibrateSDK(program);
     }
 
 
@@ -162,7 +149,7 @@ export class EquilibrateSDK {
      * @returns true if the SDK is ready to be used to make requests
      */
     public isReady(): boolean {
-        return this.program != null && this.payer != null && this.sign != null;
+        return this.program != null;
     }
 
 
@@ -171,9 +158,7 @@ export class EquilibrateSDK {
      */
     public request(): EquilibrateRequest {
         Assert.notNullish(this.program, "program");
-        Assert.notNullish(this.payer, "payer");
-        Assert.notNullish(this.sign, "sign");
-        return EquilibrateRequest.new(this.program, this.payer, this.sign);
+        return EquilibrateRequest.new(this.program);
     }
 
 
@@ -333,8 +318,6 @@ export class EquilibrateRequest {
     private readonly program: anchor.Program<Equilibrate>;
     private readonly connection: Connection;
     private readonly steps: (() => Promise<TransactionInstruction[]>)[] = [];
-    private readonly payer: PublicKey;
-    private readonly sign: SignerFunction;
     private readonly config: {
         mint?: PublicKey;
         entryFee?: number;
@@ -346,23 +329,13 @@ export class EquilibrateRequest {
     private gameId: number | undefined;
     private cancelOnLoss: boolean | undefined;
 
-    private constructor(
-        program: anchor.Program<Equilibrate>,
-        payer: PublicKey,
-        sign: SignerFunction
-    ) {
+    private constructor(program: anchor.Program<Equilibrate>) {
         this.program = program;
         this.connection = program.provider.connection;
-        this.payer = payer;
-        this.sign = sign;
     }
 
-    public static new(
-        program: anchor.Program<Equilibrate>,
-        payer: PublicKey,
-        sign: SignerFunction
-    ): EquilibrateRequest {
-        return new EquilibrateRequest(program, payer, sign);
+    public static new(program: anchor.Program<Equilibrate>): EquilibrateRequest {
+        return new EquilibrateRequest(program);
     }
 
 
@@ -496,6 +469,8 @@ export class EquilibrateRequest {
      */
     public withCreateNewGame(): EquilibrateRequest {
         this.validateConfig();
+        Assert.notNullish(this.program.provider.publicKey, "player");
+        const player: PublicKey = this.program.provider.publicKey;
         this.steps.push(async () => {
             const config: GameConfig = await this.finalizeConfig();
             // first determine if we need to create the token pool/manager
@@ -523,7 +498,7 @@ export class EquilibrateRequest {
                     .accountsStrict({
                         poolManager: poolManagerAddress,
                         tokenPool: tokenPoolAddress,
-                        payer: this.payer,
+                        payer: player,
                         gameMint: config.mint,
                         tokenProgram: TOKEN_PROGRAM_ID,
                         rent: RENT_SYSVAR,
@@ -536,14 +511,16 @@ export class EquilibrateRequest {
                 throw new Error("Cant make game, both pool manager and token pool must exist or we must create them");
             }
 
+            const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
+
             const gameId: number = this.gameId ?? this.generateGameId();
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                this.payer,
+                player,
                 this.program.programId
             );
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(config.mint, this.payer);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(config.mint, player);
             const newGameInstruction: TransactionInstruction = await this.program
                 .methods
                 .newGame(
@@ -553,7 +530,7 @@ export class EquilibrateRequest {
                 )
                 .accountsStrict({
                     tokenPool: tokenPoolAddress,
-                    payer: this.payer,
+                    payer: player,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     rent: RENT_SYSVAR,
                     systemProgram: SYSTEM_PROGRAM_ID,
@@ -566,6 +543,11 @@ export class EquilibrateRequest {
                 .instruction();
 
             instructions.push(newGameInstruction);
+
+            if (shouldAddUnwrapSolInstruction) {
+                await this.addCloseTokenAccountInstruction(instructions);
+            }
+
             return instructions;
         });
 
@@ -587,16 +569,14 @@ export class EquilibrateRequest {
 
     private async finalizeConfig(): Promise<GameConfig> {
         Assert.notNullish(this.config.mint, "mint");
-        Assert.notNullish(this.config.entryFee, "entryFee");
         Assert.notNullish(
             this.config.spillRateTokensPerSecondPerPlayer,
             "spillRateTokensPerSecondPerPlayer"
         );
         Assert.notNullish(this.config.nBuckets, "nBuckets");
         Assert.notNullish(this.config.maxPlayers, "maxPlayers");
-        const mintDecimals: number = await getMintDecimals(this.config.mint, this.connection);
-        const mintToDecimalMultiplier: number = Math.pow(10, mintDecimals);
-        const entryFeeWithDecimals: anchor.BN = new anchor.BN(this.config.entryFee * mintToDecimalMultiplier);
+        const mintToDecimalMultiplier: number = await this.computeMintToDecimalMultiplier();
+        const entryFeeWithDecimals: anchor.BN = await this.computeEntryFeeDecimalTokens(mintToDecimalMultiplier);
         const spillRateWithDecimals: anchor.BN = new anchor.BN(
             this.config.spillRateTokensPerSecondPerPlayer * mintToDecimalMultiplier
         );
@@ -611,12 +591,136 @@ export class EquilibrateRequest {
     }
 
 
+    private async computeMintToDecimalMultiplier(): Promise<number> {
+        Assert.notNullish(this.config.mint, "mint");
+        const mintDecimals: number = await getMintDecimals(this.config.mint, this.connection);
+        return Math.pow(10, mintDecimals);
+    }
+
+
+    private async computeEntryFeeDecimalTokens(mintToDecimalMultiplier: number): Promise<anchor.BN> {
+        Assert.notNullish(this.config.entryFee, "entryFee");
+        return new anchor.BN(this.config.entryFee * mintToDecimalMultiplier);
+    }
+
+
     private generateGameId(): number {
         // All we need is to ensure that each game is unique,
         // and using the epoch time in milliseconds will with very high
         // likelihood produce this result, while also conveniently
         // making games sequentially ordered
         return new Date().getTime();
+    }
+
+
+    /**
+     * Solana native mint is the one exception where the player doesnt need to already have
+     * the mint in order to transfer tokens in/out, since it can be wrapped and transferred
+     * from their wallet. Every other mint would need to be created already for them to
+     * have enough to play the game, and we can let the transaction simulation handle that error
+     * case.
+     *
+     * @param instructions instructions to append to
+     * @returns boolean flag if the instructions should be followed up with an unwrap instruction
+     */
+    private async addWrapSolInstructionsIfNeeded(instructions: TransactionInstruction[]): Promise<boolean> {
+        Assert.notNullish(this.config.mint, "mint");
+        const mint: PublicKey = this.config.mint;
+
+        let result: boolean = false;
+        if (mint.toBase58() === NATIVE_MINT.toBase58()) {
+            Assert.notNullish(this.program.provider.publicKey, "player");
+            Assert.notNullish(this.config.entryFee, "entryFee");
+            const player: PublicKey = this.program.provider.publicKey;
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const mintToDecimalMultiplier: number = await this.computeMintToDecimalMultiplier();
+            const entryFeeWithDecimals: anchor.BN = await this.computeEntryFeeDecimalTokens(mintToDecimalMultiplier);
+            const nativeTokenAccountExists: boolean = await this.accountExists(playerTokenAccount);
+
+            if (!nativeTokenAccountExists) {
+                instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+
+                const depositSolInstruction: TransactionInstruction = anchor.web3
+                    .SystemProgram
+                    .transfer({
+                        fromPubkey: player,
+                        toPubkey: playerTokenAccount,
+                        lamports: entryFeeWithDecimals.toNumber()
+                    });
+
+                instructions.push(depositSolInstruction);
+
+                const syncNativeInstruction: TransactionInstruction = await anchor.Spl
+                    .token(this.program.provider)
+                    .methods
+                    .syncNative()
+                    .accountsStrict({
+                        account: playerTokenAccount
+                    })
+                    .instruction();
+
+                instructions.push(syncNativeInstruction);
+            }
+
+            result = !nativeTokenAccountExists;
+        }
+        return result;
+    }
+
+
+    private async makeCreateTokenAccountInstruction(
+        mint: PublicKey,
+        owner: PublicKey,
+        tokenAccount: PublicKey
+    ): Promise<TransactionInstruction> {
+        return await anchor.Spl
+            .associatedToken(this.program.provider)
+            .methods
+            .create()
+            .accountsStrict({
+                mint: mint,
+                owner: owner,
+                authority: owner,
+                associatedAccount: tokenAccount,
+                tokenProgram: TOKEN_PROGRAM_ID,
+                rent: RENT_SYSVAR,
+                systemProgram: SYSTEM_PROGRAM_ID
+            })
+            .instruction();
+    }
+
+
+    private async addCloseTokenAccountInstruction(instructions: TransactionInstruction[]): Promise<void> {
+        Assert.notNullish(this.program.provider.publicKey, "player");
+        Assert.notNullish(this.config.mint, "mint");
+        const mint: PublicKey = this.config.mint;
+
+        if (mint.toBase58() === NATIVE_MINT.toBase58()) {
+            Assert.notNullish(this.program.provider.publicKey, "player");
+            Assert.notNullish(this.config.entryFee, "entryFee");
+            const player: PublicKey = this.program.provider.publicKey;
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const instruction: TransactionInstruction = await anchor.Spl
+                .token(this.program.provider)
+                .methods
+                .closeAccount()
+                .accountsStrict({
+                    authority: player,
+                    account: playerTokenAccount,
+                    destination: player
+                })
+                .instruction();
+
+            instructions.push(instruction);
+        }
+    }
+
+
+    private async accountExists(account: PublicKey): Promise<boolean> {
+        const tokenAccountInfo: anchor.web3.AccountInfo<Buffer> | null = await this.connection
+            .getAccountInfo(account);
+
+        return (tokenAccountInfo !== null) && (tokenAccountInfo.data.length > 0);
     }
 
 
@@ -630,10 +734,22 @@ export class EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
         Assert.notNullish(this.config.mint, "mint");
         Assert.notNullish(this.gameId, "gameId");
+        Assert.notNullish(this.program.provider.publicKey, "player");
         const bucketIndex: number = this.bucketIndex;
         const mint: PublicKey = this.config.mint;
         const gameId: number = this.gameId;
+        const player: PublicKey = this.program.provider.publicKey;
         this.steps.push(async () => {
+            const instructions: TransactionInstruction[] = [];
+
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const shouldCreateAndCloseTokenAccount = !this.accountExists(playerTokenAccount);
+            if (shouldCreateAndCloseTokenAccount) {
+                // really the only time we should get here is if playing with SOL, such that we
+                // already created and closed the wrapped SOL account to create or enter the game
+                instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+            }
+
             const poolManagerAddress: PublicKey = (await getPoolManagerAddress(mint, this.program.programId))[0];
             const tokenPoolAddress: PublicKey = await getTokenPoolAddress(
                 mint,
@@ -642,10 +758,9 @@ export class EquilibrateRequest {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                this.payer,
+                player,
                 this.program.programId
             );
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, this.payer);
             const instruction: TransactionInstruction = await this.program
                 .methods
                 .enterGame(
@@ -657,7 +772,7 @@ export class EquilibrateRequest {
                     programFeeDestination: PROGRAM_FEE_DESTINATION,
                     depositSourceAccount: playerTokenAccount,
                     tokenPool: tokenPoolAddress,
-                    payer: this.payer,
+                    payer: player,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     systemProgram: SYSTEM_PROGRAM_ID,
                     rent: RENT_SYSVAR,
@@ -665,7 +780,13 @@ export class EquilibrateRequest {
                 })
                 .instruction();
 
-            return [instruction];
+            instructions.push(instruction);
+
+            if (shouldCreateAndCloseTokenAccount) {
+                this.addCloseTokenAccountInstruction(instructions);
+            }
+
+            return instructions;
         });
 
         return this;
@@ -681,13 +802,15 @@ export class EquilibrateRequest {
     public withMoveBucket(): EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
         Assert.notNullish(this.gameId, "gameId");
+        Assert.notNullish(this.program.provider.publicKey, "player");
         const bucketIndex: number = this.bucketIndex;
         const gameId: number = this.gameId;
+        const player: PublicKey = this.program.provider.publicKey;
         this.steps.push(async () => {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                this.payer,
+                player,
                 this.program.programId
             );
             const instruction: TransactionInstruction = await this.program
@@ -695,7 +818,7 @@ export class EquilibrateRequest {
                 .moveBuckets(bucketIndex)
                 .accountsStrict({
                     game: gameAddress,
-                    payer: this.payer,
+                    payer: player,
                     player: playerStateAddress
                 })
                 .instruction();
@@ -717,10 +840,16 @@ export class EquilibrateRequest {
         Assert.notNullish(this.config.mint, "mint");
         Assert.notNullish(this.gameId, "gameId");
         Assert.notNullish(this.cancelOnLoss, "cancelOnLoss");
+        Assert.notNullish(this.program.provider.publicKey, "player");
         const mint: PublicKey = this.config.mint;
         const gameId: number = this.gameId;
         const cancelOnLoss: boolean = this.cancelOnLoss;
+        const player: PublicKey = this.program.provider.publicKey;
         this.steps.push(async () => {
+            const instructions: TransactionInstruction[] = [];
+
+            const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
+
             const poolManagerAddress: PublicKey = (await getPoolManagerAddress(mint, this.program.programId))[0];
             const tokenPoolAddress: PublicKey = await getTokenPoolAddress(
                 mint,
@@ -729,17 +858,17 @@ export class EquilibrateRequest {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                this.payer,
+                player,
                 this.program.programId
             );
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, this.payer);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
             const game: Game = await getGame(gameAddress, this.program);
-            const instruction: TransactionInstruction = await this.program
+            const leaveInstruction: TransactionInstruction = await this.program
                 .methods
                 .leaveGame(cancelOnLoss)
                 .accountsStrict({
                     game: gameAddress,
-                    payer: this.payer,
+                    payer: player,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     systemProgram: SYSTEM_PROGRAM_ID,
                     player: playerStateAddress,
@@ -750,7 +879,13 @@ export class EquilibrateRequest {
                 })
                 .instruction();
 
-            return [instruction];
+            instructions.push(leaveInstruction);
+
+            if (shouldAddUnwrapSolInstruction) {
+                this.addCloseTokenAccountInstruction(instructions);
+            }
+
+            return instructions;
         });
 
         return this;
@@ -774,20 +909,32 @@ export class EquilibrateRequest {
      *
      * @returns the transaction
      */
-    public async signAndSend(): Promise<string> {
-        Assert.notNullish(this.payer, "payer");
+    public async signAndSend(simulateOnly?: boolean): Promise<string> {
+        Assert.notNullish(this.program.provider.sendAndConfirm, "program.provider.sendAndConfirm");
         const transaction: Transaction = new Transaction();
         for (const step of this.steps) {
             transaction.add(...(await step()));
         }
-        const connection: Connection = this.program.provider.connection;
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-        transaction.recentBlockhash = blockhash;
-        transaction.lastValidBlockHeight = lastValidBlockHeight;
-        transaction.feePayer = this.payer;
 
-        const signed: Transaction = await this.sign(transaction);
-        return await connection.sendRawTransaction(signed.serialize());
+        let result: string = "";
+        if (simulateOnly) {
+            Assert.notNullish(this.program.provider.publicKey, "player");
+            transaction.feePayer = this.program.provider.publicKey;
+            const simulationResult = await this.program.provider.connection.simulateTransaction(transaction);
+            // debugging only
+            // eslint-disable-next-line no-console
+            console.log(simulationResult);
+
+        } else {
+            result = await this.program.provider.sendAndConfirm(
+                transaction,
+                undefined,
+                { commitment: "confirmed" }
+            );
+            //TODO replace with something the user can look at
+            console.log("Transaction", result);
+        }
+        return result;
     }
 }
 

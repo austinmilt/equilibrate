@@ -26,14 +26,14 @@ export function useEquilibrate(): EquilibrateProgramContextState {
 
 export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.Element {
     const [sdk, setSdk] = useState<EquilibrateSDK>(EquilibrateSDK.dummy());
-    const userWallet = useAnchorWallet();
+    const anchorWallet = useAnchorWallet();
     const { connection } = useConnection();
 
     useEffect(() => {
-        if (userWallet?.publicKey != null) {
+        if (anchorWallet != null) {
             const provider = new anchor.AnchorProvider(
                 connection,
-                userWallet,
+                anchorWallet,
                 anchor.AnchorProvider.defaultOptions()
             );
             const program: anchor.Program<Equilibrate> = new anchor.Program(
@@ -41,9 +41,9 @@ export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.
                 PROGRAM_ID,
                 provider
             );
-            setSdk(EquilibrateSDK.from(program, userWallet.publicKey, userWallet.signTransaction));
+            setSdk(EquilibrateSDK.from(program));
         }
-    }, [userWallet, connection, setSdk]);
+    }, [anchorWallet, connection, setSdk]);
 
     const value: EquilibrateProgramContextState = {
         equilibrate: sdk,
