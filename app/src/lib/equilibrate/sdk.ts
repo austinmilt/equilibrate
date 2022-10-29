@@ -16,7 +16,7 @@ import {
     TOKEN_PROGRAM_ID
 } from "./constants";
 import { EventCallback, EventEmitter } from "./events";
-import { Bucket, Game, GameConfig } from "./types";
+import { Bucket, BucketEnriched, Game, GameConfig, GameEnriched, GameStateEnriched } from "./types";
 import {
     getAssociatedTokenAddress,
     getGame,
@@ -37,9 +37,9 @@ export interface SubmitTransactionFunction {
  */
 export interface GameEvent {
     /**
-     * Current game account.
+     * Current game account. Will be `null` after the game ends or could not be found.
      */
-    game: Game | null;
+    game: GameEnriched | null;
 
     /**
      * Will be defined and `true` when the current event is a new game.
@@ -120,7 +120,7 @@ export class EquilibrateSDK {
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
     private readonly subscriptions: Map<string, Subscription<GameEvent>> = new Map<string, Subscription<GameEvent>>();
-    private readonly games: Map<string, Game> = new Map<string, Game>();
+    private readonly games: Map<string, GameEnriched> = new Map<string, GameEnriched>();
 
     private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
@@ -201,9 +201,10 @@ export class EquilibrateSDK {
 
     private processAndEmitGameEvent(gameAddress: PublicKey, game: Game | null, emitter: EventEmitter<GameEvent>): void {
         const gameAddressString: string = gameAddress.toBase58();
-        const gameBefore: Game | undefined = this.games.get(gameAddressString);
-        const event: GameEvent = { game: game };
-        if (game === null) {
+        const gameBefore: GameEnriched | undefined = this.games.get(gameAddressString);
+        const gameNow: GameEnriched | null = this.enrichGameObject(game);
+        const event: GameEvent = { game: gameNow };
+        if (gameNow === null) {
             if (gameBefore === undefined) {
                 throw new Error(`Game ${gameAddressString} never existed.`);
             }
@@ -227,11 +228,11 @@ export class EquilibrateSDK {
 
         } else if (gameBefore === undefined) {
             event.new = true;
-            this.games.set(gameAddressString, game);
+            this.games.set(gameAddressString, gameNow);
 
         } else {
             const bucketsBefore: Bucket[] = gameBefore.state.buckets;
-            const bucketsNow: Bucket[] = game.state.buckets;
+            const bucketsNow: Bucket[] = gameNow.state.buckets;
             const playerCountChange: number = bucketsNow[0].players - bucketsBefore[0].players;
             const bucketPlayerCountChanges: number[] = bucketsNow.map((b, i) => b.players - bucketsBefore[i].players);
             if (playerCountChange === 0) {
@@ -256,9 +257,40 @@ export class EquilibrateSDK {
                     winningsDecimalTokens: winnings
                 };
             }
-            this.games.set(gameAddressString, game);
+            this.games.set(gameAddressString, gameNow);
         }
         emitter.emit(event);
+    }
+
+    // similar to program update_bucket_balances
+    private enrichGameObject(game: Game | null): GameEnriched | null {
+        if (game === null) {
+            return null;
+        }
+        const spillRateDecimalTokensPerSecondPerPlayer: number = game.config
+            .spillRateDecimalTokensPerSecondPerPlayer
+            .toNumber();
+
+        const buckets: Bucket[] = game.state.buckets;
+        const bucketSpillRateToOthers: number[] = buckets.map(
+            bucket => bucket.players * spillRateDecimalTokensPerSecondPerPlayer,
+        );
+        const cumulativeSpillRate: number = bucketSpillRateToOthers.reduce((sum, spillRate) => sum + spillRate, 0);
+        const bucketsEnriched: BucketEnriched[] = buckets.map((bucket, i) => {
+            const netSpillRate: number = cumulativeSpillRate - bucketSpillRateToOthers[i];
+            return {
+                ...bucket,
+                netSpillRateDecimalTokensPerSecond: netSpillRate
+            };
+        });
+        const gameStateEnriched: GameStateEnriched = {
+            ...game.state,
+            buckets: bucketsEnriched
+        };
+        return {
+            ...game,
+            state: gameStateEnriched
+        };
     }
 
 
