@@ -4,7 +4,7 @@ import { useEquilibrate } from "./provider";
 import { GameEvent } from "./sdk";
 import { GameEnriched } from "./types";
 
-export interface GameInterface {
+export interface GameContext {
     game: GameEnriched | null;
     loading: boolean;
     error: Error | undefined;
@@ -14,27 +14,35 @@ export interface GameInterface {
 }
 
 
-export function useGame(gameAddress: PublicKey): GameInterface {
+export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [game, setGame] = useState<GameEnriched | null>(null);
-    const [loading, setLoading] = useState<GameInterface["loading"]>(false);
-    const [error, setError] = useState<GameInterface["error"]>();
+    const [loading, setLoading] = useState<GameContext["loading"]>(false);
+    const [error, setError] = useState<GameContext["error"]>();
 
     // (un)subscribe to the current game
     useEffect(() => {
-        if (equilibrateIsReady) {
-            equilibrate.watchGame(gameAddress, (event: GameEvent) => {
-                setGame(event.game);
-            });
+        const run = async () => {
+            if (equilibrateIsReady && (gameAddress !== undefined)) {
+                if (!await equilibrate.gameExists(gameAddress)) {
+                    throw UseGameError.noSuchGame(gameAddress);
+                }
+                equilibrate.watchGame(gameAddress, (event: GameEvent) => setGame(event.game), true);
 
-            return () => {
-                // this is an async method so it may return after the component is unmounted :(
-                equilibrate.stopWatchingGame(gameAddress);
-            };
-        }
-    }, [gameAddress, equilibrate, equilibrateIsReady]);
+                return () => {
+                    // TODO this is an async method so it may return after the component is unmounted :(
+                    // TODO likely the cause of "WebSocket is already in CLOSING or CLOSED state."
+                    equilibrate.stopWatchingGame(gameAddress);
+                };
+            }
+        };
 
-    const enterGame: GameInterface["enterGame"] = useCallback((bucketIndex) => {
+        setError(undefined);
+        setLoading(true);
+        run().catch(setError).finally(() => setLoading(false));
+    }, [gameAddress, equilibrateIsReady]);
+
+    const enterGame: GameContext["enterGame"] = useCallback((bucketIndex) => {
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -60,7 +68,7 @@ export function useGame(gameAddress: PublicKey): GameInterface {
 
     }, [game, equilibrate, equilibrateIsReady]);
 
-    const moveBucket: GameInterface["moveBucket"] = useCallback((bucketIndex) => {
+    const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex) => {
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -69,6 +77,10 @@ export function useGame(gameAddress: PublicKey): GameInterface {
         } else if (!equilibrateIsReady) {
             //TODO replace with better uX
             alert("SDK isnt ready");
+            return;
+        } else if (bucketIndex === 0) {
+            //TODO replace with better uX
+            alert("Not allowed to enter the holding bucket.");
             return;
         }
         setLoading(true);
@@ -85,7 +97,7 @@ export function useGame(gameAddress: PublicKey): GameInterface {
 
     }, [game, equilibrate, equilibrateIsReady]);
 
-    const leaveGame: GameInterface["leaveGame"] = useCallback((cancelOnLoss) => {
+    const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss) => {
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -119,4 +131,25 @@ export function useGame(gameAddress: PublicKey): GameInterface {
         moveBucket: moveBucket,
         leaveGame: leaveGame
     };
+}
+
+
+export class UseGameError extends Error {
+    public readonly code: UseGameErrorCode;
+    public readonly game: PublicKey;
+
+    private constructor(msg: string, game: PublicKey, code: UseGameErrorCode) {
+        super(msg);
+        this.game = game;
+        this.code = code;
+    }
+
+    public static noSuchGame(game: PublicKey): UseGameError {
+        return new UseGameError("No such game.", game, UseGameErrorCode.NO_SUCH_GAME);
+    }
+}
+
+
+export enum UseGameErrorCode {
+    NO_SUCH_GAME
 }
