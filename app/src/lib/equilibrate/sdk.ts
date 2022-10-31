@@ -1,5 +1,11 @@
 import * as anchor from "@project-serum/anchor";
-import { Connection, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
+import {
+    Connection,
+    PublicKey,
+    SendTransactionError,
+    Transaction,
+    TransactionInstruction
+} from "@solana/web3.js";
 import { Equilibrate } from "../../../../target/types/equilibrate";
 import {
     ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -9,6 +15,7 @@ import {
     GAME_MAX_PLAYERS_MAX,
     GAME_MAX_PLAYERS_MIN,
     PLAYER_BUCKET_INDEX_MIN,
+    PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS,
     PROGRAM_FEE_DESTINATION,
     RENT_SYSVAR,
     SPILL_RATE_MIN_EXCLUSIVE,
@@ -18,13 +25,12 @@ import {
 import { EventCallback, EventEmitter } from "./events";
 import {
     Bucket,
-    BucketEnriched,
     Game,
     GameConfig,
     GameConfigEnriched,
     GameEnriched,
-    GameStateEnriched,
-    GameWithEnrichedConfig
+    GameWithEnrichedConfig,
+    PlayerState
 } from "./types";
 import {
     accountExists,
@@ -36,6 +42,7 @@ import {
     getTokenPoolAddress
 } from "./utils";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { AnchorError } from "@project-serum/anchor";
 
 export interface SubmitTransactionFunction {
   (transaction: Transaction, connection: Connection): Promise<string>;
@@ -114,6 +121,71 @@ export interface GameEvent {
 
 export type GameEventCallback = EventCallback<GameEvent>
 
+
+/**
+ * Event emitted to listeners when a watched player in a specific game receives an update.
+ */
+export interface PlayerStateEvent {
+    /**
+     * Current player game account. Will be `null` if the player cannot be found.
+     */
+    player: PlayerState | null;
+
+    /**
+     * Will be defined and `true` when the player creates the game.
+     */
+    new?: {
+        /**
+         * Bucket index that the player entered.
+         */
+        bucketIndex: number;
+    };
+
+    /**
+     * Will be defined when the current event is the player entering the game.
+     */
+    enter?: {
+        /**
+         * Bucket index that the player entered.
+         */
+        bucketIndex: number;
+    };
+
+    /**
+     * Will be defined when the current event is the player moving buckets.
+     */
+    move?: {
+        /**
+         * Bucket index the player moved from.
+         */
+        oldBucketIndex: number;
+
+        /**
+         * Bucket index the player moved to.
+         */
+        newBucketIndex: number;
+    };
+
+    /**
+     * Will be defined when the current event is the player leaving the game.
+     */
+    leave?: {
+
+        /**
+         * Bucket index of the bucket the player left.
+         */
+        bucketIndex: number;
+
+        /**
+         * Token winnings the player took with them.
+         */
+        winningsDecimalTokens: number;
+    };
+}
+
+export type PlayerStateEventCallback = EventCallback<PlayerStateEvent>
+
+
 export interface GamesListEntry {
     account: GameWithEnrichedConfig;
     publicKey: PublicKey;
@@ -122,6 +194,35 @@ export interface GamesListEntry {
      * Will be undefined if the user's wallet isnt connected.
      */
     userIsPlaying: boolean | undefined;
+}
+
+
+export interface RequestResult {
+
+    /**
+     * RPC transaction signature. Will be defined if the transaction succeded.
+     */
+    transactionSignature?: string;
+
+    /**
+     * Will be defined if an acceptable error was thrown such that the SDK should
+     * not have thrown it immediately, e.g. when cancelling a LeaveGame request
+     * if the player would lose money.
+     */
+    error?: Error;
+
+    /**
+     * Error code string of anchor error if one was thrown. Will be defined if an
+     * acceptable error was thrown such that the SDK should not have thrown it
+     * immediately, e.g. when cancelling a LeaveGame request if the player would
+     *  lose money.
+     */
+    anchorErrorCode?: string;
+
+    /**
+     * Result of a simulation-only run. Will be defined if the request was simulation only.
+     */
+    simulationResult?: anchor.web3.SimulatedTransactionResponse;
 }
 
 interface Subscription<T> {
@@ -138,8 +239,14 @@ export class EquilibrateSDK {
     // we allow these to be undefined so that on startup we
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
-    private readonly subscriptions: Map<string, Subscription<GameEvent>> = new Map<string, Subscription<GameEvent>>();
+
+    private readonly gameSubscriptions: Map<string, Subscription<GameEvent>> =
+        new Map<string, Subscription<GameEvent>>();
     private readonly games: Map<string, GameEnriched> = new Map<string, GameEnriched>();
+
+    private readonly playerStateSubscriptions: Map<string, Subscription<PlayerStateEvent>> =
+        new Map<string, Subscription<PlayerStateEvent>>();
+    private readonly playerStates: Map<string, PlayerState> = new Map<string, PlayerState>();
 
     private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
@@ -209,16 +316,7 @@ export class EquilibrateSDK {
         if (player !== undefined) {
             await Promise.all(gamesListRaw.map(async (entry) => {
                 try {
-                    const playerStateAddress: PublicKey = await getPlayerStateAddress(
-                        entry.publicKey,
-                        player,
-                        program.programId
-                    );
-                    const playingThisGame: boolean = await accountExists(
-                        playerStateAddress,
-                        program.provider.connection
-                    );
-                    userIsPlaying.set(entry.publicKey.toBase58(), playingThisGame);
+                    userIsPlaying.set(entry.publicKey.toBase58(), await this.playerInGame(entry.publicKey));
 
                 } catch (e) {
                     console.error("Unable to determine if player is playing game.", e);
@@ -263,6 +361,38 @@ export class EquilibrateSDK {
 
 
     /**
+     * @param gameAddress game address to check if active player is playing
+     * @returns true if active player is playing this game
+     */
+    public async playerInGame(gameAddress: PublicKey): Promise<boolean> {
+        Assert.notNullish(this.program, "program");
+        Assert.notNullish(this.program.provider.publicKey, "player");
+        const playerStateAddress: PublicKey = await getPlayerStateAddress(
+            gameAddress,
+            this.program.provider.publicKey,
+            this.program.programId
+        );
+        return await accountExists(playerStateAddress, this.program.provider.connection);
+    }
+
+
+    /**
+     * @param gameAddress address of game to check for player state
+     * @returns player state if the player is in the game, `null` otherwise
+     */
+    public async getPlayerState(gameAddress: PublicKey): Promise<PlayerState | null> {
+        Assert.notNullish(this.program, "program");
+        Assert.notNullish(this.program.provider.publicKey, "player");
+        const playerStateAddress: PublicKey = await getPlayerStateAddress(
+            gameAddress,
+            this.program.provider.publicKey,
+            this.program.programId
+        );
+        return await this.program.account.playerState.fetchNullable(playerStateAddress);
+    }
+
+
+    /**
      * Subscribes to changes to the given game, calling the callback whenever an update is received.
      *
      * @param gameAddress game to start watching
@@ -270,7 +400,7 @@ export class EquilibrateSDK {
      * @throws if this is a dummy SDK instance
      */
     public watchGame(gameAddress: PublicKey, callback: GameEventCallback, fetchNow: boolean = false): void {
-        const subscription: Subscription<GameEvent> = this.addOrGetSubscription(gameAddress);
+        const subscription: Subscription<GameEvent> = this.addOrGetGameSubscription(gameAddress);
         subscription.emitter.subscribe(callback);
 
         if (fetchNow) {
@@ -281,10 +411,10 @@ export class EquilibrateSDK {
     }
 
 
-    private addOrGetSubscription(gameAddress: PublicKey): Subscription<GameEvent> {
+    private addOrGetGameSubscription(gameAddress: PublicKey): Subscription<GameEvent> {
         Assert.notNullish(this.program, "program");
         const gameAddressString: string = gameAddress.toBase58();
-        let subscription: Subscription<GameEvent> | undefined = this.subscriptions.get(gameAddressString);
+        let subscription: Subscription<GameEvent> | undefined = this.gameSubscriptions.get(gameAddressString);
         if (subscription !== undefined) {
             return subscription;
         }
@@ -292,6 +422,8 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
         const connection: Connection = this.program.provider.connection;
         const emitter: EventEmitter<GameEvent> = new EventEmitter();
+        // we have to use connection.onAccountChange for accounts that may be deleted while we're watching them
+        // because anchor doesnt handle that
         const listenerId: number = connection.onAccountChange(gameAddress, async (buffer) => {
             let game: Game | null = null;
             if (buffer != null && buffer.data.length > 0) {
@@ -303,7 +435,7 @@ export class EquilibrateSDK {
             await this.processAndEmitGameEvent(gameAddress, game, emitter);
         });
         subscription = { emitter: emitter, id: listenerId };
-        this.subscriptions.set(gameAddressString, subscription);
+        this.gameSubscriptions.set(gameAddressString, subscription);
         return subscription;
     }
 
@@ -349,12 +481,17 @@ export class EquilibrateSDK {
             const playerCountChange: number = bucketsNow[0].players - bucketsBefore[0].players;
             const bucketPlayerCountChanges: number[] = bucketsNow.map((b, i) => b.players - bucketsBefore[i].players);
             if (playerCountChange === 0) {
-                const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
-                const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
-                event.move = {
-                    newBucketIndex: bucketEnteredIndex,
-                    oldBucketIndex: bucketLeftIndex
-                };
+                try {
+                    const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
+                    const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
+                    event.move = {
+                        newBucketIndex: bucketEnteredIndex,
+                        oldBucketIndex: bucketLeftIndex
+                    };
+                } catch (e) {
+                    //TODO figure out what's triggering this
+                    console.warn(e);
+                }
             } else if (playerCountChange > 0) {
                 const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
                 event.enter = {
@@ -376,7 +513,6 @@ export class EquilibrateSDK {
     }
 
 
-    // similar to program update_bucket_balances
     private async enrichGameObject(
         gameBefore: GameEnriched | undefined,
         gameNow: Game | null
@@ -391,34 +527,9 @@ export class EquilibrateSDK {
             mintDecimals: await this.getGameMintDecimals(gameBefore, gameNow)
         };
 
-        const spillRateDecimalTokensPerSecondPerPlayer: number = gameNow.config
-            .spillRateDecimalTokensPerSecondPerPlayer
-            .toNumber();
-
-        const buckets: Bucket[] = gameNow.state.buckets;
-        const bucketOutflowRate: number[] = buckets.map(
-            bucket => bucket.players * spillRateDecimalTokensPerSecondPerPlayer,
-        );
-        const cumulativeOutflowRate: number = bucketOutflowRate.reduce((sum, spillRate) => sum + spillRate, 0);
-        const bucketsEnriched: BucketEnriched[] = buckets.map((bucket, i) => {
-            // playable buckets only spill into other playable buckets, whereas the
-            // holding bucket only spill into playable buckets
-            const bucketInflowRate: number = i === 0 ? 0 : cumulativeOutflowRate - bucketOutflowRate[i];
-            const netInflowRate: number = bucketInflowRate - bucketOutflowRate[i];
-            return {
-                ...bucket,
-                netSpillRateDecimalTokensPerSecond: netInflowRate
-            };
-        });
-        const gameStateEnriched: GameStateEnriched = {
-            ...gameNow.state,
-            buckets: bucketsEnriched
-        };
-
         return {
             ...gameNow,
             config: gameConfigEnriched,
-            state: gameStateEnriched
         };
     }
 
@@ -469,13 +580,179 @@ export class EquilibrateSDK {
     public async stopWatchingGame(gameAddress: PublicKey): Promise<void> {
         Assert.notNullish(this.program, "program");
         const gameAddressString: string = gameAddress.toBase58();
-        const subscription: Subscription<GameEvent> | undefined = this.subscriptions.get(gameAddressString);
+        const subscription: Subscription<GameEvent> | undefined = this.gameSubscriptions.get(gameAddressString);
         if (subscription !== undefined) {
             subscription.emitter.unsubscribeAll();
             await this.program.provider.connection.removeAccountChangeListener(subscription.id);
-            this.subscriptions.delete(gameAddressString);
+            this.gameSubscriptions.delete(gameAddressString);
         }
     }
+
+
+    /**
+     * Subscribes to changes to the given player's state in the given game,
+     * calling the callback whenever an update is received.
+     *
+     * @param playerAddress player to start watching
+     * @param gameAddress game of player to start watching
+     * @param callback callback to call with player state whenever an update is received
+     * @throws if this is a dummy SDK instance
+     */
+    public watchPlayer(
+        playerAddress: PublicKey,
+        gameAddress: PublicKey,
+        callback: PlayerStateEventCallback,
+        fetchNow: boolean = false
+    ): void {
+        Assert.notNullish(this.program, "program");
+
+        // subscribe to the game as well - will already be most likely - so that we can draw on its state
+        // to determine additional context for the player
+        this.addOrGetGameSubscription(gameAddress);
+
+        const program = this.program;
+        getPlayerStateAddress(gameAddress, playerAddress, program.programId)
+            .then(async (playerStateAddresss) => {
+                const subscription: Subscription<PlayerStateEvent>
+                    = this.addOrGetPlayerStateSubscription(playerStateAddresss, gameAddress);
+
+                subscription.emitter.subscribe(callback);
+
+                if (fetchNow) {
+                    const playerState: PlayerState | null = await program.account
+                        .playerState
+                        .fetchNullable(playerStateAddresss);
+
+                    await this.processAndEmitPlayerStateEvent(
+                        playerStateAddresss,
+                        gameAddress,
+                        playerState,
+                        subscription.emitter
+                    );
+                }
+            });
+    }
+
+
+    private addOrGetPlayerStateSubscription(
+        playerStateAddress: PublicKey,
+        gameAddress: PublicKey
+    ): Subscription<PlayerStateEvent> {
+
+        Assert.notNullish(this.program, "program");
+        const playerStateAddressString: string = playerStateAddress.toBase58();
+        let subscription: Subscription<PlayerStateEvent> | undefined =
+            this.playerStateSubscriptions.get(playerStateAddressString);
+
+        if (subscription !== undefined) {
+            return subscription;
+        }
+
+        const program: anchor.Program<Equilibrate> = this.program;
+        const connection: Connection = this.program.provider.connection;
+        const emitter: EventEmitter<PlayerStateEvent> = new EventEmitter();
+        // we have to use connection.onAccountChange for accounts that may be deleted while we're watching them
+        // because anchor doesnt handle that
+        const listenerId: number = connection.onAccountChange(playerStateAddress, async (buffer) => {
+            let playerState: PlayerState | null = null;
+            if (buffer != null && buffer.data.length > 0) {
+                // The string "playerState" here matches the name of the game state account in the rust program.
+                playerState = program.coder.accounts.decode<PlayerState>("playerState", buffer.data);
+            }
+            await this.processAndEmitPlayerStateEvent(playerStateAddress, gameAddress, playerState, emitter);
+        });
+        subscription = { emitter: emitter, id: listenerId };
+        this.playerStateSubscriptions.set(playerStateAddressString, subscription);
+        return subscription;
+    }
+
+
+    private async processAndEmitPlayerStateEvent(
+        playerStateAddress: PublicKey,
+        gameAddress: PublicKey,
+        playerState: PlayerState | null,
+        emitter: EventEmitter<PlayerStateEvent>
+    ): Promise<void> {
+        const playerStateAddressString: string = playerStateAddress.toBase58();
+        const playerStateBefore: PlayerState | undefined = this.playerStates.get(playerStateAddressString);
+        const event: PlayerStateEvent = { player: playerState };
+        const mostRecentGame: GameEnriched | undefined = this.games.get(gameAddress.toBase58());
+        if (playerState === null) {
+            if (playerStateBefore !== undefined) {
+                let approximateWinnings: number = 0;
+                if (mostRecentGame !== undefined) {
+                    if (mostRecentGame.state.buckets[0].players === 1) {
+                        // player was the last one to leave and so took everything left
+                        approximateWinnings = mostRecentGame.state.buckets.reduce((sum, bucket) =>
+                            sum + bucket.decimalTokens.toNumber(), 0
+                        );
+                    } else {
+                        // player wasnt last one left, so they only took a fraction of their bucket
+                        const bucketLeft: Bucket = mostRecentGame.state.buckets[playerStateBefore.bucket];
+                        approximateWinnings = bucketLeft.decimalTokens.toNumber() / bucketLeft.players;
+                    }
+                }
+                event.leave = {
+                    bucketIndex: playerStateBefore.bucket,
+                    winningsDecimalTokens: approximateWinnings,
+                };
+            }
+        } else if (playerStateBefore === undefined) {
+            if (mostRecentGame === undefined) {
+                // most likely the player created a new game, though this isnt guaranteed
+                event.new = {
+                    bucketIndex: playerState.bucket
+                };
+            } else {
+                event.enter = {
+                    bucketIndex: playerState.bucket
+                };
+            }
+            this.playerStates.set(playerStateAddressString, playerState);
+
+        } else {
+            event.move = {
+                newBucketIndex: playerState.bucket,
+                oldBucketIndex: playerStateBefore.bucket
+            };
+            this.playerStates.set(playerStateAddressString, playerState);
+        }
+        emitter.emit(event);
+    }
+
+
+    /**
+     * Stops watching the given player's game state, meaning all registered callbacks will cease to work.
+     *
+     * Does nothing if the player isnt being watched.
+     *
+     * @param playerAddress player to stop watching
+     * @param gameAddress game of the player to stop watching
+     * @throws if this is a dummy SDK instance
+     */
+    public async stopWatchingPlayerState(playerAddress: PublicKey, gameAddress: PublicKey): Promise<void> {
+        Assert.notNullish(this.program, "program");
+        const playerStateAddress: PublicKey = await getPlayerStateAddress(
+            gameAddress,
+            playerAddress,
+            this.program.programId
+        );
+        const playerStateAddressString: string = playerStateAddress.toBase58();
+        const subscription: Subscription<PlayerStateEvent> | undefined
+            = this.playerStateSubscriptions.get(playerStateAddressString);
+
+        if (subscription !== undefined) {
+            subscription.emitter.unsubscribeAll();
+            await this.program.provider.connection.removeAccountChangeListener(subscription.id);
+            this.playerStateSubscriptions.delete(playerStateAddressString);
+        }
+    }
+}
+
+
+interface RequestStep {
+    name: string;
+    buildInstructions: () => Promise<TransactionInstruction[]>;
 }
 
 
@@ -495,10 +772,11 @@ export class EquilibrateSDK {
 export class EquilibrateRequest {
     private readonly program: anchor.Program<Equilibrate>;
     private readonly connection: Connection;
-    private readonly steps: (() => Promise<TransactionInstruction[]>)[] = [];
+    private readonly steps: RequestStep[] = [];
     private readonly config: {
         mint?: PublicKey;
         entryFee?: number;
+        entryFeeDecimalTokens?: number;
         spillRateTokensPerSecondPerPlayer?: number;
         nBuckets?: number;
         maxPlayers?: number;
@@ -506,6 +784,7 @@ export class EquilibrateRequest {
     private bucketIndex: number | undefined;
     private gameId: number | undefined;
     private cancelOnLoss: boolean | undefined;
+    private neededToCreatePlayerTokenAccount: boolean = false;
 
     private constructor(program: anchor.Program<Equilibrate>) {
         this.program = program;
@@ -536,9 +815,24 @@ export class EquilibrateRequest {
      * @returns this request
      * @throws if the entry fee is too small
      */
-    public setEntryFee(entryFee: number): EquilibrateRequest {
+    public setEntryFeeTokens(entryFee: number): EquilibrateRequest {
         Assert.greaterThan(entryFee, ENTRY_FEE_MIN_EXCLUSIVE, "entryFee");
         this.config.entryFee = entryFee;
+        return this;
+    }
+
+
+    /**
+     * Sets the entry fee for a new game.
+     *
+     * @param entryFee entry fee in decimal tokens
+     * @returns this request
+     * @throws if the entry fee is too small
+     */
+    public setEntryFeeDecimalTokens(entryFeeDecimalTokens: number): EquilibrateRequest {
+        Assert.greaterThan(entryFeeDecimalTokens, ENTRY_FEE_MIN_EXCLUSIVE, "entryFeeDecimalTokens");
+        Assert.isInteger(entryFeeDecimalTokens, "entryFeeDecimalTokens");
+        this.config.entryFeeDecimalTokens = entryFeeDecimalTokens;
         return this;
     }
 
@@ -650,7 +944,10 @@ export class EquilibrateRequest {
         this.validateConfig();
         Assert.notNullish(this.program.provider.publicKey, "player");
         const player: PublicKey = this.program.provider.publicKey;
-        this.steps.push(async () => {
+
+        this.withWrapSolInstructionsIfNeeded("create game: wrap SOL");
+
+        this.addStep("create game", async () => {
             const config: GameConfig = await this.finalizeConfig();
             // first determine if we need to create the token pool/manager
             // before making the game
@@ -690,7 +987,6 @@ export class EquilibrateRequest {
                 throw new Error("Cant make game, both pool manager and token pool must exist or we must create them");
             }
 
-            const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
             const gameId: number = this.gameId ?? this.generateGameId();
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             if (finalizedCallback !== undefined) finalizedCallback(gameAddress);
@@ -723,12 +1019,10 @@ export class EquilibrateRequest {
 
             instructions.push(newGameInstruction);
 
-            if (shouldAddUnwrapSolInstruction) {
-                await this.addCloseTokenAccountInstruction(instructions);
-            }
-
             return instructions;
         });
+
+        this.withCloseTokenAccountInstructionIfNeeded();
 
         return this;
     }
@@ -778,6 +1072,8 @@ export class EquilibrateRequest {
 
 
     private async computeEntryFeeDecimalTokens(mintToDecimalMultiplier: number): Promise<anchor.BN> {
+        if (this.config.entryFeeDecimalTokens !== undefined) return new anchor.BN(this.config.entryFeeDecimalTokens);
+
         Assert.notNullish(this.config.entryFee, "entryFee");
         return new anchor.BN(this.config.entryFee * mintToDecimalMultiplier);
     }
@@ -801,54 +1097,58 @@ export class EquilibrateRequest {
      *
      * https://spl.solana.com/token#example-wrapping-sol-in-a-token
      *
-     * @param instructions instructions to append to
-     * @returns boolean flag if the instructions should be followed up with an unwrap instruction
      */
-    private async addWrapSolInstructionsIfNeeded(instructions: TransactionInstruction[]): Promise<boolean> {
+    private withWrapSolInstructionsIfNeeded(stepName: string): EquilibrateRequest {
         Assert.notNullish(this.config.mint, "mint");
         const mint: PublicKey = this.config.mint;
 
-        let result: boolean = false;
         if (mint.toBase58() === NATIVE_MINT.toBase58()) {
             Assert.notNullish(this.program.provider.publicKey, "player");
-            Assert.notNullish(this.config.entryFee, "entryFee");
-            const player: PublicKey = this.program.provider.publicKey;
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
-            const mintToDecimalMultiplier: number = await this.computeMintToDecimalMultiplier();
-            const entryFeeWithDecimals: anchor.BN = await this.computeEntryFeeDecimalTokens(mintToDecimalMultiplier);
-            const nativeTokenAccountExists: boolean = await accountExists(
-                playerTokenAccount,
-                this.program.provider.connection
+            Assert.someNotNullish(
+                [this.config.entryFee, this.config.entryFeeDecimalTokens],
+                ["entryFee", "entryFeeDecimalTokens"]
             );
+            const player: PublicKey = this.program.provider.publicKey;
 
-            if (!nativeTokenAccountExists) {
-                instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+            this.addStep(stepName, async () => {
+                const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+                const entryFeeWithDecimals: anchor.BN = await this.resolveEntryFeeDecimalTokens();
+                const nativeTokenAccountExists: boolean = await accountExists(
+                    playerTokenAccount,
+                    this.program.provider.connection
+                );
 
-                const depositSolInstruction: TransactionInstruction = anchor.web3
-                    .SystemProgram
-                    .transfer({
-                        fromPubkey: player,
-                        toPubkey: playerTokenAccount,
-                        lamports: entryFeeWithDecimals.toNumber()
-                    });
+                const instructions: TransactionInstruction[] = [];
+                if (!nativeTokenAccountExists) {
+                    this.neededToCreatePlayerTokenAccount = true;
+                    instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
 
-                instructions.push(depositSolInstruction);
+                    const depositSolInstruction: TransactionInstruction = anchor.web3
+                        .SystemProgram
+                        .transfer({
+                            fromPubkey: player,
+                            toPubkey: playerTokenAccount,
+                            lamports: entryFeeWithDecimals.toNumber()
+                        });
 
-                const syncNativeInstruction: TransactionInstruction = await anchor.Spl
-                    .token(this.program.provider)
-                    .methods
-                    .syncNative()
-                    .accountsStrict({
-                        account: playerTokenAccount
-                    })
-                    .instruction();
+                    instructions.push(depositSolInstruction);
 
-                instructions.push(syncNativeInstruction);
-            }
+                    const syncNativeInstruction: TransactionInstruction = await anchor.Spl
+                        .token(this.program.provider)
+                        .methods
+                        .syncNative()
+                        .accountsStrict({
+                            account: playerTokenAccount
+                        })
+                        .instruction();
 
-            result = !nativeTokenAccountExists;
+                    instructions.push(syncNativeInstruction);
+                }
+
+                return instructions;
+            });
         }
-        return result;
+        return this;
     }
 
 
@@ -857,6 +1157,7 @@ export class EquilibrateRequest {
      *
      * @returns this request
      * @throws if any of the following have not been set: `mint`, `bucketIndex`, `gameId`
+     * @throws if the mint is SOL and `entryFeeDecimalTokens` has not been set
      */
     public withEnterGame(): EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
@@ -867,11 +1168,10 @@ export class EquilibrateRequest {
         const mint: PublicKey = this.config.mint;
         const gameId: number = this.gameId;
         const player: PublicKey = this.program.provider.publicKey;
-        this.steps.push(async () => {
-            const instructions: TransactionInstruction[] = [];
 
-            const shouldAddUnwrapSolInstruction: boolean = await this.addWrapSolInstructionsIfNeeded(instructions);
+        this.withWrapSolInstructionsIfNeeded("enter game: wrap SOL");
 
+        this.addStep("enter game", async () => {
             const poolManagerAddress: PublicKey = (await getPoolManagerAddress(mint, this.program.programId))[0];
             const tokenPoolAddress: PublicKey = await getTokenPoolAddress(
                 mint,
@@ -903,14 +1203,10 @@ export class EquilibrateRequest {
                 })
                 .instruction();
 
-            instructions.push(instruction);
-
-            if (shouldAddUnwrapSolInstruction) {
-                this.addCloseTokenAccountInstruction(instructions);
-            }
-
-            return instructions;
+            return [instruction];
         });
+
+        this.withCloseTokenAccountInstructionIfNeeded();
 
         return this;
     }
@@ -929,7 +1225,7 @@ export class EquilibrateRequest {
         const bucketIndex: number = this.bucketIndex;
         const gameId: number = this.gameId;
         const player: PublicKey = this.program.provider.publicKey;
-        this.steps.push(async () => {
+        this.addStep("move bucket", async () => {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
@@ -968,7 +1264,7 @@ export class EquilibrateRequest {
         const gameId: number = this.gameId;
         const cancelOnLoss: boolean = this.cancelOnLoss;
         const player: PublicKey = this.program.provider.publicKey;
-        this.steps.push(async () => {
+        this.addStep("leave game", async () => {
             const instructions: TransactionInstruction[] = [];
 
             const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
@@ -981,6 +1277,7 @@ export class EquilibrateRequest {
                 // really the only time we should get here is if playing with SOL, such that we
                 // already created and closed the wrapped SOL account to create or enter the game
                 instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+                this.neededToCreatePlayerTokenAccount = true;
             }
 
             const poolManagerAddress: PublicKey = (await getPoolManagerAddress(mint, this.program.programId))[0];
@@ -1013,12 +1310,10 @@ export class EquilibrateRequest {
 
             instructions.push(leaveInstruction);
 
-            if (shouldCreateAndCloseTokenAccount) {
-                this.addCloseTokenAccountInstruction(instructions);
-            }
-
             return instructions;
         });
+
+        this.withCloseTokenAccountInstructionIfNeeded();
 
         return this;
     }
@@ -1047,26 +1342,53 @@ export class EquilibrateRequest {
 
 
     // https://spl.solana.com/token#example-wrapping-sol-in-a-token
-    private async addCloseTokenAccountInstruction(instructions: TransactionInstruction[]): Promise<void> {
+    private withCloseTokenAccountInstructionIfNeeded(): EquilibrateRequest {
         Assert.notNullish(this.program.provider.publicKey, "player");
         Assert.notNullish(this.config.mint, "mint");
 
         const mint: PublicKey = this.config.mint;
         const player: PublicKey = this.program.provider.publicKey;
-        const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
 
-        const instruction: TransactionInstruction = await anchor.Spl
-            .token(this.program.provider)
-            .methods
-            .closeAccount()
-            .accountsStrict({
-                authority: player,
-                account: playerTokenAccount,
-                destination: player
-            })
-            .instruction();
+        this.addStep("close token account", async () => {
+            if (!this.neededToCreatePlayerTokenAccount) return [];
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const instruction: TransactionInstruction = await anchor.Spl
+                .token(this.program.provider)
+                .methods
+                .closeAccount()
+                .accountsStrict({
+                    authority: player,
+                    account: playerTokenAccount,
+                    destination: player
+                })
+                .instruction();
 
-        instructions.push(instruction);
+            return [instruction];
+        });
+
+        return this;
+    }
+
+
+    private async resolveEntryFeeDecimalTokens(): Promise<anchor.BN> {
+        Assert.someNotNullish(
+            [this.config.entryFee, this.config.entryFeeDecimalTokens],
+            ["entryFee", "entryFeeDecimalTokens"]
+        );
+        let entryFeeWithDecimals: anchor.BN;
+        if (this.config.entryFeeDecimalTokens != null) {
+            entryFeeWithDecimals = new anchor.BN(this.config.entryFeeDecimalTokens);
+
+        } else if (this.config.entryFee != null) {
+            const mintToDecimalMultiplier: number = await this.computeMintToDecimalMultiplier();
+            entryFeeWithDecimals = await this.computeEntryFeeDecimalTokens(mintToDecimalMultiplier);
+
+        } else {
+            // this will never be reached because we check for the values being available above,
+            // just dont have a way to tell typescript it's good
+            entryFeeWithDecimals = new anchor.BN(0);
+        }
+        return entryFeeWithDecimals;
     }
 
 
@@ -1077,8 +1399,16 @@ export class EquilibrateRequest {
      * @returns this request
      */
     public withInstructions(...instructions: TransactionInstruction[]): EquilibrateRequest {
-        this.steps.push(async () => instructions);
+        this.addStep("custom instructions", async () => instructions);
         return this;
+    }
+
+
+    private addStep(name: RequestStep["name"], builder: RequestStep["buildInstructions"]): void {
+        this.steps.push({
+            name: name,
+            buildInstructions: builder
+        });
     }
 
 
@@ -1087,31 +1417,57 @@ export class EquilibrateRequest {
      *
      * @returns the transaction
      */
-    public async signAndSend(simulateOnly?: boolean): Promise<string> {
+    public async signAndSend(simulateOnly?: boolean): Promise<RequestResult> {
         Assert.notNullish(this.program.provider.sendAndConfirm, "program.provider.sendAndConfirm");
         const transaction: Transaction = new Transaction();
         for (const step of this.steps) {
-            transaction.add(...(await step()));
+            try {
+                transaction.add(...(await step.buildInstructions()));
+
+            } catch (e) {
+                throw new Error(`Error while building instructions for '${step.name}'`, {cause: e});
+            }
         }
 
-        let result: string = "";
+        let result: RequestResult;
         if (simulateOnly) {
             Assert.notNullish(this.program.provider.publicKey, "player");
             transaction.feePayer = this.program.provider.publicKey;
             const simulationResult = await this.program.provider.connection.simulateTransaction(transaction);
-            //TODO replace with something the (dev) user can look at
-            // debugging only
-            // eslint-disable-next-line no-console
-            console.log(simulationResult);
+            result = { simulationResult: simulationResult.value };
 
         } else {
-            //TODO this isnt always throwing when there's a program error (AnchorError only?). How to make
-            // it throw?
-            result = await this.program.provider.sendAndConfirm(
-                transaction,
-                undefined,
-                { commitment: "confirmed" }
-            );
+            try {
+                const signature: string = await this.program.provider.sendAndConfirm(
+                    transaction,
+                    undefined,
+                    { commitment: "confirmed" }
+                );
+
+                result = { transactionSignature: signature };
+
+            } catch (e) {
+                if (e instanceof AnchorError) {
+                    if (e.error.errorCode.code === PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS) {
+                        result = { error: e, anchorErrorCode: e.error.errorCode.code };
+
+                    } else {
+                        throw e;
+                    }
+                } else if (e instanceof SendTransactionError) {
+                    const isAbortLeaveOnLoss: boolean = e.logs?.some(e => e.includes(
+                        PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS
+                    )) ?? false;
+                    if (isAbortLeaveOnLoss) {
+                        result = { error: e, anchorErrorCode: PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS };
+
+                    } else {
+                        throw e;
+                    }
+                } else {
+                    throw e;
+                }
+            }
         }
         return result;
     }
@@ -1132,6 +1488,12 @@ class Assert {
         if (arg == null) throw new Error("Must define " + name);
     }
 
+    public static someNotNullish<T>(values: T[], names: string[]): void {
+        if (values.every(v => v == null)) {
+            throw new Error("Must define at least one of " + names.join(", "));
+        }
+    }
+
     public static lessThan(arg: number, lessThanThis: number, name: string): void {
         if (arg >= lessThanThis) throw new Error(`${arg} (${name}) must be less than ${lessThanThis}`);
     }
@@ -1149,6 +1511,12 @@ class Assert {
     public static greaterThanOrEqualTo(arg: number, greaterOrEqualToThis: number, name: string): void {
         if (arg < greaterOrEqualToThis) {
             throw new Error(`${arg} (${name}) must be greater than or equal to ${greaterOrEqualToThis}`);
+        }
+    }
+
+    public static isInteger(arg: number, name: string): void {
+        if (!Number.isInteger(arg)) {
+            throw new Error(`${name} must be an integer`);
         }
     }
 }

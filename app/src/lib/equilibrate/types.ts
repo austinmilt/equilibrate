@@ -45,9 +45,9 @@ export interface GameState {
 }
 
 
-export interface BucketEnriched extends Bucket {
-    netSpillRateDecimalTokensPerSecond: number;
-}
+// removed an attribute which was no longer used, but
+// leaving the type for future enhancements
+export type BucketEnriched = Bucket
 
 
 export interface Bucket {
