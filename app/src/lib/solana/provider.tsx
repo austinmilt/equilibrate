@@ -8,7 +8,6 @@ import {
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import { clusterApiUrl } from "@solana/web3.js";
-import { SOLANA_RPC_URL } from "../constants";
 
 // https://github.com/solana-labs/wallet-adapter/blob/master/APP.md
 export function SolanaProvider(props: {children: React.ReactNode}): JSX.Element {
@@ -52,7 +51,7 @@ export function useEndpoint(): EndpointContextState {
 
 export function EndpointProvider(props: { children: ReactNode }): JSX.Element {
     const [key, setKey] = useState<Endpoint>("local");
-    const [url, setUrl] = useState<string>(SOLANA_RPC_URL);
+    const [url, setUrl] = useState<string>("http://localhost:8899");
     const [isProd, setIsProd] = useState<boolean>(false);
 
     useEffect(() => {
