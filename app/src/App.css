@@ -1,7 +1,9 @@
-.app {
-  display: flex;
-  flex-direction: column;
-  justify-items: center;
-  align-items: center;
-  padding: 6em;
+.main {
+  height: 100vh;
+  width: 100%;
+  padding: 3em;
+  display: grid;
+  grid-template-columns: 25% 75%;
+  gap: 2rem;
+  justify-content: center;
 }

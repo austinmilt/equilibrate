@@ -1,52 +1,64 @@
 import { useCallback, useMemo } from "react";
+import { ActiveGalaxyContextState, GalaxyConstants, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
 import { Star } from "./Star";
 
 // Galaxy is the collection of stars and conduits
 export interface GalaxyProps {
-    /**
-     * Stats about stars. Should include the central star.
-     */
-    stars: {
-        fuel: number; // equivalent to bucket balance
-        satellites: number; // equivalent to number of players,
-        fuelChangeRate: number; // equivalent to bucket flow rate
-    }[];
-
-    galaxyConstants: {
-        entryFuel: number;
-        maxSatellites: number;
-    }
-
     viewportDimensions: {
         widthPixels: number;
         heightPixels: number;
     }
 }
 
-//TODO 3) display info about a star
+
 export function Galaxy(props: GalaxyProps): JSX.Element {
-    const stars = useComputedStarProps(props);
+    const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
+    const stars: StarProps[] = useComputedStarProps(
+        props.viewportDimensions,
+        activeGalaxyContext.stars ?? [],
+        activeGalaxyContext.galaxy?.constants
+    );
 
-    const onClickStar: DisplayProps["onClick"] = useCallback((starIndex) => {
-        //TODO map to something meaningful, like changing buckets or showing stats
-        console.log(stars[starIndex].flow);
-    }, [stars]);
+    const onStarMousedOverChange: (index: number, mousedOver: boolean) => void = useCallback((index, mousedOver) => {
+        if (mousedOver) {
+            activeGalaxyContext.focalStar.set(index);
+        }
+    }, [activeGalaxyContext.focalStar.set]);
 
-    return <Display stars={stars} onClick={onClickStar} />;
+    return <>
+        {stars.map((star, i) =>
+            <Star
+                x={star.x}
+                y={star.y}
+                radius={star.radius}
+                fuelChangeRate={star.fuelChangeRate}
+                focused={activeGalaxyContext.focalStar.index === i}
+                onClick={() => activeGalaxyContext.focalStar.onClick(i)}
+                onMouseOverChange={(mousedOver: boolean) => onStarMousedOverChange(i, mousedOver)}
+                key={i}
+            />
+        )}
+    </>;
 }
 
 
-function useComputedStarProps(props: GalaxyProps): StarProps[] {
-    const nPlayableStars: number = useMemo(() => props.stars.length - 1, [props.stars]);
-    const innermostRingDivisions: number = useMemo(() => getInnerMostRingDivisions(nPlayableStars), [props.stars]);
+//TODO change to making a star field with a fixed grid with randomly chosen cells for each star to be centered in,
+//TODO and the holding bucket to be central
+function useComputedStarProps(
+    viewportDimensions: GalaxyProps["viewportDimensions"],
+    stars: StarData[],
+    galaxyConstants: GalaxyConstants | undefined
+): StarProps[] {
+    const nPlayableStars: number = useMemo(() => stars.length - 1, [stars]);
+    const innermostRingDivisions: number = useMemo(() => getInnerMostRingDivisions(nPlayableStars), [stars]);
     const numberOfRings: number = useMemo(() => computeNumberOfRings(
         nPlayableStars, innermostRingDivisions
     ), [nPlayableStars, innermostRingDivisions]);
 
     const boundarySize: number = useMemo(() => Math.min(
-        props.viewportDimensions.heightPixels,
-        props.viewportDimensions.widthPixels),
-    [props.viewportDimensions]);
+        viewportDimensions.heightPixels,
+        viewportDimensions.widthPixels),
+    [viewportDimensions]);
 
     const ringRadii: number[] = useMemo(() => Array(numberOfRings)
         .fill(null)
@@ -65,22 +77,23 @@ function useComputedStarProps(props: GalaxyProps): StarProps[] {
     ), [ringRadii, ringDivisionArcLengths]);
 
     return useMemo(() => {
-        const width: number = props.viewportDimensions.widthPixels;
-        const height: number = props.viewportDimensions.heightPixels;
+        const width: number = viewportDimensions.widthPixels;
+        const height: number = viewportDimensions.heightPixels;
         const result: StarProps[] = [];
         // the central star (holding bucket)
-        result.push({
-            x: Math.round(width/2),
-            y: Math.round(height/2),
-            radius: computeStarRadius(
-                props.stars[0].fuel,
-                props.stars,
-                starMaxRadius,
-                props.galaxyConstants.entryFuel,
-                props.galaxyConstants.maxSatellites
-            ),
-            flow: props.stars[0].fuelChangeRate
-        });
+        if (stars.length > 0) {
+            result.push({
+                x: Math.round(width/2),
+                y: Math.round(height/2),
+                radius: computeStarRadius(
+                    stars[0].fuel,
+                    starMaxRadius,
+                    galaxyConstants?.entryFuel ?? 0,
+                    galaxyConstants?.maxSatellites ?? 0
+                ),
+                fuelChangeRate: stars[0].fuelChangeRate
+            });
+        }
         //TODO this stuff should probably be delegated to the Star component
         let starOverallIndex: number = 1;
         for (let ringIndex = 0; ringIndex < numberOfRings; ringIndex++) {
@@ -88,13 +101,12 @@ function useComputedStarProps(props: GalaxyProps): StarProps[] {
             const reminaingStars: number = nPlayableStars - starOverallIndex + 1;
             const starsToPlaceInRing: number = Math.min(reminaingStars, ringDivisions);
             for (let starIndexInRing = 0; starIndexInRing < starsToPlaceInRing; starIndexInRing++) {
-                const starStats: GalaxyProps["stars"][0] = props.stars[starOverallIndex];
+                const starStats: StarData = stars[starOverallIndex];
                 const starRadius: number = computeStarRadius(
                     starStats.fuel,
-                    props.stars,
                     starMaxRadius,
-                    props.galaxyConstants.entryFuel,
-                    props.galaxyConstants.maxSatellites
+                    galaxyConstants?.entryFuel ?? 0,
+                    galaxyConstants?.maxSatellites ?? 0
                 );
                 const { x, y } = computeStarCoordinates(
                     starIndexInRing,
@@ -108,14 +120,13 @@ function useComputedStarProps(props: GalaxyProps): StarProps[] {
                     x: Math.round(x),
                     y: Math.round(y),
                     radius: starRadius,
-                    //TODO map the flow rate to something meaningful for display
-                    flow: starStats.fuelChangeRate
+                    fuelChangeRate: starStats.fuelChangeRate
                 });
                 starOverallIndex += 1;
             }
         }
         return result;
-    }, [props.stars]);
+    }, [stars]);
 }
 
 
@@ -181,16 +192,13 @@ function computeNumberOfRingDivisions(
 
 function computeStarRadius(
     fuel: number,
-    starStats: GalaxyProps["stars"],
     maxRadius: number,
     entryFuel: number,
     maxSatellites: number
 ): number {
     const minPossibleFuel: number = 0;
-    //TODO change this to be entryFee*maxPlayers so the max is static per game and suns dont try to readjust
-    //  whenever someone enters or leaves (growing suns should always grow, not shring, and vice versa)
+    //  whenever someone enters or leaves (growing suns should always grow, not shrink, and vice versa)
     const maxPossibleFuel: number = entryFuel * maxSatellites;
-    // const maxPossibleFuel: number = starStats.reduce((partialSum, s) => partialSum + s.fuel, 0);
     const relativeFuel: number = (
         (fuel - minPossibleFuel) / (maxPossibleFuel - minPossibleFuel)
     );
@@ -216,25 +224,5 @@ interface StarProps {
     x: number;
     y: number;
     radius: number;
-    flow: number;
-}
-
-interface DisplayProps {
-    stars: StarProps[];
-    onClick: (index: number) => void;
-}
-
-function Display(props: DisplayProps): JSX.Element {
-    return <>
-        {props.stars.map((star, i) =>
-            <Star
-                x={star.x}
-                y={star.y}
-                radius={star.radius}
-                flow={star.flow}
-                key={i}
-                onClick={() => props.onClick(i)}
-            />
-        )}
-    </>;
+    fuelChangeRate: number;
 }

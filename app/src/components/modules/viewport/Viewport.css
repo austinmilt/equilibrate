@@ -1,0 +1,14 @@
+.viewport {
+    display: flex;
+    /* needed to allow hud to overlay and stretch to fit */
+    position: relative;
+}
+
+.stage {
+    background-color: #1e1e1e;
+    border: 1px solid white;
+    border-radius: 1rem;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+}

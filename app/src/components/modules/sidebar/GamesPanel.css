@@ -1,0 +1,27 @@
+.games-nav {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    height: 100%;
+    width: 100%;
+    border: 1px solid white;
+    border-radius: 1rem;
+}
+
+.games-header {
+    font-size: 1.25rem;
+}
+
+.games-list {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    background-color: gray;
+}
+
+.game-card-button {
+    background: none;
+    border: none;
+    padding: none;
+}
