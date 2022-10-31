@@ -10,10 +10,12 @@ import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { EquilibrateSDK } from "./sdk";
 import { Equilibrate, IDL } from "../../../../target/types/equilibrate";
 import { PROGRAM_ID } from "./constants";
+import { PublicKey } from "@solana/web3.js";
 
 export interface EquilibrateProgramContextState {
     equilibrate: EquilibrateSDK;
     equilibrateIsReady: boolean;
+    player: PublicKey | undefined;
 }
 
 export const EquilibrateProgramContext = createContext<EquilibrateProgramContextState>(
@@ -48,6 +50,7 @@ export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.
     const value: EquilibrateProgramContextState = {
         equilibrate: sdk,
         equilibrateIsReady: sdk.isReady(),
+        player: anchorWallet?.publicKey
     };
 
     return (

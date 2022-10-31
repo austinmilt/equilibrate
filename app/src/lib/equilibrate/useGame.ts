@@ -1,16 +1,25 @@
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "./provider";
-import { GameEvent } from "./sdk";
+import { GameEvent, RequestResult } from "./sdk";
 import { GameEnriched } from "./types";
+
+interface OnSuccessFunction {
+    (result: RequestResult): void;
+}
+
+
+interface OnErrorFunction {
+    (error: Error): void;
+}
 
 export interface GameContext {
     game: GameEnriched | null;
     loading: boolean;
     error: Error | undefined;
-    enterGame: (bucketIndex: number) => void;
-    moveBucket: (bucketIndex: number) => void;
-    leaveGame: (cancelOnLoss: boolean) => void;
+    enterGame: (bucketIndex: number, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
+    moveBucket: (bucketIndex: number, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
+    leaveGame: (cancelOnLoss: boolean, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
 }
 
 
@@ -19,6 +28,14 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const [game, setGame] = useState<GameEnriched | null>(null);
     const [loading, setLoading] = useState<GameContext["loading"]>(false);
     const [error, setError] = useState<GameContext["error"]>();
+
+    //TODO delegate to UI
+    useEffect(() => {
+        if (error !== undefined) {
+            console.error(error);
+            console.error(error.cause);
+        }
+    }, [error]);
 
     // (un)subscribe to the current game
     useEffect(() => {
@@ -42,7 +59,7 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
         run().catch(setError).finally(() => setLoading(false));
     }, [gameAddress, equilibrateIsReady]);
 
-    const enterGame: GameContext["enterGame"] = useCallback((bucketIndex) => {
+    const enterGame: GameContext["enterGame"] = useCallback((bucketIndex, onSuccess, onError) => {
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -59,16 +76,21 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             .setGameId(game.id.toNumber())
             .setMint(game.config.mint)
             .setPlayerBucketIndex(bucketIndex)
+            .setEntryFeeDecimalTokens(game.config.entryFeeDecimalTokens.toNumber())
             .withEnterGame()
             .signAndSend()
-            //TODO replace with better UX
-            .then(signature => console.log("Entered game", signature))
-            .catch(setError)
+            .then(signature => {
+                if (onSuccess) onSuccess(signature);
+            })
+            .catch(e => {
+                setError(e);
+                if (onError) onError(e);
+            })
             .finally(() => setLoading(false));
 
     }, [game, equilibrate, equilibrateIsReady]);
 
-    const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex) => {
+    const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex, onSuccess, onError) => {
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -90,14 +112,18 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             .setPlayerBucketIndex(bucketIndex)
             .withMoveBucket()
             .signAndSend()
-            //TODO replace with better UX
-            .then(signature => console.log("Moved buckets", signature))
-            .catch(setError)
+            .then(signature => {
+                if (onSuccess) onSuccess(signature);
+            })
+            .catch(e => {
+                setError(e);
+                if (onError) onError(e);
+            })
             .finally(() => setLoading(false));
 
     }, [game, equilibrate, equilibrateIsReady]);
 
-    const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss) => {
+    const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss, onSuccess, onError) => {
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -116,9 +142,13 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             .setCancelOnLoss(cancelOnLoss)
             .withLeaveGame()
             .signAndSend()
-            //TODO replace with better UX
-            .then(signature => console.log("Left game", signature))
-            .catch(setError)
+            .then(signature => {
+                if (onSuccess) onSuccess(signature);
+            })
+            .catch(e => {
+                setError(e);
+                if (onError) onError(e);
+            })
             .finally(() => setLoading(false));
 
     }, [game, equilibrate, equilibrateIsReady]);
