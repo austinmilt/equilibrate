@@ -1,5 +1,5 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { Bucket, BucketEnriched, GameEnriched, GameState, GameStateEnriched } from "../../../lib/equilibrate/types";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useState } from "react";
+import { Bucket, BucketEnriched, GameEnriched } from "../../../lib/equilibrate/types";
 import { GameContext, useGame } from "../../../lib/equilibrate/useGame";
 import { ActiveGameContextState, useActiveGame } from "../game/provider";
 
@@ -22,6 +22,11 @@ export interface GalaxyState {
 }
 
 
+interface OnClick {
+    (index: number): void;
+}
+
+
 export interface ActiveGalaxyContextState {
     galaxy: undefined | {
         constants: GalaxyConstants;
@@ -41,6 +46,8 @@ export interface ActiveGalaxyContextState {
         data: StarData | undefined;
         index: number | undefined;
         set: (index: number | undefined) => void;
+        onClick: (index: number) => void;
+        addOnClick: (listener: OnClick) => () => void;
     }
 }
 
@@ -55,23 +62,56 @@ export function useActiveGalaxy(): ActiveGalaxyContextState {
 }
 
 
+function addOnClickReducer(
+    focalStarClickListeners: OnClick[],
+    data: {
+        action: "add" | "remove" | "clear",
+        onClick?: OnClick | undefined
+    }
+) {
+    switch (data.action) {
+    case "add":
+        if (data.onClick === undefined) {
+            throw new Error("Cannot add an undefined onClick");
+        }
+        focalStarClickListeners.push(data.onClick);
+        return focalStarClickListeners;
+
+    case "remove":
+        return focalStarClickListeners.filter(f => f !== data.onClick);
+
+    case "clear":
+        return [];
+
+    default:
+        throw new Error("Unrecognized action " + data.action);
+    }
+}
+
+
 export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Element {
     const [updateInterval, setUpdateIntervalObj] = useState<NodeJS.Timeout | undefined>();
 
-    const { address: activeGame }: ActiveGameContextState = useActiveGame();
+    const { address: activeGame, playerState }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
     const [stars, setStars] = useState<StarData[] | undefined>();
     const [focalStarIndex, setFocalStarIndex] = useState<ActiveGalaxyContextState["focalStar"]["index"]>();
     const [playerStarIndex, setPlayerStarIndex] = useState<ActiveGalaxyContextState["playerStar"]["index"]>();
+    const [focalStarClickListeners, focalStarClickListenersDispatch] = useReducer(addOnClickReducer, []);
+
+    // (re)set the player's existing active star when they change up the current game
+    useEffect(() => {
+        if (playerState != null) {
+            setPlayerStarIndex(playerState.bucket);
+        }
+    }, [activeGame, playerState]);
 
     const updateStarsWithGame = useCallback((game: GameEnriched) => {
-        const currentPlayerCount: number = game.state.buckets[0].players;
-        const maxStarFuel: number = currentPlayerCount * game.config.entryFeeDecimalTokens.toNumber();
-        const newBucketBalances: number[] = computeBucketBalances(game);
-        const newStars = game.state.buckets.map((bucket, i) => {
-            const fuel: number = Math.min(maxStarFuel, Math.max(0, newBucketBalances[i]));
-            let fuelChangeRate: number = newBucketBalances[i];
-            if ((fuel <= 0) || (fuel >= maxStarFuel)) {
+        const bucketSnapshots: BucketSnapshot[] = computeBucketSnapshots(game);
+        const newStars = bucketSnapshots.map(bucket => {
+            const fuel: number = Math.max(0, bucket.decimalTokens);
+            let fuelChangeRate: number = bucket.spillRate;
+            if (fuel <= 0) {
                 fuelChangeRate = 0;
             }
             return {
@@ -80,8 +120,6 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
                 fuelChangeRate: fuelChangeRate
             };
         });
-        // eslint-disable-next-line max-len
-        // console.log("fuel", JSON.stringify(newStars.map(s => `${s.fuel.toFixed(0)} | ${s.fuelChangeRate.toFixed(0)}`), undefined, 2));
         setStars(newStars);
     }, []);
 
@@ -106,6 +144,17 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
             clearInterval(newInterval);
         };
     }, [ updateStars ]);
+
+
+    const addFocalStarOnClick: ActiveGalaxyContextState["focalStar"]["addOnClick"] = useCallback(listener => {
+        focalStarClickListenersDispatch({action: "add", onClick: listener});
+        return () => focalStarClickListenersDispatch({action: "remove", onClick: listener});
+    }, [focalStarClickListenersDispatch]);
+
+
+    const focalStarOnClick: ActiveGalaxyContextState["focalStar"]["onClick"] = useCallback((index: number) => {
+        focalStarClickListeners.forEach(onClick => onClick(index));
+    }, [focalStarClickListeners]);
 
 
     const galaxyConstants: GalaxyConstants | undefined = useMemo(() => {
@@ -157,7 +206,9 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
             data: focalStar,
             index: focalStarIndex,
             set: setFocalStarIndex,
-            isSource: focalStarIndex === 0
+            isSource: focalStarIndex === 0,
+            addOnClick: addFocalStarOnClick,
+            onClick: focalStarOnClick
         }
     }), [stars, focalStar, galaxyConstants, galaxyState, activeGame, playerStar]);
 
@@ -170,19 +221,31 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 }
 
 
+interface BucketSnapshot {
+    players: number;
+    decimalTokens: number;
+    spillRate: number;
+}
+
+
 //TODO consider moving to the SDK and calling with a timestamp for `now`
-// same as Game::update_bucket_balances in the program
-function computeBucketBalances(game: GameEnriched): number[] {
+// Adapted from Game::update_bucket_balances in the program
+//
+// Note to self: two buckets with zero players will, in general, not end up with the same balance at
+// steady state. Since buckets with zero players have no outflow, there's no mechanism for them to
+// equilibrate with other buckets with the same number of players. I believe this applies to any
+// two buckets with the same number of players.
+function computeBucketSnapshots(game: GameEnriched): BucketSnapshot[] {
     // while the BN's here could be large enough to cause an overflow error, it's highly unlikely
     // a game would reach that state, so we'll use toNumber()
     const now: number = new Date().getTime();
-    const secondsSinceLastUpdate: number = Math.floor(now / 1000) - game.state.lastUpdateEpochSeconds.toNumber();
+    const secondsSinceLastUpdate: number = (now / 1000) - game.state.lastUpdateEpochSeconds.toNumber();
     const spillRateConfigured: number = game.config.spillRateDecimalTokensPerSecondPerPlayer.toNumber();
     const buckets: BucketEnriched[] = game.state.buckets;
     const nBucketsIncludingHolding: number = buckets.length;
     const nBucketsPlayable: number = nBucketsIncludingHolding - 1;
     const inflow: number[] = Array(nBucketsIncludingHolding).fill(0);
-    const result: number[] = [];
+    const result: BucketSnapshot[] = [];
     for (let i = 0; i < nBucketsIncludingHolding; i++) {
         const bucketI: BucketEnriched = buckets[i];
         const iIsHolding: boolean = i === 0;
@@ -207,7 +270,13 @@ function computeBucketBalances(game: GameEnriched): number[] {
             inflow[i] += spilloverToI;
             inflow[j] += spilloverToJ;
         }
-        result.push(bucketI.decimalTokens.toNumber() + inflow[i] - spilloverI);
+        const balanceChange: number = inflow[i] - spilloverI;
+        const balanceI: number = bucketI.decimalTokens.toNumber() + balanceChange;
+        result.push({
+            decimalTokens: balanceI,
+            players: bucketI.players,
+            spillRate: balanceChange / secondsSinceLastUpdate
+        });
     }
 
     return result;
