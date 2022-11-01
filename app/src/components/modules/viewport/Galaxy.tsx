@@ -1,5 +1,7 @@
 import { useCallback, useMemo } from "react";
+import { Group } from "react-konva";
 import { ActiveGalaxyContextState, GalaxyConstants, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
+import { Satellite } from "./Satellite";
 import { Star } from "./Star";
 
 // Galaxy is the collection of stars and conduits
@@ -13,7 +15,7 @@ export interface GalaxyProps {
 
 export function Galaxy(props: GalaxyProps): JSX.Element {
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
-    const stars: StarProps[] = useComputedStarProps(
+    const [stars, starMaxRadius] = useComputedStarProps(
         props.viewportDimensions,
         activeGalaxyContext.stars ?? [],
         activeGalaxyContext.galaxy?.constants
@@ -27,16 +29,27 @@ export function Galaxy(props: GalaxyProps): JSX.Element {
 
     return <>
         {stars.map((star, i) =>
-            <Star
-                x={star.x}
-                y={star.y}
-                radius={star.radius}
-                fuelChangeRate={star.fuelChangeRate}
-                focused={activeGalaxyContext.focalStar.index === i}
-                onClick={() => activeGalaxyContext.focalStar.onClick(i)}
-                onMouseOverChange={(mousedOver: boolean) => onStarMousedOverChange(i, mousedOver)}
-                key={i}
-            />
+            <Group key={i}>
+                <Star
+                    x={star.x}
+                    y={star.y}
+                    isSource={i === 0}
+                    radius={star.radius}
+                    fuelChangeRate={star.fuelChangeRate}
+                    focused={activeGalaxyContext.focalStar.index === i}
+                    onClick={() => activeGalaxyContext.focalStar.onClick(i)}
+                    onMouseOverChange={(mousedOver: boolean) => onStarMousedOverChange(i, mousedOver)}
+                />
+                {(i > 0) && Array(activeGalaxyContext.stars?.[i].satellites).fill(null).map(iSat => (
+                    <Satellite
+                        starMaxRadius={starMaxRadius}
+                        starRadius={star.radius}
+                        starX={star.x}
+                        starY={star.y}
+                        key={`${i}-${iSat}`}
+                    />
+                ))}
+            </Group>
         )}
     </>;
 }
@@ -48,7 +61,7 @@ function useComputedStarProps(
     viewportDimensions: GalaxyProps["viewportDimensions"],
     stars: StarData[],
     galaxyConstants: GalaxyConstants | undefined
-): StarProps[] {
+): [StarProps[], number] {
     const nPlayableStars: number = useMemo(() => stars.length - 1, [stars]);
     const innermostRingDivisions: number = useMemo(() => getInnerMostRingDivisions(nPlayableStars), [stars]);
     const numberOfRings: number = useMemo(() => computeNumberOfRings(
@@ -125,7 +138,7 @@ function useComputedStarProps(
                 starOverallIndex += 1;
             }
         }
-        return result;
+        return [result, starMaxRadius];
     }, [stars]);
 }
 

@@ -9,6 +9,7 @@ interface Props {
     radius: number;
     fuelChangeRate: number;
     focused: boolean;
+    isSource: boolean;
     onClick: () => void;
     onMouseOverChange: (mousedOver: boolean) => void;
 }
@@ -19,7 +20,10 @@ export function Star(props: Props): JSX.Element {
     const [color, setColor] = useState<string>("#ebb729");
 
     useEffect(() => {
-        if (props.fuelChangeRate < 0) {
+        if (props.isSource) {
+            setColor("black");
+
+        } else if (props.fuelChangeRate < 0) {
             setColor("#2f488a");
 
         } else if (props.fuelChangeRate > 0) {
