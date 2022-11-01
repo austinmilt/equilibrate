@@ -1,9 +1,5 @@
 import { Paper, RingProgress, Center, Text, Group, Switch } from "@mantine/core";
-import { PublicKey } from "@solana/web3.js";
 import { ReactNode, useEffect, useMemo, useState } from "react";
-import { useEquilibrate } from "../../../lib/equilibrate/provider";
-import { PlayerStateEvent } from "../../../lib/equilibrate/sdk";
-import { PlayerState } from "../../../lib/equilibrate/types";
 import { GameContext, useGame } from "../../../lib/equilibrate/useGame";
 import { useEndpoint } from "../../../lib/solana/provider";
 import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
@@ -22,7 +18,7 @@ enum GameAction {
 export function Hud(): JSX.Element {
     const [cancelOnLoss, setCancelOnLoss] = useState<boolean>(false);
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
-    const { address: activeGame, playerState }: ActiveGameContextState = useActiveGame();
+    const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
     const { url: solanaRpcUrl } = useEndpoint();
 
@@ -32,11 +28,11 @@ export function Hud(): JSX.Element {
         let result: GameAction = GameAction.NO_OP;
         if (focalStarIndex !== undefined) {
             // player is in the game
-            if (playerState !== null) {
+            if (gameContext.player !== null) {
                 if (focalStarIndex === 0) {
                     result = GameAction.LEAVE;
 
-                } else if (playerState.bucket !== focalStarIndex) {
+                } else if (gameContext.player.bucket !== focalStarIndex) {
                     result = GameAction.MOVE;
                 }
             } else {
@@ -50,7 +46,7 @@ export function Hud(): JSX.Element {
         }
         return result;
 
-    }, [activeGalaxyContext.focalStar.index, playerState]);
+    }, [activeGalaxyContext.focalStar.index, gameContext.player]);
 
 
     // register a click event for whichever focal star is clicked on so we can

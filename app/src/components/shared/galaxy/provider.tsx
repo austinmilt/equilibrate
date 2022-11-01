@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useState } from "react";
 import { Bucket, BucketEnriched, GameEnriched } from "../../../lib/equilibrate/types";
-import { GameContext, useGame } from "../../../lib/equilibrate/useGame";
+import { useGame } from "../../../lib/equilibrate/useGame";
+import { useInterval } from "../../../lib/shared/useInterval";
 import { ActiveGameContextState, useActiveGame } from "../game/provider";
 
 export interface StarData {
@@ -68,7 +69,8 @@ function addOnClickReducer(
         action: "add" | "remove" | "clear",
         onClick?: OnClick | undefined
     }
-) {
+): OnClick[] {
+
     switch (data.action) {
     case "add":
         if (data.onClick === undefined) {
@@ -90,10 +92,8 @@ function addOnClickReducer(
 
 
 export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Element {
-    const [updateInterval, setUpdateIntervalObj] = useState<NodeJS.Timeout | undefined>();
-
-    const { address: activeGame, playerState }: ActiveGameContextState = useActiveGame();
-    const gameContext: GameContext = useGame(activeGame);
+    const { address: activeGame }: ActiveGameContextState = useActiveGame();
+    const { game, player: playerState } = useGame(activeGame);
     const [stars, setStars] = useState<StarData[] | undefined>();
     const [focalStarIndex, setFocalStarIndex] = useState<ActiveGalaxyContextState["focalStar"]["index"]>();
     const [playerStarIndex, setPlayerStarIndex] = useState<ActiveGalaxyContextState["playerStar"]["index"]>();
@@ -105,6 +105,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
             setPlayerStarIndex(playerState.bucket);
         }
     }, [activeGame, playerState]);
+
 
     const updateStarsWithGame = useCallback((game: GameEnriched) => {
         const bucketSnapshots: BucketSnapshot[] = computeBucketSnapshots(game);
@@ -125,25 +126,14 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 
 
     const updateStars = useCallback(() => {
-        if (gameContext.game !== null) {
-            updateStarsWithGame(gameContext.game);
+        if (game !== null) {
+            updateStarsWithGame(game);
         }
-    }, [gameContext.game, updateStarsWithGame]);
+    }, [game, updateStarsWithGame]);
 
 
     // update predicted game state at regular intervals
-    useEffect(() => {
-        if (updateInterval) {
-            clearInterval(updateInterval);
-        }
-
-        const newInterval: NodeJS.Timeout = setInterval(updateStars, 100);
-        setUpdateIntervalObj(newInterval);
-
-        return () => {
-            clearInterval(newInterval);
-        };
-    }, [ updateStars ]);
+    useInterval(updateStars, 100);
 
 
     const addFocalStarOnClick: ActiveGalaxyContextState["focalStar"]["addOnClick"] = useCallback(listener => {
@@ -158,21 +148,21 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 
 
     const galaxyConstants: GalaxyConstants | undefined = useMemo(() => {
-        return (gameContext.game === undefined) ? undefined : {
-            entryFuel: gameContext.game?.config.entryFeeDecimalTokens.toNumber() ?? 0,
-            maxSatellites: gameContext.game?.config.maxPlayers ?? 0
+        return (game === undefined) ? undefined : {
+            entryFuel: game?.config.entryFeeDecimalTokens.toNumber() ?? 0,
+            maxSatellites: game?.config.maxPlayers ?? 0
         };
-    }, [gameContext.game?.config]);
+    }, [game?.config]);
 
 
     const galaxyState: GalaxyState | undefined = useMemo(() => {
-        if (gameContext.game == null) return undefined;
-        const buckets: Bucket[] = gameContext.game.state.buckets;
+        if (game == null) return undefined;
+        const buckets: Bucket[] = game.state.buckets;
         return {
             totalFuel: buckets.reduce((fuel, bucket) => fuel + bucket.decimalTokens.toNumber(), 0),
             totalSatellites: buckets[0].players
         };
-    }, [gameContext.game?.state]);
+    }, [game?.state]);
 
 
     const playerStar: StarData | undefined = useMemo(() => (stars !== undefined) &&
