@@ -1,8 +1,8 @@
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "./provider";
-import { GameEvent, RequestResult } from "./sdk";
-import { GameEnriched } from "./types";
+import { GameEvent, PlayerStateEvent, RequestResult } from "./sdk";
+import { GameEnriched, PlayerStateEnriched } from "./types";
 
 interface OnSuccessFunction {
     (result: RequestResult): void;
@@ -15,6 +15,7 @@ interface OnErrorFunction {
 
 export interface GameContext {
     game: GameEnriched | null;
+    player: PlayerStateEnriched | null;
     loading: boolean;
     error: Error | undefined;
     enterGame: (bucketIndex: number, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
@@ -24,8 +25,9 @@ export interface GameContext {
 
 
 export function useGame(gameAddress: PublicKey | undefined): GameContext {
-    const { equilibrate, equilibrateIsReady } = useEquilibrate();
+    const { equilibrate, equilibrateIsReady, player } = useEquilibrate();
     const [game, setGame] = useState<GameEnriched | null>(null);
+    const playerStateContext = usePlayerState(player, gameAddress);
     const [loading, setLoading] = useState<GameContext["loading"]>(false);
     const [error, setError] = useState<GameContext["error"]>();
 
@@ -155,11 +157,60 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
 
     return {
         game: game,
-        loading: loading,
-        error: error,
+        player: playerStateContext.playerState,
+        loading: loading || playerStateContext.loading,
+        error: error ?? playerStateContext.error,
         enterGame: enterGame,
         moveBucket: moveBucket,
         leaveGame: leaveGame
+    };
+}
+
+
+
+
+interface PlayerStateContext {
+    playerState: PlayerStateEnriched | null;
+    loading: boolean;
+    error: Error | undefined;
+}
+
+
+function usePlayerState(playerAddress: PublicKey | undefined, gameAddress: PublicKey | undefined): PlayerStateContext {
+    const { equilibrate, equilibrateIsReady } = useEquilibrate();
+    const [playerState, setPlayerState] = useState<PlayerStateEnriched | null>(null);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<Error | undefined>();
+
+    // (un)subscribe to the current player state
+    useEffect(() => {
+        const run = async () => {
+            if (equilibrateIsReady && (gameAddress !== undefined) && (playerAddress !== undefined)) {
+                equilibrate.watchPlayer(
+                    playerAddress,
+                    gameAddress,
+                    (event: PlayerStateEvent) => setPlayerState(event.player),
+                    true
+                );
+
+                return () => {
+                    // TODO this is an async method so it may return after the component is unmounted :(
+                    // TODO likely the cause of "WebSocket is already in CLOSING or CLOSED state."
+                    equilibrate.stopWatchingPlayerState(playerAddress, gameAddress);
+                };
+            }
+        };
+
+        setError(undefined);
+        setLoading(true);
+        run().catch(setError).finally(() => setLoading(false));
+    }, [gameAddress, equilibrateIsReady]);
+
+
+    return {
+        playerState: playerState,
+        loading: loading,
+        error: error
     };
 }
 
