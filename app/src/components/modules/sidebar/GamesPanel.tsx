@@ -21,6 +21,8 @@ import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
 import "./GamesPanel.css";
 import { useActiveGame } from "../../shared/game/provider";
+import { useInterval } from "../../../lib/shared/useInterval";
+import { Duration } from "../../../lib/shared/duration";
 
 //TODO remove
 const useStyles = createStyles((theme) => ({
@@ -67,14 +69,17 @@ export function GamesPanel(props: Props): JSX.Element {
         equilibrate.getGamesList().then(setGamesList);
     }, [equilibrate]);
 
-    //TODO update games when user enters game, creates new game, and leaves game
 
-    // initial fetch
+    // refresh list on specific events
     useEffect(() => {
         if (equilibrateIsReady && (gamesList === undefined)) {
             fetchGames();
         }
-    }, [equilibrateIsReady]);
+    }, [equilibrateIsReady, activeGameAddress]);
+
+
+    // refresh the list at regular intervals
+    useInterval(fetchGames, Duration.ofSeconds(10).asMilliseconds());
 
 
     const gamesSorted: GamesListEntry[] = useMemo(() =>
