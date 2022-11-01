@@ -16,14 +16,14 @@ import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { Endpoint, useEndpoint } from "../../../lib/solana/provider";
-import { NATIVE_MINT } from "@solana/spl-token";
 import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types";
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
 import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
 import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
-import "./GamesPanel.css";
 import { useGame } from "../../../lib/equilibrate/useGame";
+import { NewGameModal } from "./NewGameModal";
+import "./GamesPanel.css";
 
 //TODO remove
 const useStyles = createStyles((theme) => ({
@@ -58,6 +58,7 @@ interface SetGameFunction {
 export function GamesPanel(): JSX.Element {
     const { isProd: endpointIsProd } = useEndpoint();
     const gamesListContext = useGamesList();
+    const [openModal, setOpenModal] = useState<boolean>(false);
 
     return (
         <nav className="games-nav">
@@ -66,10 +67,7 @@ export function GamesPanel(): JSX.Element {
             <ClusterControl/>
             <Group>
                 { !endpointIsProd && <AirdropButton/> }
-                <NewGameButton
-                    setGame={ (address) => gamesListContext.selectGame(address, false) }
-                    onSuccess={gamesListContext.refreshList}
-                />
+                <Button onClick={() => setOpenModal(true)}>New Game</Button>
             </Group>
             <ScrollArea style={{height: "40vh", border: "1px solid gray"}}>
                 <Group spacing="sm">
@@ -85,6 +83,12 @@ export function GamesPanel(): JSX.Element {
                     }
                 </Group>
             </ScrollArea>
+            <NewGameModal
+                open={openModal}
+                onCloseIntent={() => setOpenModal(false)}
+                onGameAddressResolved={ (address) => gamesListContext.selectGame(address, false) }
+                onSuccess={gamesListContext.refreshList}
+            />
         </nav>
     );
 }
@@ -101,20 +105,20 @@ interface UseGamesListContext {
 function useGamesList(): UseGamesListContext {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [gamesList, setGamesList] = useState<GamesListEntry[] | undefined>();
-    const { address: activeGameAddress, set: setActiveGame } = useActiveGame();
-    const { game: gameEvent } = useGame(activeGameAddress);
+    const activeGameContex = useActiveGame();
+    const { game: gameEvent } = useGame(activeGameContex.address);
 
     const refreshList: () => void = useCallback(() => {
         equilibrate.getGamesList().then(setGamesList);
     }, [equilibrate]);
 
 
-    // refresh list when we
+    // initial fetch
     useEffect(() => {
         if (equilibrateIsReady && (gamesList === undefined)) {
             refreshList();
         }
-    }, [equilibrateIsReady, activeGameAddress]);
+    }, [equilibrateIsReady, activeGameContex.address]);
 
 
     useEffect(() => {
@@ -133,29 +137,32 @@ function useGamesList(): UseGamesListContext {
     useInterval(refreshList, GAMES_LIST_UPDATE_INTERVAL.asMilliseconds());
 
 
+    //TODO troubleshoot games list fucking up and also triggering a bunch of
+    // additional game watchers (see console)
     const gamesSorted: GamesListEntry[] = useMemo(() =>
-        (gamesList ?? []).sort((a, b) => {
-            // selected game is always at the top
-            if (a.publicKey === activeGameAddress) {
-                return -1;
+        gamesList ?? [],
+    // (gamesList ?? []).sort((a, b) => {
+    //     // selected game is always at the top
+    //     if (a.publicKey === activeGameContex.address) {
+    //         return -1;
 
-            } else if (b.publicKey === activeGameAddress) {
-                return 1;
+    //     } else if (b.publicKey === activeGameContex.address) {
+    //         return 1;
 
-            } else {
-                // sort descending by volume
-                return computeGamePoolTotal(b.account) - computeGamePoolTotal(a.account);
-            }
-        }),
-    [gamesList, activeGameAddress]);
+    //     } else {
+    //         // sort descending by volume
+    //         return computeGamePoolTotal(b.account) - computeGamePoolTotal(a.account);
+    //     }
+    // }),
+    [gamesList, activeGameContex.address]);
 
 
     // show the top sorted game if another one isnt selected
-    useEffect(() => {
-        if ((gamesList !== undefined) && (activeGameAddress !== undefined) && (gamesList.length > 0)) {
-            setActiveGame(gamesList[0].publicKey);
-        }
-    }, [setActiveGame, gamesList]);
+    // useEffect(() => {
+    //     if ((gamesList !== undefined) && (activeGameContex.address !== undefined) && (gamesList.length > 0)) {
+    //         activeGameContex.set(gamesList[0].publicKey);
+    //     }
+    // }, [activeGameContex.address, gamesList]);
 
 
     const onSelectGame: (game: PublicKey, expectExists: boolean) => void = useCallback(async (game, expectExists) => {
@@ -167,63 +174,16 @@ function useGamesList(): UseGamesListContext {
             alert("Game has ended.");
             refreshList();
         }
-        setActiveGame(game);
-    }, [equilibrateIsReady, equilibrate.gameExists, gamesList, setActiveGame]);
+        activeGameContex.set(game);
+    }, [equilibrateIsReady, equilibrate.gameExists, gamesList, activeGameContex.address]);
 
 
     return {
         games: gamesSorted,
-        activeGame: activeGameAddress,
+        activeGame: activeGameContex.address,
         selectGame: onSelectGame,
         refreshList: refreshList
     };
-}
-
-
-function computeGamePoolTotal(game: Game): number {
-    return game.state.buckets.reduce((sum, bucket) => sum + bucket.decimalTokens.toNumber(), 0);
-}
-
-
-function NewGameButton(props: { setGame: SetGameFunction, onSuccess: () => void }): JSX.Element {
-    const { equilibrate, equilibrateIsReady } = useEquilibrate();
-    const [loading, setLoading] = useState<boolean>(false);
-
-    const onNewGame: () => void = useCallback(async () => {
-        setLoading(true);
-        try {
-            if (!equilibrateIsReady) {
-                //TODO replace with toast or auto-signin
-                alert("SDK not ready GUY.");
-
-            } else {
-                try {
-                    //TODO new game modal
-                    await equilibrate.request()
-                        .setEntryFeeTokens(0.1)
-                        .setMint(NATIVE_MINT)
-                        .setSpillRate(0.0001)
-                        .setNumberOfBuckets(3)
-                        .setMaxPlayers(5)
-                        // this sets the game address before the game is made, allowing
-                        // us to observe the game creation event
-                        .withCreateNewGame(props.setGame)
-                        .signAndSend();
-
-                    props.onSuccess();
-
-                } catch (e) {
-                    //TODO better UX
-                    console.trace(e);
-                }
-            }
-
-        } finally {
-            setLoading(false);
-        }
-    }, [equilibrate, equilibrateIsReady]);
-
-    return <Button onClick={ onNewGame }>{ loading ? <Loader/> : "New Game" }</Button>;
 }
 
 
