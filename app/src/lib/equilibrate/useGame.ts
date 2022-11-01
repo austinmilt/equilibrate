@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "./provider";
 import { GameEvent, PlayerStateEvent, RequestResult } from "./sdk";
-import { GameEnriched, PlayerStateEnriched } from "./types";
+import { GameEnriched } from "./types";
 
 interface OnSuccessFunction {
     (result: RequestResult): void;
@@ -14,8 +14,8 @@ interface OnErrorFunction {
 }
 
 export interface GameContext {
-    game: GameEnriched | null;
-    player: PlayerStateEnriched | null;
+    game: GameEvent | null;
+    player: PlayerStateEvent | null;
     loading: boolean;
     error: Error | undefined;
     enterGame: (bucketIndex: number, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
@@ -26,42 +26,14 @@ export interface GameContext {
 
 export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const { equilibrate, equilibrateIsReady, player } = useEquilibrate();
-    const [game, setGame] = useState<GameEnriched | null>(null);
-    const playerStateContext = usePlayerState(player, gameAddress);
-    const [loading, setLoading] = useState<GameContext["loading"]>(false);
-    const [error, setError] = useState<GameContext["error"]>();
+    const gameEventsContext = useGameEvents(gameAddress);
+    const playerStateContext = usePlayerEvents(player, gameAddress);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<Error | undefined>();
 
-    //TODO delegate to UI
-    useEffect(() => {
-        if (error !== undefined) {
-            console.error(error);
-            console.error(error.cause);
-        }
-    }, [error]);
-
-    // (un)subscribe to the current game
-    useEffect(() => {
-        const run = async () => {
-            if (equilibrateIsReady && (gameAddress !== undefined)) {
-                if (!await equilibrate.gameExists(gameAddress)) {
-                    throw UseGameError.noSuchGame(gameAddress);
-                }
-                equilibrate.watchGame(gameAddress, (event: GameEvent) => setGame(event.game), true);
-
-                return () => {
-                    // TODO this is an async method so it may return after the component is unmounted :(
-                    // TODO likely the cause of "WebSocket is already in CLOSING or CLOSED state."
-                    equilibrate.stopWatchingGame(gameAddress);
-                };
-            }
-        };
-
-        setError(undefined);
-        setLoading(true);
-        run().catch(setError).finally(() => setLoading(false));
-    }, [gameAddress, equilibrateIsReady]);
 
     const enterGame: GameContext["enterGame"] = useCallback((bucketIndex, onSuccess, onError) => {
+        const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -90,9 +62,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             })
             .finally(() => setLoading(false));
 
-    }, [game, equilibrate, equilibrateIsReady]);
+    }, [gameEventsContext.event, equilibrate, equilibrateIsReady]);
+
 
     const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex, onSuccess, onError) => {
+        const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -123,9 +97,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             })
             .finally(() => setLoading(false));
 
-    }, [game, equilibrate, equilibrateIsReady]);
+    }, [gameEventsContext.event, equilibrate, equilibrateIsReady]);
+
 
     const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss, onSuccess, onError) => {
+        const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
             //TODO replace with better uX
             alert("Game is null.");
@@ -153,13 +129,13 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             })
             .finally(() => setLoading(false));
 
-    }, [game, equilibrate, equilibrateIsReady]);
+    }, [gameEventsContext.event, equilibrate, equilibrateIsReady]);
 
     return {
-        game: game,
-        player: playerStateContext.playerState,
-        loading: loading || playerStateContext.loading,
-        error: error ?? playerStateContext.error,
+        game: gameEventsContext.event,
+        player: playerStateContext.event,
+        loading: loading || gameEventsContext.loading || playerStateContext.loading,
+        error: (error ?? gameEventsContext.error) ?? playerStateContext.error,
         enterGame: enterGame,
         moveBucket: moveBucket,
         leaveGame: leaveGame
@@ -167,18 +143,56 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
 }
 
 
-
-
-interface PlayerStateContext {
-    playerState: PlayerStateEnriched | null;
+interface UseEventsContext<T> {
+    event: T | null;
     loading: boolean;
     error: Error | undefined;
 }
 
 
-function usePlayerState(playerAddress: PublicKey | undefined, gameAddress: PublicKey | undefined): PlayerStateContext {
+function useGameEvents(gameAddress: PublicKey | undefined): UseEventsContext<GameEvent> {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
-    const [playerState, setPlayerState] = useState<PlayerStateEnriched | null>(null);
+    const [event, setEvent] = useState<GameEvent | null>(null);
+    const [loading, setLoading] = useState<GameContext["loading"]>(false);
+    const [error, setError] = useState<GameContext["error"]>();
+
+    // (un)subscribe to the current game
+    useEffect(() => {
+        const run = async () => {
+            if (equilibrateIsReady && (gameAddress !== undefined)) {
+                if (!await equilibrate.gameExists(gameAddress)) {
+                    throw UseGameError.noSuchGame(gameAddress);
+                }
+                equilibrate.watchGame(gameAddress, setEvent, true);
+
+                return () => {
+                    // TODO this is an async method so it may return after the component is unmounted :(
+                    // TODO likely the cause of "WebSocket is already in CLOSING or CLOSED state."
+                    equilibrate.stopWatchingGame(gameAddress);
+                };
+            }
+        };
+
+        setError(undefined);
+        setLoading(true);
+        run().catch(setError).finally(() => setLoading(false));
+    }, [gameAddress, equilibrateIsReady]);
+
+    return {
+        event: event,
+        loading: loading,
+        error: error
+    };
+}
+
+
+function usePlayerEvents(
+    playerAddress: PublicKey | undefined,
+    gameAddress: PublicKey | undefined
+): UseEventsContext<PlayerStateEvent> {
+
+    const { equilibrate, equilibrateIsReady } = useEquilibrate();
+    const [event, setEvent] = useState<PlayerStateEvent | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<Error | undefined>();
 
@@ -189,7 +203,7 @@ function usePlayerState(playerAddress: PublicKey | undefined, gameAddress: Publi
                 equilibrate.watchPlayer(
                     playerAddress,
                     gameAddress,
-                    (event: PlayerStateEvent) => setPlayerState(event.player),
+                    setEvent,
                     true
                 );
 
@@ -208,7 +222,7 @@ function usePlayerState(playerAddress: PublicKey | undefined, gameAddress: Publi
 
 
     return {
-        playerState: playerState,
+        event: event,
         loading: loading,
         error: error
     };

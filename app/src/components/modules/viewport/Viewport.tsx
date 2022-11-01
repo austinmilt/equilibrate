@@ -1,18 +1,15 @@
-import { PublicKey } from "@solana/web3.js";
 import { RefObject, useCallback, useEffect, useRef, useState } from "react";
 import { Stage, Layer, Text } from "react-konva";
 import { ActiveGalaxyProvider } from "../../shared/galaxy/provider";
+import { useActiveGame } from "../../shared/game/provider";
 import { Hud } from "../hud/Hud";
 import { Galaxy } from "./Galaxy";
 import "./Viewport.css";
 
-interface Props {
-    gameAddress: PublicKey | undefined;
-}
-
-export function Viewport(props: Props): JSX.Element {
+export function Viewport(): JSX.Element {
     const viewportRef = useRef<HTMLElement>(null);
     const [width, height] = useViewportDimenions(viewportRef);
+    const { address: gameAddress } = useActiveGame();
 
     return (
         <section className="viewport" ref={viewportRef}>
@@ -25,7 +22,7 @@ export function Viewport(props: Props): JSX.Element {
                 >
                     <Layer>
                         {
-                            props.gameAddress === undefined ?
+                            gameAddress === undefined ?
                                 <ViewportSkeleton/> :
                                 <ViewportDefined
                                     width={ width }

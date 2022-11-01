@@ -23,6 +23,7 @@ import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
 import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import "./GamesPanel.css";
+import { useGame } from "../../../lib/equilibrate/useGame";
 
 //TODO remove
 const useStyles = createStyles((theme) => ({
@@ -54,32 +55,82 @@ interface SetGameFunction {
 }
 
 
-interface Props {
-    setGame: SetGameFunction;
+export function GamesPanel(): JSX.Element {
+    const { isProd: endpointIsProd } = useEndpoint();
+    const gamesListContext = useGamesList();
+
+    return (
+        <nav className="games-nav">
+            <h1 className="games-header">Games</h1>
+            <Center><WalletMultiButton/></Center>
+            <ClusterControl/>
+            <Group>
+                { !endpointIsProd && <AirdropButton/> }
+                <NewGameButton
+                    setGame={ (address) => gamesListContext.selectGame(address, false) }
+                    onSuccess={gamesListContext.refreshList}
+                />
+            </Group>
+            <ScrollArea style={{height: "40vh", border: "1px solid gray"}}>
+                <Group spacing="sm">
+                    {
+                        gamesListContext.games.map(g =>
+                            <GameCard
+                                entry={g}
+                                setGame={ (address) => gamesListContext.selectGame(address, true) }
+                                selected={g.publicKey === gamesListContext.activeGame}
+                                key={g.publicKey.toBase58()}
+                            />
+                        )
+                    }
+                </Group>
+            </ScrollArea>
+        </nav>
+    );
 }
 
 
-export function GamesPanel(props: Props): JSX.Element {
-    const { isProd: endpointIsProd } = useEndpoint();
+interface UseGamesListContext {
+    games: GamesListEntry[];
+    activeGame: PublicKey | undefined;
+    selectGame: (address: PublicKey, expectExists: boolean) => void;
+    refreshList: () => void;
+}
+
+
+function useGamesList(): UseGamesListContext {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [gamesList, setGamesList] = useState<GamesListEntry[] | undefined>();
     const { address: activeGameAddress, set: setActiveGame } = useActiveGame();
+    const { game: gameEvent } = useGame(activeGameAddress);
 
-    const fetchGames: () => void = useCallback(() => {
+    const refreshList: () => void = useCallback(() => {
         equilibrate.getGamesList().then(setGamesList);
     }, [equilibrate]);
 
 
-    // refresh list on specific events
+    // refresh list when we
     useEffect(() => {
         if (equilibrateIsReady && (gamesList === undefined)) {
-            fetchGames();
+            refreshList();
         }
     }, [equilibrateIsReady, activeGameAddress]);
 
 
+    useEffect(() => {
+        const gameSummaryChanged: boolean = (gameEvent?.end != null) ||
+            (gameEvent?.enter != null) ||
+            (gameEvent?.leave != null) ||
+            (gameEvent?.new != null);
+
+        if (gameSummaryChanged) {
+            refreshList();
+        }
+    }, [gameEvent]);
+
+
     // refresh the list at regular intervals
-    useInterval(fetchGames, GAMES_LIST_UPDATE_INTERVAL.asMilliseconds());
+    useInterval(refreshList, GAMES_LIST_UPDATE_INTERVAL.asMilliseconds());
 
 
     const gamesSorted: GamesListEntry[] = useMemo(() =>
@@ -99,20 +150,6 @@ export function GamesPanel(props: Props): JSX.Element {
     [gamesList, activeGameAddress]);
 
 
-    const onSelectGame: SetGameFunction = useCallback(async game => {
-        if (!equilibrateIsReady) {
-            alert("SDK not ready");
-        }
-        if (!await equilibrate.gameExists(game)) {
-            //TODO better ux
-            alert("Game has ended.");
-            fetchGames();
-        }
-        setActiveGame(game);
-        props.setGame(game);
-    }, [equilibrate.gameExists, gamesList, setActiveGame]);
-
-
     // show the top sorted game if another one isnt selected
     useEffect(() => {
         if ((gamesList !== undefined) && (activeGameAddress !== undefined) && (gamesList.length > 0)) {
@@ -121,31 +158,25 @@ export function GamesPanel(props: Props): JSX.Element {
     }, [setActiveGame, gamesList]);
 
 
-    return (
-        <nav className="games-nav">
-            <h1 className="games-header">Games</h1>
-            <Center><WalletMultiButton/></Center>
-            <ClusterControl/>
-            <Group>
-                { !endpointIsProd && <AirdropButton/> }
-                <NewGameButton setGame={ onSelectGame }/>
-            </Group>
-            <ScrollArea style={{height: "40vh", border: "1px solid gray"}}>
-                <Group spacing="sm">
-                    {
-                        gamesSorted.map(g =>
-                            <GameCard
-                                entry={g}
-                                setGame={onSelectGame}
-                                selected={g.publicKey === activeGameAddress}
-                                key={g.publicKey.toBase58()}
-                            />
-                        )
-                    }
-                </Group>
-            </ScrollArea>
-        </nav>
-    );
+    const onSelectGame: (game: PublicKey, expectExists: boolean) => void = useCallback(async (game, expectExists) => {
+        if (!equilibrateIsReady) {
+            alert("SDK not ready DUDE");
+        }
+        if (expectExists && !await equilibrate.gameExists(game)) {
+            //TODO better ux
+            alert("Game has ended.");
+            refreshList();
+        }
+        setActiveGame(game);
+    }, [equilibrateIsReady, equilibrate.gameExists, gamesList, setActiveGame]);
+
+
+    return {
+        games: gamesSorted,
+        activeGame: activeGameAddress,
+        selectGame: onSelectGame,
+        refreshList: refreshList
+    };
 }
 
 
@@ -154,7 +185,7 @@ function computeGamePoolTotal(game: Game): number {
 }
 
 
-function NewGameButton(props: { setGame: SetGameFunction }): JSX.Element {
+function NewGameButton(props: { setGame: SetGameFunction, onSuccess: () => void }): JSX.Element {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [loading, setLoading] = useState<boolean>(false);
 
@@ -163,7 +194,7 @@ function NewGameButton(props: { setGame: SetGameFunction }): JSX.Element {
         try {
             if (!equilibrateIsReady) {
                 //TODO replace with toast or auto-signin
-                alert("SDK not ready.");
+                alert("SDK not ready GUY.");
 
             } else {
                 try {
@@ -178,6 +209,8 @@ function NewGameButton(props: { setGame: SetGameFunction }): JSX.Element {
                         // us to observe the game creation event
                         .withCreateNewGame(props.setGame)
                         .signAndSend();
+
+                    props.onSuccess();
 
                 } catch (e) {
                     //TODO better UX

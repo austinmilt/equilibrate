@@ -94,7 +94,7 @@ function addOnClickReducer(
 
 export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Element {
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
-    const { game, player: playerState } = useGame(activeGame);
+    const { game: gameEvent, player: playerEvent } = useGame(activeGame);
     const [stars, setStars] = useState<StarData[] | undefined>();
     const [focalStarIndex, setFocalStarIndex] = useState<ActiveGalaxyContextState["focalStar"]["index"]>();
     const [playerStarIndex, setPlayerStarIndex] = useState<ActiveGalaxyContextState["playerStar"]["index"]>();
@@ -102,10 +102,10 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 
     // (re)set the player's existing active star when they change up the current game
     useEffect(() => {
-        if (playerState != null) {
-            setPlayerStarIndex(playerState.bucket);
+        if (playerEvent?.player != null) {
+            setPlayerStarIndex(playerEvent?.player.bucket);
         }
-    }, [activeGame, playerState]);
+    }, [activeGame, playerEvent?.player]);
 
 
     const updateStarsWithGame = useCallback((game: GameEnriched) => {
@@ -127,10 +127,10 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 
 
     const updateStars = useCallback(() => {
-        if (game !== null) {
-            updateStarsWithGame(game);
+        if (gameEvent?.game != null) {
+            updateStarsWithGame(gameEvent.game);
         }
-    }, [game, updateStarsWithGame]);
+    }, [gameEvent?.game, updateStarsWithGame]);
 
 
     // update predicted game state at regular intervals
@@ -149,21 +149,21 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 
 
     const galaxyConstants: GalaxyConstants | undefined = useMemo(() => {
-        return (game === undefined) ? undefined : {
-            entryFuel: game?.config.entryFeeDecimalTokens.toNumber() ?? 0,
-            maxSatellites: game?.config.maxPlayers ?? 0
+        return (gameEvent?.game == null) ? undefined : {
+            entryFuel: gameEvent?.game?.config.entryFeeDecimalTokens.toNumber() ?? 0,
+            maxSatellites: gameEvent?.game?.config.maxPlayers ?? 0
         };
-    }, [game?.config]);
+    }, [gameEvent?.game?.config]);
 
 
     const galaxyState: GalaxyState | undefined = useMemo(() => {
-        if (game == null) return undefined;
-        const buckets: Bucket[] = game.state.buckets;
+        if (gameEvent?.game == null) return undefined;
+        const buckets: Bucket[] = gameEvent?.game.state.buckets;
         return {
             totalFuel: buckets.reduce((fuel, bucket) => fuel + bucket.decimalTokens.toNumber(), 0),
             totalSatellites: buckets[0].players
         };
-    }, [game?.state]);
+    }, [gameEvent?.game?.state]);
 
 
     const playerStar: StarData | undefined = useMemo(() => (stars !== undefined) &&

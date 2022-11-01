@@ -32,7 +32,7 @@ export function Hud(): JSX.Element {
                 if (focalStarIndex === 0) {
                     result = GameAction.LEAVE;
 
-                } else if (gameContext.player.bucket !== focalStarIndex) {
+                } else if (gameContext.player.player?.bucket !== focalStarIndex) {
                     result = GameAction.MOVE;
                 }
             } else {
