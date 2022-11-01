@@ -30,7 +30,8 @@ import {
     GameConfigEnriched,
     GameEnriched,
     GameWithEnrichedConfig,
-    PlayerState
+    PlayerState,
+    PlayerStateEnriched
 } from "./types";
 import {
     accountExists,
@@ -129,7 +130,7 @@ export interface PlayerStateEvent {
     /**
      * Current player game account. Will be `null` if the player cannot be found.
      */
-    player: PlayerState | null;
+    player: PlayerStateEnriched | null;
 
     /**
      * Will be defined and `true` when the player creates the game.
@@ -447,7 +448,7 @@ export class EquilibrateSDK {
     ): Promise<void> {
         const gameAddressString: string = gameAddress.toBase58();
         const gameBefore: GameEnriched | undefined = this.games.get(gameAddressString);
-        const gameNow: GameEnriched | null = await this.enrichGameObject(gameBefore, game);
+        const gameNow: GameEnriched | null = await this.enrichGameObject(gameAddress, gameBefore, game);
         const event: GameEvent = { game: gameNow };
         if (gameNow === null) {
             if (gameBefore === undefined) {
@@ -514,6 +515,7 @@ export class EquilibrateSDK {
 
 
     private async enrichGameObject(
+        gameAddress: PublicKey,
         gameBefore: GameEnriched | undefined,
         gameNow: Game | null
     ): Promise<GameEnriched | null> {
@@ -530,6 +532,7 @@ export class EquilibrateSDK {
         return {
             ...gameNow,
             config: gameConfigEnriched,
+            address: gameAddress
         };
     }
 
@@ -614,7 +617,7 @@ export class EquilibrateSDK {
         getPlayerStateAddress(gameAddress, playerAddress, program.programId)
             .then(async (playerStateAddresss) => {
                 const subscription: Subscription<PlayerStateEvent>
-                    = this.addOrGetPlayerStateSubscription(playerStateAddresss, gameAddress);
+                    = this.addOrGetPlayerStateSubscription(playerAddress, playerStateAddresss, gameAddress);
 
                 subscription.emitter.subscribe(callback);
 
@@ -624,6 +627,7 @@ export class EquilibrateSDK {
                         .fetchNullable(playerStateAddresss);
 
                     await this.processAndEmitPlayerStateEvent(
+                        playerAddress,
                         playerStateAddresss,
                         gameAddress,
                         playerState,
@@ -635,6 +639,7 @@ export class EquilibrateSDK {
 
 
     private addOrGetPlayerStateSubscription(
+        playerAddress: PublicKey,
         playerStateAddress: PublicKey,
         gameAddress: PublicKey
     ): Subscription<PlayerStateEvent> {
@@ -659,7 +664,13 @@ export class EquilibrateSDK {
                 // The string "playerState" here matches the name of the game state account in the rust program.
                 playerState = program.coder.accounts.decode<PlayerState>("playerState", buffer.data);
             }
-            await this.processAndEmitPlayerStateEvent(playerStateAddress, gameAddress, playerState, emitter);
+            await this.processAndEmitPlayerStateEvent(
+                playerAddress,
+                playerStateAddress,
+                gameAddress,
+                playerState,
+                emitter
+            );
         });
         subscription = { emitter: emitter, id: listenerId };
         this.playerStateSubscriptions.set(playerStateAddressString, subscription);
@@ -668,6 +679,7 @@ export class EquilibrateSDK {
 
 
     private async processAndEmitPlayerStateEvent(
+        playerAddress: PublicKey,
         playerStateAddress: PublicKey,
         gameAddress: PublicKey,
         playerState: PlayerState | null,
@@ -675,7 +687,14 @@ export class EquilibrateSDK {
     ): Promise<void> {
         const playerStateAddressString: string = playerStateAddress.toBase58();
         const playerStateBefore: PlayerState | undefined = this.playerStates.get(playerStateAddressString);
-        const event: PlayerStateEvent = { player: playerState };
+        const event: PlayerStateEvent = {
+            player: playerState === null ? null : {
+                ...playerState,
+                gameAddress: gameAddress,
+                stateAddress: playerStateAddress,
+                playerAddress: playerAddress
+            }
+        };
         const mostRecentGame: GameEnriched | undefined = this.games.get(gameAddress.toBase58());
         if (playerState === null) {
             if (playerStateBefore !== undefined) {

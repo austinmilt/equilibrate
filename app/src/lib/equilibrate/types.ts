@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 export interface GameEnriched extends Game {
     config: GameConfigEnriched;
     state: GameStateEnriched;
+    address: PublicKey;
 }
 
 
@@ -53,6 +54,13 @@ export type BucketEnriched = Bucket
 export interface Bucket {
     decimalTokens: anchor.BN;
     players: number;
+}
+
+
+export interface PlayerStateEnriched extends PlayerState {
+    playerAddress: PublicKey;
+    stateAddress: PublicKey;
+    gameAddress: PublicKey;
 }
 
 
