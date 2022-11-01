@@ -1,12 +1,41 @@
 // https://vitejs.dev/guide/env-and-mode.html
 
-export const SOLANA_RPC_URL: string = parseEnv(import.meta.env.VITE_SOLANA_RPC_URL, "SOLANA_RPC_URL");
+import { Duration } from "./duration";
 
-function parseEnv<T>(value: string | undefined, name: string, transform: (v: string) => T = castString): T {
+export const GAMES_LIST_UPDATE_INTERVAL: Duration = parseEnv(
+    "GAMES_LIST_UPDATE_INTERVAL",
+    import.meta.env.VITE_GAMES_LIST_UPDATE_INTERVAL,
+    Duration.ofSeconds(10),
+    (v) => Duration.ofSeconds(Number.parseInt(v))
+);
+
+
+export const VIEWPORT_UPDATE_INTERVAL_MS: Duration = parseEnv(
+    "VIEWPORT_UPDATE_INTERVAL_MS",
+    import.meta.env.VITE_GAMES_LIST_UPDATE_INTERVAL,
+    Duration.ofMilliseconds(100),
+    (v) => Duration.ofMilliseconds(Number.parseInt(v))
+);
+
+
+function parseEnv<T>(
+    name: string,
+    value: string | undefined,
+    defaultValue?: T | undefined,
+    transform: (v: string) => T = castString
+): T {
+    let result: T;
     if (value === undefined) {
-        throw new Error(`Missing required env variable ${name}.`);
+        if (defaultValue === undefined) {
+            throw new Error(`Missing required env variable ${name}.`);
+
+        } else {
+            result = defaultValue;
+        }
+    } else {
+        result = transform(value);
     }
-    return transform(value);
+    return result;
 }
 
 

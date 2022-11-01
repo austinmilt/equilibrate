@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useReducer, useState } from "react";
 import { Bucket, BucketEnriched, GameEnriched } from "../../../lib/equilibrate/types";
 import { useGame } from "../../../lib/equilibrate/useGame";
+import { VIEWPORT_UPDATE_INTERVAL_MS } from "../../../lib/shared/constants";
 import { useInterval } from "../../../lib/shared/useInterval";
 import { ActiveGameContextState, useActiveGame } from "../game/provider";
 
@@ -133,7 +134,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
 
 
     // update predicted game state at regular intervals
-    useInterval(updateStars, 100);
+    useInterval(updateStars, VIEWPORT_UPDATE_INTERVAL_MS.asMilliseconds());
 
 
     const addFocalStarOnClick: ActiveGalaxyContextState["focalStar"]["addOnClick"] = useCallback(listener => {

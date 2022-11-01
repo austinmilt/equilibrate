@@ -19,10 +19,10 @@ import { Endpoint, useEndpoint } from "../../../lib/solana/provider";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types";
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
-import "./GamesPanel.css";
 import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
-import { Duration } from "../../../lib/shared/duration";
+import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
+import "./GamesPanel.css";
 
 //TODO remove
 const useStyles = createStyles((theme) => ({
@@ -79,7 +79,7 @@ export function GamesPanel(props: Props): JSX.Element {
 
 
     // refresh the list at regular intervals
-    useInterval(fetchGames, Duration.ofSeconds(10).asMilliseconds());
+    useInterval(fetchGames, GAMES_LIST_UPDATE_INTERVAL.asMilliseconds());
 
 
     const gamesSorted: GamesListEntry[] = useMemo(() =>
