@@ -76,7 +76,7 @@ export function GamesPanel(): JSX.Element {
                             <GameCard
                                 entry={g}
                                 setGame={ (address) => gamesListContext.selectGame(address, true) }
-                                selected={g.publicKey === gamesListContext.activeGame}
+                                selected={g.publicKey.toBase58() === gamesListContext.activeGame?.toBase58()}
                                 key={g.publicKey.toBase58()}
                             />
                         )
@@ -105,22 +105,25 @@ interface UseGamesListContext {
 function useGamesList(): UseGamesListContext {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [gamesList, setGamesList] = useState<GamesListEntry[] | undefined>();
-    const activeGameContex = useActiveGame();
-    const { game: gameEvent } = useGame(activeGameContex.address);
+    const activeGameContext = useActiveGame();
+    const { game: gameEvent } = useGame(activeGameContext.address);
 
     const refreshList: () => void = useCallback(() => {
-        equilibrate.getGamesList().then(setGamesList);
-    }, [equilibrate]);
+        if (equilibrateIsReady) {
+            equilibrate.getGamesList().then(setGamesList);
+        }
+    }, [equilibrate, equilibrateIsReady]);
 
 
     // initial fetch
     useEffect(() => {
-        if (equilibrateIsReady && (gamesList === undefined)) {
+        if (gamesList === undefined) {
             refreshList();
         }
-    }, [equilibrateIsReady, activeGameContex.address]);
+    }, [equilibrateIsReady, activeGameContext.address]);
 
 
+    // refresh when the active game updates
     useEffect(() => {
         const gameSummaryChanged: boolean = (gameEvent?.end != null) ||
             (gameEvent?.enter != null) ||
@@ -137,32 +140,30 @@ function useGamesList(): UseGamesListContext {
     useInterval(refreshList, GAMES_LIST_UPDATE_INTERVAL.asMilliseconds());
 
 
-    //TODO troubleshoot games list fucking up and also triggering a bunch of
-    // additional game watchers (see console)
     const gamesSorted: GamesListEntry[] = useMemo(() =>
-        gamesList ?? [],
-    // (gamesList ?? []).sort((a, b) => {
-    //     // selected game is always at the top
-    //     if (a.publicKey === activeGameContex.address) {
-    //         return -1;
+        (gamesList ?? []).sort((a, b) => {
+            // selected game is always at the top
+            const activeAddressString: string | undefined = activeGameContext.address?.toBase58();
+            if (a.publicKey.toBase58() === activeAddressString) {
+                return -1;
 
-    //     } else if (b.publicKey === activeGameContex.address) {
-    //         return 1;
+            } else if (b.publicKey.toBase58() === activeAddressString) {
+                return 1;
 
-    //     } else {
-    //         // sort descending by volume
-    //         return computeGamePoolTotal(b.account) - computeGamePoolTotal(a.account);
-    //     }
-    // }),
-    [gamesList, activeGameContex.address]);
+            } else {
+                // sort descending by volume
+                return computeGamePoolTotal(b.account) - computeGamePoolTotal(a.account);
+            }
+        }),
+    [gamesList, activeGameContext.address]);
 
 
     // show the top sorted game if another one isnt selected
-    // useEffect(() => {
-    //     if ((gamesList !== undefined) && (activeGameContex.address !== undefined) && (gamesList.length > 0)) {
-    //         activeGameContex.set(gamesList[0].publicKey);
-    //     }
-    // }, [activeGameContex.address, gamesList]);
+    useEffect(() => {
+        if ((gamesList !== undefined) && (activeGameContext?.address === undefined) && (gamesList.length > 0)) {
+            activeGameContext.set(gamesList[0].publicKey);
+        }
+    }, [activeGameContext.address, gamesList]);
 
 
     const onSelectGame: (game: PublicKey, expectExists: boolean) => void = useCallback(async (game, expectExists) => {
@@ -174,16 +175,21 @@ function useGamesList(): UseGamesListContext {
             alert("Game has ended.");
             refreshList();
         }
-        activeGameContex.set(game);
-    }, [equilibrateIsReady, equilibrate.gameExists, gamesList, activeGameContex.address]);
+        activeGameContext.set(game);
+    }, [equilibrateIsReady, equilibrate.gameExists, gamesList, activeGameContext.address]);
 
 
     return {
         games: gamesSorted,
-        activeGame: activeGameContex.address,
+        activeGame: activeGameContext.address,
         selectGame: onSelectGame,
         refreshList: refreshList
     };
+}
+
+
+function computeGamePoolTotal(game: Game): number {
+    return game.state.buckets.reduce((total, b) => total + b.decimalTokens.toNumber(), 0);
 }
 
 

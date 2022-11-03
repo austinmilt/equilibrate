@@ -481,7 +481,14 @@ export class EquilibrateSDK {
             const bucketsNow: Bucket[] = gameNow.state.buckets;
             const playerCountChange: number = bucketsNow[0].players - bucketsBefore[0].players;
             const bucketPlayerCountChanges: number[] = bucketsNow.map((b, i) => b.players - bucketsBefore[i].players);
-            if (playerCountChange === 0) {
+            if (bucketPlayerCountChanges.every(c => c === 0)) {
+                // We need the player balance in a bucket to have updated to know what happened. It's possible that
+                // this event was triggered manually rather than by the program, which could mean
+                // that nothing has actually changed. In fact, this should be the only possibility
+                // since the only updates to the game account come when someone leaves, enters,
+                // or moves buckets, all of which would affect the bucket player balances.
+
+            } else if (playerCountChange === 0) {
                 try {
                     const bucketLeftIndex: number = this.getBucketLeftIndex(bucketPlayerCountChanges);
                     const bucketEnteredIndex: number = this.getBucketEnteredIndex(bucketPlayerCountChanges);
@@ -490,7 +497,6 @@ export class EquilibrateSDK {
                         oldBucketIndex: bucketLeftIndex
                     };
                 } catch (e) {
-                    //TODO figure out what's triggering this
                     console.warn(e);
                 }
             } else if (playerCountChange > 0) {
