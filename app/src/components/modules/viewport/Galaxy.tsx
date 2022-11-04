@@ -5,7 +5,6 @@ import { Satellite } from "./Satellite";
 import { Star } from "./Star";
 import { useComputedStarProps } from "./useComputedStarProps";
 
-// Galaxy is the collection of stars and conduits
 export interface GalaxyProps {
     viewportDimensions: {
         widthPixels: number;
@@ -29,25 +28,26 @@ export function Galaxy(props: GalaxyProps): JSX.Element {
     }, [activeGalaxyContext.focalStar.set]);
 
     return <>
-        {stars.map((star, i) =>
-            <Group key={i}>
+        {stars.map((star, iStar) =>
+            <Group key={iStar}>
                 <Star
                     x={star.x}
                     y={star.y}
-                    isSource={i === 0}
+                    isSource={iStar === 0}
                     radius={star.radius}
                     fuelChangeRate={star.fuelChangeRate}
-                    focused={activeGalaxyContext.focalStar.index === i}
-                    onClick={() => activeGalaxyContext.focalStar.onClick(i)}
-                    onMouseOverChange={(mousedOver: boolean) => onStarMousedOverChange(i, mousedOver)}
+                    focused={activeGalaxyContext.focalStar.index === iStar}
+                    onClick={() => activeGalaxyContext.focalStar.onClick(iStar)}
+                    onMouseOverChange={(mousedOver: boolean) => onStarMousedOverChange(iStar, mousedOver)}
                 />
-                {(i > 0) && Array(activeGalaxyContext.stars?.[i].satellites).fill(null).map(iSat => (
+                {(iStar > 0) && Array(activeGalaxyContext.stars?.[iStar].satellites).fill(null).map((_, iSat) => (
                     <Satellite
                         starMaxRadius={starMaxRadius}
                         starRadius={star.radius}
                         starX={star.x}
                         starY={star.y}
-                        key={`${i}-${iSat}`}
+                        isPlayer={(iSat === 0) && (iStar === activeGalaxyContext.playerStar.index)}
+                        key={`${iStar}-${iSat}`}
                     />
                 ))}
             </Group>
