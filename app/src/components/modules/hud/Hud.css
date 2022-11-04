@@ -1,18 +1,13 @@
 .hud {
-    position: absolute;
-    top: 0px;
-    right: 0px;
     padding: 1rem;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
-    z-index: 1000;
+    width: 100%;
 }
 
 .star-status {
-    position: relative;
-    float: right;
-    flex-direction: column;
+    flex-direction: row;
     display: flex;
     gap: 1rem;
 }

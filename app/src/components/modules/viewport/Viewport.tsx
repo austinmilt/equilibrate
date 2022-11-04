@@ -1,5 +1,6 @@
-import { RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Text } from "react-konva";
+import Konva from "konva";
 import { ActiveGalaxyProvider } from "../../shared/galaxy/provider";
 import { useActiveGame } from "../../shared/game/provider";
 import { Hud } from "../hud/Hud";
@@ -14,7 +15,6 @@ export function Viewport(): JSX.Element {
     return (
         <section className="viewport" ref={viewportRef}>
             <ActiveGalaxyProvider>
-                <Hud />
                 <Stage
                     className="stage"
                     width={width}
@@ -23,7 +23,10 @@ export function Viewport(): JSX.Element {
                     <Layer>
                         {
                             gameAddress === undefined ?
-                                <ViewportSkeleton/> :
+                                <ViewportSkeleton
+                                    width={ width }
+                                    height={ height }
+                                /> :
                                 <ViewportDefined
                                     width={ width }
                                     height={ height }
@@ -31,25 +34,42 @@ export function Viewport(): JSX.Element {
                         }
                     </Layer>
                 </Stage>
+                <Hud />
             </ActiveGalaxyProvider>
         </section>
     );
 }
 
 
-
-function ViewportSkeleton(): JSX.Element {
-    return <Text text="Select a game"/>;
-}
-
-
-interface ViewportDefinedProps {
+interface ViewportInnerProps {
     width: number;
     height: number;
 }
 
 
-function ViewportDefined(props: ViewportDefinedProps): JSX.Element {
+
+function ViewportSkeleton(props: ViewportInnerProps): JSX.Element {
+    const [ref, setRef] = useState<Konva.Text | null>(null);
+
+    const x: number = useMemo(() => (props.width - (ref?.width() ?? 0)) / 2, [props.width, ref]);
+    const y: number = useMemo(() => (props.height - (ref?.height() ?? 0)) / 2, [props.height, ref]);
+
+    return (
+        <Text
+            ref={setRef}
+            text="Select or create a game"
+            x={x}
+            y={y}
+            fill="white"
+            fontSize={30}
+            align="center"
+            width={props.width / 2}
+        />
+    );
+}
+
+
+function ViewportDefined(props: ViewportInnerProps): JSX.Element {
     return (
         <Galaxy
             viewportDimensions={{widthPixels: props.width, heightPixels: props.height}}

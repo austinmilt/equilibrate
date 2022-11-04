@@ -1,6 +1,4 @@
 .main {
-  height: 100vh;
-  width: 100%;
   padding: 3em;
   display: grid;
   grid-template-columns: 25% 75%;
