@@ -23,21 +23,20 @@ export function useComputedStarProps(
     stars: StarData[],
     galaxyConstants: GalaxyConstants | undefined
 ): [StarProps[], number] {
-    const nPlayableStars: number = useMemo(() => stars.length - 1, [stars]);
-    const [gridRows, gridCols] = computeGridDimensions(
+    const [gridRows, gridCols] = useMemo(() => computeGridDimensions(
         stars.length,
         viewportDimensions.widthPixels,
         viewportDimensions.heightPixels
-    );
+    ), [stars.length, viewportDimensions.widthPixels, viewportDimensions.heightPixels]);
 
-    const starMaxRadius: number = Math.min(
+    const starMaxRadius: number = useMemo(() => Math.min(
         viewportDimensions.widthPixels / gridCols,
         viewportDimensions.heightPixels / gridRows
-    );
+    ), [viewportDimensions.widthPixels, gridRows, gridCols]);
 
     const activeCells: number[] = useMemo(() =>
-        generateActiveCells(nPlayableStars, gridRows, gridCols),
-    [nPlayableStars, gridRows, gridCols]);
+        generatePlayableStarsActiveCells(stars.length, gridRows, gridCols),
+    [stars.length, gridRows, gridCols]);
 
     const starCentroids: Point2D[] = useMemo(() => {
         const width: number = viewportDimensions.widthPixels;
@@ -120,8 +119,7 @@ function computeGridDimensions(
 }
 
 
-function generateActiveCells(nStars: number, gridRows: number, gridCols: number): number[] {
-    console.log("hay hay");
+function generatePlayableStarsActiveCells(nStars: number, gridRows: number, gridCols: number): number[] {
     const nCells: number = gridCols*gridRows;
     const sourceIndex: number = Math.floor(nCells / 2);
     const seeds: number[] = Array(nCells).fill(0).map(Math.random);
@@ -132,7 +130,7 @@ function generateActiveCells(nStars: number, gridRows: number, gridCols: number)
         .map(([_, i]) => i);
 
     const indicesWithoutSource: number[] = indices.filter(i => i !== sourceIndex);
-    return indicesWithoutSource.slice(0, nStars);
+    return indicesWithoutSource.slice(0, nStars - 1); // dont include source star
 }
 
 
