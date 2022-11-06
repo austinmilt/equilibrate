@@ -18,6 +18,14 @@ export const VIEWPORT_UPDATE_INTERVAL_MS: Duration = parseEnv(
 );
 
 
+export const SHIP_MAX_LOGS: number = parseEnv(
+    "SHIP_MAX_LOGS",
+    import.meta.env.VITE_SHIP_MAX_LOGS,
+    20,
+    Number.parseInt
+);
+
+
 function parseEnv<T>(
     name: string,
     value: string | undefined,

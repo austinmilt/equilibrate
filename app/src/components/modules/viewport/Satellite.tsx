@@ -10,13 +10,25 @@ export function Satellite(props: {
     isPlayer: boolean
 }): JSX.Element {
 
-    // draw the conduit behind the star
     const [conduitRef, setConduitRef] = useState<Konva.Line | null>(null);
     useEffect(() => {
         if (conduitRef !== null) {
-            conduitRef.setZIndex(0);
+            //TODO want to draw the conduit behind the star, but cant do that unless it's
+            // in the same level as the star, so I'll have to rearrange how this stuff is
+            // drawn (draw all the conduits before the stars and satellites)
+
+            // pass pointer events through to the star if it's overlapping
+            conduitRef.listening(false);
         }
     }, [conduitRef]);
+
+    const [satelliteRef, setSatelliteRef] = useState<Konva.Circle | null>(null);
+    useEffect(() => {
+        if (satelliteRef !== null) {
+            // pass pointer events through to the star if it's overlapping
+            satelliteRef.listening(false);
+        }
+    }, [satelliteRef]);
 
     const xOffsetProp: number = useMemo(() => 2*Math.random() - 1, []);
     const yOffsetProp: number = useMemo(() => 2*Math.random() - 1, []);
@@ -32,10 +44,12 @@ export function Satellite(props: {
     const x: number = useMemo(() => props.starX + xOffset, [xOffset, props.starX]);
     const y: number = useMemo(() => props.starY + yOffset, [yOffset, props.starY]);
 
+    //TODO export style consts elsewhere
     const color: string = useMemo(() => props.isPlayer ? "#D9594C" : "gray", [props.isPlayer]);
 
     return <>
         <Circle
+            ref={(ref) => setSatelliteRef(ref)}
             x={x}
             y={y}
             radius={3}

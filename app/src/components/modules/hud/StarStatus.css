@@ -1,0 +1,5 @@
+.star-status {
+    flex-direction: row;
+    display: flex;
+    gap: 1rem;
+}

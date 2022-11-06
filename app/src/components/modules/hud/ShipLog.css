@@ -1,0 +1,8 @@
+.ship-log {
+    height: 100%;
+    border: 1px solid gray;
+    display: flex;
+    width: 20rem;
+    flex-direction: column;
+    max-height: 10rem;
+}

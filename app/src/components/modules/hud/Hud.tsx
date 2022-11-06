@@ -1,11 +1,12 @@
-import { Paper, RingProgress, Center, Text, Group, Switch, Image } from "@mantine/core";
+import { Text, Switch, SimpleGrid } from "@mantine/core";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame } from "../../../lib/equilibrate/useGame";
 import { useEndpoint } from "../../../lib/solana/provider";
-import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
+import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/provider";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
-import HydrogenIcon from "../../../../public/hydrogen-icon.svg";
+import { StarStatus } from "./StarStatus";
 import "./Hud.css";
+import { ShipLog, cleanShipLogs, useShipLogs } from "./ShipLog";
 
 enum GameAction {
     ENTER,
@@ -22,6 +23,12 @@ export function Hud(): JSX.Element {
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
     const { url: solanaRpcUrl } = useEndpoint();
+    const shipLogContext = useShipLogs(activeGame);
+
+    // clean up old ship logs from stale games the user has left
+    useEffect(() => {
+        cleanShipLogs();
+    }, []);
 
     // what would happen if the user clicked the focal star?
     const focalStarClickAction: GameAction = useMemo(() => {
@@ -56,16 +63,16 @@ export function Hud(): JSX.Element {
         const removeOnClick = activeGalaxyContext.focalStar.addOnClick((starIndex: number) => {
             if (focalStarClickAction === GameAction.ENTER) {
                 gameContext.enterGame(starIndex, ({transactionSignature: signature}) => {
-                    //TODO better UX
                     const transactionUrl = `https://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${encodeURIComponent(solanaRpcUrl)}`;
                     console.log("Entered game, view transaction at", transactionUrl);
+                    shipLogContext.record({ text: "Entered the system.", url: transactionUrl });
                     activeGalaxyContext.playerStar.set(starIndex);
                 });
             } else if (focalStarClickAction === GameAction.MOVE) {
                 gameContext.moveBucket(starIndex, ({transactionSignature: signature}) => {
-                    //TODO better UX
                     const transactionUrl = `https://explorer.solana.com/tx/${signature}?cluster=custom&customUrl=${encodeURIComponent(solanaRpcUrl)}`;
                     console.log("Moved bucket, view transaction at", transactionUrl);
+                    shipLogContext.record({ text: "Orbit changed.", url: transactionUrl });
                     activeGalaxyContext.playerStar.set(starIndex);
                 });
             } else if (focalStarClickAction === GameAction.LEAVE) {
@@ -74,13 +81,14 @@ export function Hud(): JSX.Element {
                     (result) => {
                         if (cancelOnLoss) {
                             if (result.anchorErrorCode === "AbortLeaveOnLoss") {
-                                //TODO better UX
                                 console.log("Stayed in game because you would've lost money.");
+                                shipLogContext.record({ text: "Escape aborted." });
                             }
                         } else {
-                            //TODO better UX
                             const transactionUrl = `https://explorer.solana.com/tx/${result.transactionSignature}?cluster=custom&customUrl=${encodeURIComponent(solanaRpcUrl)}`;
                             console.log("Left game, view transaction at", transactionUrl);
+                            shipLogContext.record({ text: "Escaped the system.", url: transactionUrl });
+                            shipLogContext.onEscapeSystem();
                         }
                     }
                 );
@@ -117,7 +125,7 @@ export function Hud(): JSX.Element {
             galaxyState={activeGalaxyContext.galaxy?.state}
             isSourceStar={activeGalaxyContext.focalStar.isSource}
         />
-        <Group>
+        <SimpleGrid cols={1}>
             <Switch
                 checked={cancelOnLoss}
                 onChange={() => setCancelOnLoss(!cancelOnLoss)}
@@ -126,126 +134,7 @@ export function Hud(): JSX.Element {
                 offLabel="Always leave"
             />
             { clickActionHelp }
-        </Group>
+        </SimpleGrid>
+        <ShipLog gameAddress={activeGame}/>
     </div>;
-}
-
-
-interface StarStatusProps {
-    data: StarData | undefined;
-    galaxyState: undefined | {
-        totalFuel: number,
-        totalSatellites: number
-    }
-    isSourceStar: boolean;
-}
-
-
-function StarStatus(props: StarStatusProps): JSX.Element {
-    return (
-        <div className="star-status">
-            <FuelGuage {...props}/>
-            <SatelliteGuage {...props}/>
-        </div>
-    );
-}
-
-
-function FuelGuage(props: StarStatusProps): JSX.Element {
-    const ringPercent: number = useMemo(() => {
-        if ((props.galaxyState === undefined) || (props.data === undefined)) {
-            return 0;
-
-        } else {
-            const maxFuel: number = props.galaxyState.totalFuel * props.galaxyState.totalSatellites;
-            return props.data.fuel * 100 / maxFuel;
-        }
-    }, [props.data]);
-
-
-    const fuelFormatted: string | undefined = useMemo(() => {
-        if (props.data?.fuel === undefined) return undefined;
-        return Math.round(props.data.fuel).toLocaleString();
-    }, [props.data?.fuel]);
-
-
-    const fuelDirectionIndicator: React.ReactNode = useMemo(() => {
-        if (props.data === undefined) {
-            return "?";
-        } else if (props.data.fuelChangeRate > 0) {
-            return "▲";
-        } else if (props.data.fuelChangeRate < 0) {
-            return "⯆";
-        } else {
-            return "";
-        }
-    }, [props.data?.fuelChangeRate]);
-
-
-    return (
-        <Paper withBorder radius="md" p="xs">
-            <Group>
-                <RingProgress
-                    size={80}
-                    roundCaps
-                    thickness={8}
-                    sections={[{ value: ringPercent, color: "#ebb729" }]}
-                    label={
-                        <Center>
-                            <Image src={HydrogenIcon} alt="H" className="hydrogen-icon" width={40}/>
-                        </Center>
-                    }
-                />
-
-                <div>
-                    <Text color="dimmed" size="xs" transform="uppercase" weight={700}>
-                        Hydrogen
-                    </Text>
-                    <Text weight={700} size="xl">
-                        { fuelDirectionIndicator } {fuelFormatted ?? "❔"}
-                    </Text>
-                </div>
-            </Group>
-        </Paper>
-    );
-}
-
-
-function SatelliteGuage(props: StarStatusProps): JSX.Element {
-    const ringPercent: number = useMemo(() => {
-        if ((props.galaxyState === undefined) || (props.data === undefined) || props.isSourceStar) {
-            return 0;
-
-        } else {
-            return props.data.satellites * 100 / props.galaxyState.totalSatellites;
-        }
-    }, [props.data]);
-
-
-    return (
-        <Paper withBorder radius="md" p="xs">
-            <Group>
-                <RingProgress
-                    size={80}
-                    roundCaps
-                    thickness={8}
-                    sections={[{ value: ringPercent, color: "grape" }]}
-                    label={
-                        <Center>
-                            🚀
-                        </Center>
-                    }
-                />
-
-                <div>
-                    <Text color="dimmed" size="xs" transform="uppercase" weight={700}>
-                        Ships
-                    </Text>
-                    <Text weight={700} size="xl">
-                        {props.isSourceStar ? 0 : (props.data?.satellites ?? "❔")}
-                    </Text>
-                </div>
-            </Group>
-        </Paper>
-    );
 }

@@ -244,7 +244,7 @@ function GameCard(props: GameCardProps): JSX.Element {
                         </Text>
                         <Group noWrap spacing="xs">
                             <Group spacing="xs" noWrap>
-                                <Text size="xs">{`👥 ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
+                                <Text size="xs">{`🚀 ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
                                 {
                                     userIsPlaying && <Text size="xs" title="You're in this game">🥊</Text>
                                 }
