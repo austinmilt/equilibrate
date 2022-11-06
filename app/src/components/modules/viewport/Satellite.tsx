@@ -14,7 +14,7 @@ export function Satellite(props: {
     const [conduitRef, setConduitRef] = useState<Konva.Line | null>(null);
     useEffect(() => {
         if (conduitRef !== null) {
-            conduitRef.setZIndex(-100);
+            conduitRef.setZIndex(0);
         }
     }, [conduitRef]);
 

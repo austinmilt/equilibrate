@@ -54,8 +54,7 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                 Find yourself in a mysterious starfield where
                 stars feed off the hydrogen escaping the wormhole
                 you exited. With empty tanks, your only hope is to
-                escape with some of the precious hydrogen that feeds
-                the stars and wormhole. Be strategic, because your
+                siphon hydrogen off one of the stars. Be strategic, because your
                 bounty is only as big as your claim on the star you orbit.
             </Text>
             <Accordion>
@@ -65,7 +64,7 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                         <List>
                             <List.Item>
                                 Enter a game or create a new one (you&apos;ll need to
-                                connect a wallet first.)
+                                connect a wallet first).
                                 <List>
                                     <List.Item>
                                         New Game: Click the New Game button,

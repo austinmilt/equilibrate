@@ -1,9 +1,10 @@
-import { Paper, RingProgress, Center, Text, Group, Switch } from "@mantine/core";
+import { Paper, RingProgress, Center, Text, Group, Switch, Image } from "@mantine/core";
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame } from "../../../lib/equilibrate/useGame";
 import { useEndpoint } from "../../../lib/solana/provider";
 import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
+import HydrogenIcon from "../../../../public/hydrogen-icon.svg";
 import "./Hud.css";
 
 enum GameAction {
@@ -191,14 +192,14 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
                     sections={[{ value: ringPercent, color: "#ebb729" }]}
                     label={
                         <Center>
-                            ⛽
+                            <Image src={HydrogenIcon} alt="H" className="hydrogen-icon" width={40}/>
                         </Center>
                     }
                 />
 
                 <div>
                     <Text color="dimmed" size="xs" transform="uppercase" weight={700}>
-                        Fuel
+                        Hydrogen
                     </Text>
                     <Text weight={700} size="xl">
                         { fuelDirectionIndicator } {fuelFormatted ?? "❔"}
@@ -231,14 +232,14 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
                     sections={[{ value: ringPercent, color: "grape" }]}
                     label={
                         <Center>
-                            🛰️
+                            🚀
                         </Center>
                     }
                 />
 
                 <div>
                     <Text color="dimmed" size="xs" transform="uppercase" weight={700}>
-                        Satellites
+                        Ships
                     </Text>
                     <Text weight={700} size="xl">
                         {props.isSourceStar ? 0 : (props.data?.satellites ?? "❔")}

@@ -85,7 +85,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             <PubkeyInput label="Mint" defaultValue={NATIVE_MINT} onChange={setMint}/>
             <NumberInput
                 value={entryFee}
-                label="Entry Fuel (Tokens)"
+                label="Entry Fuel (tokens)"
                 onChange={setEntryFee}
                 min={1e-9}
                 precision={9}
@@ -93,7 +93,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             />
             <NumberInput
                 value={spillRate}
-                label="Fuel Escape Rate (tokens per player per second)"
+                label="Hydrogen Escape Rate (tokens per player per second)"
                 onChange={setSpillRate}
                 min={1e-9}
                 precision={9}
@@ -101,7 +101,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             />
             <NumberInput
                 value={players}
-                label="Max Players"
+                label="Max Ships (players)"
                 onChange={setPlayers}
                 min={1}
                 max={1000}
