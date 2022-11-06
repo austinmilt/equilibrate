@@ -1,4 +1,5 @@
 import { MantineProvider } from "@mantine/core";
+import { NotificationsProvider } from "@mantine/notifications";
 import { EquilibrateProgramProvider } from "../../../lib/equilibrate/provider";
 import { EndpointProvider, SolanaProvider } from "../../../lib/solana/provider";
 import { ActiveGameProvider } from "../../shared/game/provider";
@@ -19,19 +20,21 @@ export default function App(): JSX.Element {
                     colorScheme: "dark"
                 }}
             >
-                <EndpointProvider>
-                    <SolanaProvider>
-                        <EquilibrateProgramProvider>
-                            <ActiveGameProvider>
-                                <main className="main">
-                                    <GamesPanel/>
-                                    <Viewport/>
-                                    <WelcomeModal/>
-                                </main>
-                            </ActiveGameProvider>
-                        </EquilibrateProgramProvider>
-                    </SolanaProvider>
-                </EndpointProvider>
+                <NotificationsProvider>
+                    <EndpointProvider>
+                        <SolanaProvider>
+                            <EquilibrateProgramProvider>
+                                <ActiveGameProvider>
+                                    <main className="main">
+                                        <GamesPanel/>
+                                        <Viewport/>
+                                        <WelcomeModal/>
+                                    </main>
+                                </ActiveGameProvider>
+                            </EquilibrateProgramProvider>
+                        </SolanaProvider>
+                    </EndpointProvider>
+                </NotificationsProvider>
             </MantineProvider>
         </LocalStorageProvider>
     );

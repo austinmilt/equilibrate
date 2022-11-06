@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
+import { Notifications } from "../shared/notifications";
 import { useEquilibrate } from "./provider";
 import { GameEvent, PlayerStateEvent, RequestResult } from "./sdk";
 import { GameEnriched } from "./types";
@@ -35,13 +36,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const enterGame: GameContext["enterGame"] = useCallback((bucketIndex, onSuccess, onError) => {
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
-            //TODO replace with better uX
-            alert("Game is null.");
+            Notifications.enterNullGame();
             return;
 
         } else if (!equilibrateIsReady) {
-            //TODO replace with better uX
-            alert("SDK isnt ready");
+            Notifications.enterSdkNotReady();
             return;
         }
         setLoading(true);
@@ -68,17 +67,15 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex, onSuccess, onError) => {
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
-            //TODO replace with better uX
-            alert("Game is null.");
+            Notifications.moveNullGame();
             return;
 
         } else if (!equilibrateIsReady) {
-            //TODO replace with better uX
-            alert("SDK isnt ready");
+            Notifications.moveSdkNotReady();
             return;
+
         } else if (bucketIndex === 0) {
-            //TODO replace with better uX
-            alert("Not allowed to enter the holding bucket.");
+            Notifications.moveWormholeOrbit();
             return;
         }
         setLoading(true);
@@ -103,13 +100,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss, onSuccess, onError) => {
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
-            //TODO replace with better uX
-            alert("Game is null.");
+            Notifications.leaveNullGame();
             return;
 
         } else if (!equilibrateIsReady) {
-            //TODO replace with better uX
-            alert("SDK isnt ready");
+            Notifications.leaveSdkNotReady();
             return;
         }
         setLoading(true);

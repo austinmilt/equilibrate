@@ -24,6 +24,7 @@ import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { NewGameModal } from "./NewGameModal";
 import "./GamesPanel.css";
+import { notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
 
 //TODO remove
 const useStyles = createStyles((theme) => ({
@@ -171,8 +172,7 @@ function useGamesList(): UseGamesListContext {
             alert("SDK not ready DUDE");
         }
         if (expectExists && !await equilibrate.gameExists(game)) {
-            //TODO better ux
-            alert("Game has ended.");
+            notifyWarning("Game has ended.", "This game no longer exists and will be removed from the list.");
             refreshList();
         }
         activeGameContext.set(game);
@@ -313,10 +313,14 @@ function AirdropButton(): JSX.Element {
 
         } else {
             try {
-                const transactionId: string = await connection.requestAirdrop(wallet?.publicKey, 1*LAMPORTS_PER_SOL);
+                const transactionId: string = await connection.requestAirdrop(wallet.publicKey, 1*LAMPORTS_PER_SOL);
                 const blockhash = await connection.getLatestBlockhash();
                 await connection.confirmTransaction({...blockhash, signature: transactionId}, "finalized");
-                console.log("Success! New balance: ", await connection.getBalance(wallet.publicKey));
+                const newSol: number = (await connection.getBalance(wallet.publicKey)) / LAMPORTS_PER_SOL;
+                notifySuccess(
+                    "Airdrop suceeded!",
+                    `New balance on ${wallet.publicKey.toBase58()} is ${newSol.toFixed(3)} SOL.`
+                );
 
             } finally {
                 setLoading(false);

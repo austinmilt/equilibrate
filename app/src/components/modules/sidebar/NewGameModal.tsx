@@ -3,6 +3,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
+import { Notifications } from "../../../lib/shared/notifications";
 
 interface NewGameModalProps {
     open: boolean;
@@ -34,8 +35,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             validateArg(players, "players");
 
             if (!equilibrateIsReady) {
-                //TODO replace with toast or auto-signin
-                alert("SDK not ready GUY.");
+                Notifications.createSdkNotReady();
 
             } else {
                 try {
@@ -54,8 +54,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                     props.onCloseIntent();
 
                 } catch (e) {
-                    //TODO better UX
-                    console.trace(e);
+                    Notifications.createError(e);
                 }
             }
 
