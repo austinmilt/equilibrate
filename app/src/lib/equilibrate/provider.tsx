@@ -32,19 +32,18 @@ export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.
     const { connection } = useConnection();
 
     useEffect(() => {
-        if (anchorWallet != null) {
-            const provider = new anchor.AnchorProvider(
-                connection,
-                anchorWallet,
-                anchor.AnchorProvider.defaultOptions()
-            );
-            const program: anchor.Program<Equilibrate> = new anchor.Program(
-                IDL as unknown as Equilibrate,
-                PROGRAM_ID,
-                provider
-            );
-            setSdk(EquilibrateSDK.from(program));
-        }
+        const provider: anchor.AnchorProvider = new anchor.AnchorProvider(
+            connection,
+            // fallback value allows querying the program without having a wallet connected
+            anchorWallet ?? ({} as anchor.Wallet),
+            anchor.AnchorProvider.defaultOptions()
+        );
+        const program: anchor.Program<Equilibrate> = new anchor.Program(
+            IDL as unknown as Equilibrate,
+            PROGRAM_ID,
+            provider ?? ({} as anchor.AnchorProvider)
+        );
+        setSdk(EquilibrateSDK.from(program));
     }, [anchorWallet, connection, setSdk]);
 
     const value: EquilibrateProgramContextState = {

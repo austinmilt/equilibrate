@@ -241,13 +241,13 @@ export class EquilibrateSDK {
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
 
+    private readonly games: Map<string, GameEnriched> = new Map<string, GameEnriched>();
     private readonly gameSubscriptions: Map<string, Subscription<GameEvent>> =
         new Map<string, Subscription<GameEvent>>();
-    private readonly games: Map<string, GameEnriched> = new Map<string, GameEnriched>();
 
+    private readonly playerStates: Map<string, PlayerState> = new Map<string, PlayerState>();
     private readonly playerStateSubscriptions: Map<string, Subscription<PlayerStateEvent>> =
         new Map<string, Subscription<PlayerStateEvent>>();
-    private readonly playerStates: Map<string, PlayerState> = new Map<string, PlayerState>();
 
     private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
@@ -289,7 +289,6 @@ export class EquilibrateSDK {
     }
 
 
-    //TODO figure out how to fetch this without the user wallet being connected
     /**
      * @returns all active games
      */
