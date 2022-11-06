@@ -1,10 +1,10 @@
 import { Modal, Button, TextInput, Loader, NumberInput } from "@mantine/core";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 
-export interface NewGameModalProps {
+interface NewGameModalProps {
     open: boolean;
     onGameAddressResolved: (address: PublicKey) => void;
     onSuccess: () => void;
@@ -27,6 +27,12 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const onNewGame: () => void = useCallback(async () => {
         setLoading(true);
         try {
+            validateArg(entryFee, "entryFee");
+            validateArg(mint, "mint");
+            validateArg(spillRate, "spillRate");
+            validateArg(buckets, "buckets");
+            validateArg(players, "players");
+
             if (!equilibrateIsReady) {
                 //TODO replace with toast or auto-signin
                 alert("SDK not ready GUY.");
@@ -79,7 +85,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             <PubkeyInput label="Mint" defaultValue={NATIVE_MINT} onChange={setMint}/>
             <NumberInput
                 value={entryFee}
-                label="Entry Fee Tokens"
+                label="Entry Fuel (Tokens)"
                 onChange={setEntryFee}
                 min={1e-9}
                 precision={9}
@@ -87,7 +93,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             />
             <NumberInput
                 value={spillRate}
-                label="Entry Spill Rate (tokens per player per second)"
+                label="Fuel Escape Rate (tokens per player per second)"
                 onChange={setSpillRate}
                 min={1e-9}
                 precision={9}
@@ -104,7 +110,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             />
             <NumberInput
                 value={buckets}
-                label="Number of Stars (excluding source star)"
+                label="Number of Stars"
                 onChange={setBuckets}
                 min={1}
                 max={64}
@@ -114,6 +120,13 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             <Button onClick={onNewGame}>{ loading ? <Loader/> : "Create Game" }</Button>
         </Modal>
     );
+}
+
+
+function validateArg<T>(arg: T | undefined | null, name: string): asserts arg is NonNullable<T> & void {
+    if (arg == null) {
+        throw new Error(`${name} is required`);
+    }
 }
 
 
