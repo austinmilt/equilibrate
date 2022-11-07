@@ -1,6 +1,6 @@
 import { ScrollArea, Text, Anchor } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { SHIP_MAX_LOGS } from "../../../lib/shared/constants";
 import { useLocalStorageParam } from "../../shared/localStorage/provider";
 import "./ShipLog.css";
@@ -58,8 +58,16 @@ export function useShipLogs(gameAddress: PublicKey | undefined): UseShipLogsCont
         `${LOGS_KEY_PREFIX}${gameAddress?.toBase58() ?? "dummy"}`
     );
 
-    const logs: LogEntry[] = localStorageContext.value?.logs ?? [];
-    const stale: boolean = localStorageContext.value?.stale ?? false;
+
+    const logs: LogEntry[] = useMemo(() =>
+        localStorageContext.value?.logs ?? [],
+    [localStorageContext.value?.logs]);
+
+
+    const stale: boolean = useMemo(() =>
+        localStorageContext.value?.stale ?? false,
+    [localStorageContext.value?.stale]);
+
 
     const record: UseShipLogsContext["record"] = useCallback((log) => {
         while (logs.length >= SHIP_MAX_LOGS) {

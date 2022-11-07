@@ -1,6 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
-import { Notifications } from "../shared/notifications";
 import { useEquilibrate } from "./provider";
 import { GameEvent, PlayerStateEvent, RequestResult } from "./sdk";
 import { GameEnriched } from "./types";
@@ -36,12 +35,16 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const enterGame: GameContext["enterGame"] = useCallback((bucketIndex, onSuccess, onError) => {
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
-            Notifications.enterNullGame();
-            return;
+            throw UseGameError.enterNullGame(gameAddress);
 
         } else if (!equilibrateIsReady) {
-            Notifications.enterSdkNotReady();
-            return;
+            throw UseGameError.enterSdkNotReady(gameAddress);
+
+        } else if (bucketIndex === 0) {
+            throw UseGameError.enterHoldingBucket(gameAddress);
+
+        } else if (player === undefined) {
+            throw UseGameError.enterNullPlayer(gameAddress);
         }
         setLoading(true);
         equilibrate.request()
@@ -67,16 +70,16 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex, onSuccess, onError) => {
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
-            Notifications.moveNullGame();
-            return;
+            throw UseGameError.moveNullGame(gameAddress);
 
         } else if (!equilibrateIsReady) {
-            Notifications.moveSdkNotReady();
-            return;
+            throw UseGameError.moveSdkNotReady(gameAddress);
 
         } else if (bucketIndex === 0) {
-            Notifications.moveWormholeOrbit();
-            return;
+            throw UseGameError.moveHoldingBucket(gameAddress);
+
+        } else if (player === undefined) {
+            throw UseGameError.moveNullPlayer(gameAddress);
         }
         setLoading(true);
         equilibrate.request()
@@ -100,12 +103,13 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss, onSuccess, onError) => {
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
-            Notifications.leaveNullGame();
-            return;
+            throw UseGameError.leaveNullGame(gameAddress);
 
         } else if (!equilibrateIsReady) {
-            Notifications.leaveSdkNotReady();
-            return;
+            throw UseGameError.leaveSdkNotReady(gameAddress);
+
+        } else if (player === undefined) {
+            throw UseGameError.leaveNullPlayer(gameAddress);
         }
         setLoading(true);
         equilibrate.request()
@@ -156,7 +160,7 @@ function useGameEvents(gameAddress: PublicKey | undefined): UseEventsContext<Gam
         const run = async () => {
             if (equilibrateIsReady && (gameAddress !== undefined)) {
                 if (!await equilibrate.gameExists(gameAddress)) {
-                    throw UseGameError.noSuchGame(gameAddress);
+                    throw UseGameError.eventNoSuchGame(gameAddress);
                 }
                 equilibrate.watchGame(gameAddress, setEvent, true);
 
@@ -185,7 +189,6 @@ function usePlayerEvents(
     playerAddress: PublicKey | undefined,
     gameAddress: PublicKey | undefined
 ): UseEventsContext<PlayerStateEvent> {
-
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [event, setEvent] = useState<PlayerStateEvent | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -226,20 +229,87 @@ function usePlayerEvents(
 
 export class UseGameError extends Error {
     public readonly code: UseGameErrorCode;
-    public readonly game: PublicKey;
+    public readonly game: PublicKey | undefined;
 
-    private constructor(msg: string, game: PublicKey, code: UseGameErrorCode) {
+    private constructor(msg: string, game: PublicKey | undefined, code: UseGameErrorCode) {
         super(msg);
         this.game = game;
         this.code = code;
     }
 
-    public static noSuchGame(game: PublicKey): UseGameError {
-        return new UseGameError("No such game.", game, UseGameErrorCode.NO_SUCH_GAME);
+
+    public static eventNoSuchGame(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("No such game.", game, UseGameErrorCode.EVENT_NO_SUCH_GAME);
+    }
+
+
+    public static enterNullGame(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to enter game.", game, UseGameErrorCode.ENTER_NULL_GAME);
+    }
+
+
+    public static enterSdkNotReady(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to enter game.", game, UseGameErrorCode.ENTER_SDK_NOT_READY);
+    }
+
+
+    public static enterHoldingBucket(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to enter game.", game, UseGameErrorCode.ENTER_HOLDING_BUCKET);
+    }
+
+
+    public static enterNullPlayer(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to enter game.", game, UseGameErrorCode.ENTER_NULL_PLAYER);
+    }
+
+
+    public static moveNullGame(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to move buckets.", game, UseGameErrorCode.MOVE_NULL_GAME);
+    }
+
+
+    public static moveSdkNotReady(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to move buckets.", game, UseGameErrorCode.MOVE_SDK_NOT_READY);
+    }
+
+
+    public static moveHoldingBucket(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to move buckets.", game, UseGameErrorCode.MOVE_HOLDING_BUCKET);
+    }
+
+
+    public static moveNullPlayer(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to move buckets.", game, UseGameErrorCode.MOVE_NULL_PLAYER);
+    }
+
+
+    public static leaveNullGame(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to leave game.", game, UseGameErrorCode.LEAVE_NULL_GAME);
+    }
+
+
+    public static leaveSdkNotReady(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to leave.", game, UseGameErrorCode.LEAVE_SDK_NOT_READY);
+    }
+
+
+    public static leaveNullPlayer(game: PublicKey | undefined): UseGameError {
+        return new UseGameError("Unable to leave.", game, UseGameErrorCode.LEAVE_NULL_PLAYER);
     }
 }
 
 
 export enum UseGameErrorCode {
-    NO_SUCH_GAME
+    EVENT_NO_SUCH_GAME,
+    ENTER_HOLDING_BUCKET,
+    ENTER_NULL_GAME,
+    ENTER_SDK_NOT_READY,
+    ENTER_NULL_PLAYER,
+    MOVE_HOLDING_BUCKET,
+    MOVE_NULL_GAME,
+    MOVE_SDK_NOT_READY,
+    MOVE_NULL_PLAYER,
+    LEAVE_NULL_GAME,
+    LEAVE_SDK_NOT_READY,
+    LEAVE_NULL_PLAYER
 }

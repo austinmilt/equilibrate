@@ -6,40 +6,36 @@ export function notifyError(summary?: string, error?: Error): void {
 
 export function notifyErrorCustom(summary?: string, details?: string): void {
     showNotification({
-        title: summary,
+        title: "🥵 " + summary,
         color: "red",
         message: details,
-        icon: "😢"
     });
 }
 
 
 export function notifyWarning(summary?: string, details?: string): void {
     showNotification({
-        title: summary,
+        title: "🧐 " + summary,
         color: "yellow",
         message: details,
-        icon: "🧐"
     });
 }
 
 
 export function notifySuccess(summary?: string, details?: string): void {
     showNotification({
-        title: summary,
+        title: "🎉 " + summary,
         color: "blue",
         message: details,
-        icon: "🚀"
     });
 }
 
 
 export function notifyPotentialBug(summary?: string): void {
     showNotification({
-        title: summary,
+        title: "🪲 " + summary,
         color: "red",
         message: "This is probably a bug. Please report it.",
-        icon: "🪲"
     });
 }
 
@@ -65,47 +61,47 @@ export class Notifications {
 
 
     public static createSdkNotReady(): void {
-        this.bug("Unable to create game", NotificationCode.CREATE_SDK_NOT_READY);
+        this.bug("Unable to create game.", NotificationCode.CREATE_SDK_NOT_READY);
     }
 
 
     public static createError(error: Error | unknown): void {
-        this.error("Unable to create game", NotificationCode.CREATE_ERROR, error);
+        this.error("Unable to create game.", NotificationCode.CREATE_ERROR, error);
     }
 
 
     public static enterNullGame(): void {
-        this.bug("Unable to enter game", NotificationCode.ENTER_NULL_GAME);
+        this.bug("Unable to enter game.", NotificationCode.ENTER_NULL_GAME);
     }
 
 
     public static enterSdkNotReady(): void {
-        this.bug("Unable to enter game", NotificationCode.ENTER_SDK_NOT_READY);
+        this.bug("Unable to enter game.", NotificationCode.ENTER_SDK_NOT_READY);
     }
 
 
     public static moveNullGame(): void {
-        this.bug("Unable to move ship", NotificationCode.MOVE_NULL_GAME);
+        this.bug("Unable to move ship.", NotificationCode.MOVE_NULL_GAME);
     }
 
 
     public static moveSdkNotReady(): void {
-        this.bug("Unable to move ship", NotificationCode.MOVE_SDK_NOT_READY);
+        this.bug("Unable to move ship.", NotificationCode.MOVE_SDK_NOT_READY);
     }
 
 
     public static moveWormholeOrbit(): void {
-        this.bug("Unable to move ship", NotificationCode.MOVE_WORMHOLE_ORBIT);
+        this.bug("Unable to move ship.", NotificationCode.MOVE_WORMHOLE_ORBIT);
     }
 
 
     public static leaveNullGame(): void {
-        this.bug("Unable to escape", NotificationCode.LEAVE_NULL_GAME);
+        this.bug("Unable to escape.", NotificationCode.LEAVE_NULL_GAME);
     }
 
 
     public static leaveSdkNotReady(): void {
-        this.bug("Unable to escape", NotificationCode.LEAVE_SDK_NOT_READY);
+        this.bug("Unable to escape.", NotificationCode.LEAVE_SDK_NOT_READY);
     }
 
 
@@ -120,6 +116,6 @@ export class Notifications {
 
 
     private static summaryWithCode(summary: string, code: NotificationCode): string {
-        return `${summary} (${NotificationCode[code]}).`;
+        return `${summary} (${NotificationCode[code]})`;
     }
 }

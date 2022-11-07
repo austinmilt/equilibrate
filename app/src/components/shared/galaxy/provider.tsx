@@ -307,17 +307,17 @@ function computeBucketSnapshots(game: GameEnriched): BucketSnapshot[] {
         const balanceChange: number = inflow[i] - spilloverI;
         const balanceI: number = bucketI.decimalTokens.toNumber() + balanceChange;
         //TODO revert
-        if (i > 0 && bucketI.players > 0) {
-            console.log({
-                inflow: inflow[i],
-                outflow: spilloverI,
-                lastTokens: bucketI.decimalTokens.toNumber(),
-                expected: bucketI.decimalTokens.toNumber() - bucketI.players * spillRateConfigured * secondsSinceLastUpdate,
-                decimalTokens: balanceI,
-                players: bucketI.players,
-                spillRate: balanceChange / secondsSinceLastUpdate
-            });
-        }
+        // if (i > 0 && bucketI.players > 0) {
+        //     console.log({
+        //         inflow: inflow[i],
+        //         outflow: spilloverI,
+        //         lastTokens: bucketI.decimalTokens.toNumber(),
+        //         expected: bucketI.decimalTokens.toNumber() - bucketI.players * spillRateConfigured * secondsSinceLastUpdate,
+        //         decimalTokens: balanceI,
+        //         players: bucketI.players,
+        //         spillRate: balanceChange / secondsSinceLastUpdate
+        //     });
+        // }
         result.push({
             decimalTokens: balanceI,
             players: bucketI.players,

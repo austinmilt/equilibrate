@@ -1,9 +1,43 @@
 import { Modal, Button, TextInput, Loader, NumberInput } from "@mantine/core";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { Notifications } from "../../../lib/shared/notifications";
+import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
+
+
+interface NewGameControlProps {
+    onGameAddressResolved: NewGameModalProps["onGameAddressResolved"];
+    onSuccess: NewGameModalProps["onSuccess"];
+}
+
+
+export function NewGameControl(props: NewGameControlProps): JSX.Element {
+    const [openModal, setOpenModal] = useState<boolean>(false);
+    const connectWalletIfNeeded = useInsertConnectWallet();
+
+    const onClickOpenModal: () => void = useCallback(() => {
+        // if the user hasnt connected their wallet, make them go
+        // through that first and then automatically open the
+        // new game modal
+        connectWalletIfNeeded(() => setOpenModal(true));
+    }, [setOpenModal, connectWalletIfNeeded]);
+
+    return (
+        <>
+            <Button onClick={onClickOpenModal}>New Game</Button>
+            <NewGameModal
+                open={openModal}
+                onCloseIntent={() => setOpenModal(false)}
+                onGameAddressResolved={props.onGameAddressResolved}
+                onSuccess={props.onSuccess}
+            />
+        </>
+    );
+}
+
 
 interface NewGameModalProps {
     open: boolean;
@@ -130,7 +164,7 @@ function validateArg<T>(arg: T | undefined | null, name: string): asserts arg is
 
 
 // https://ui.mantine.dev/category/inputs
-export function PubkeyInput(props: {
+function PubkeyInput(props: {
     label: string,
     defaultValue: PublicKey,
     onChange: (value: PublicKey | null) => void

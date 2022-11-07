@@ -22,9 +22,9 @@ import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
 import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
-import { NewGameModal } from "./NewGameModal";
+import { NewGameControl, NewGameModal } from "./NewGameControl";
 import "./GamesPanel.css";
-import { notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
+import { notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
 
 //TODO remove
 const useStyles = createStyles((theme) => ({
@@ -59,7 +59,6 @@ interface SetGameFunction {
 export function GamesPanel(): JSX.Element {
     const { isProd: endpointIsProd } = useEndpoint();
     const gamesListContext = useGamesList();
-    const [openModal, setOpenModal] = useState<boolean>(false);
 
     return (
         <nav className="games-nav">
@@ -68,7 +67,10 @@ export function GamesPanel(): JSX.Element {
             <ClusterControl/>
             <Group>
                 { !endpointIsProd && <AirdropButton/> }
-                <Button onClick={() => setOpenModal(true)}>New Game</Button>
+                <NewGameControl
+                    onGameAddressResolved={ (address) => gamesListContext.selectGame(address, false) }
+                    onSuccess={gamesListContext.refreshList}
+                />
             </Group>
             <ScrollArea style={{height: "40vh", border: "1px solid gray"}}>
                 <Group spacing="sm">
@@ -84,12 +86,7 @@ export function GamesPanel(): JSX.Element {
                     }
                 </Group>
             </ScrollArea>
-            <NewGameModal
-                open={openModal}
-                onCloseIntent={() => setOpenModal(false)}
-                onGameAddressResolved={ (address) => gamesListContext.selectGame(address, false) }
-                onSuccess={gamesListContext.refreshList}
-            />
+
         </nav>
     );
 }
@@ -306,10 +303,10 @@ function AirdropButton(): JSX.Element {
     const onAirdrop: () => Promise<void> = useCallback(async () => {
         setLoading(true);
         if (endpointIsProd) {
-            alert("Airdrop only allowed on local and devnet.");
+            notifyPotentialBug("Airdrop only allowed on local and devnet.");
 
         } else if (wallet === undefined) {
-            alert("Connect wallet first.");
+            notifyWarning("No wallet connected.", "You must connect a wallet to use this.");
 
         } else {
             try {
