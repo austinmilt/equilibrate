@@ -1,6 +1,11 @@
 import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useState } from "react";
+
+interface OnConnectedFunction {
+    (player: PublicKey, neededToConnect: boolean): void;
+}
 
 /**
  * Use to insert the wallet connection flow before some action that requires
@@ -8,13 +13,13 @@ import { useCallback, useEffect, useState } from "react";
  *
  * @returns
  */
-export function useInsertConnectWallet(): (onConnected: () => void) => void {
+export function useInsertConnectWallet(): (onConnected: OnConnectedFunction) => void {
     const wallet = useAnchorWallet();
     const walletModalContext = useWalletModal();
-    const [onConnected, setOnConnected] = useState<(() => void) | undefined>();
+    const [onConnected, setOnConnected] = useState<OnConnectedFunction | undefined>();
     const [userConnectingWallet, setUserConnectingWallet] = useState<boolean>(false);
 
-    const openIfNeeded: (onConnected: () => void) => void = useCallback((onConnected) => {
+    const openIfNeeded: (onConnected: OnConnectedFunction) => void = useCallback((onConnected) => {
         if ((wallet === undefined) && !walletModalContext.visible) {
             // I dont really understand why I need to wrap the function
             // when setting in state, but it is required. Otherwise the
@@ -25,8 +30,8 @@ export function useInsertConnectWallet(): (onConnected: () => void) => void {
             walletModalContext.setVisible(true);
             setUserConnectingWallet(true);
 
-        } else {
-            onConnected();
+        } else if (wallet !== undefined) {
+            onConnected(wallet.publicKey, false);
         }
     }, [wallet, walletModalContext, setUserConnectingWallet]);
 
@@ -38,7 +43,7 @@ export function useInsertConnectWallet(): (onConnected: () => void) => void {
             (wallet !== undefined)
         ) {
             setUserConnectingWallet(false);
-            onConnected();
+            onConnected(wallet.publicKey, true);
         }
     }, [walletModalContext.visible, wallet]);
 

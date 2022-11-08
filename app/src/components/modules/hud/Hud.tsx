@@ -5,11 +5,13 @@ import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/p
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
 import { StarStatus } from "./StarStatus";
 import { ShipLog, cleanShipLogs, useShipLogs } from "./ShipLog";
-import { Notifications, notifyError, notifyPotentialBug, notifyWarning } from "../../../lib/shared/notifications";
+import { Notifications, notifyError, notifyPotentialBug } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
-import "./Hud.css";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
+import { PublicKey } from "@solana/web3.js";
+import "./Hud.css";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
+import { PlayerState } from "../../../lib/equilibrate/types";
 
 enum GameAction {
     ENTER,
@@ -23,30 +25,50 @@ enum GameAction {
 export function Hud(): JSX.Element {
     const [cancelOnLoss, setCancelOnLoss] = useState<boolean>(false);
     const [clickedStar, setClickedStar] = useState<number | undefined>();
+    const [overridePlayer, setOverridePlayer] = useState<PublicKey | undefined>();
+    const [focalStarClickAction, setFocalStarClickAction] = useState<GameAction>(GameAction.NO_OP)
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
     const makeTransactionUrl = useMakeTransactionUrl();
     const shipLogContext = useShipLogs(activeGame);
     const connectWalletIfNeeded = useInsertConnectWallet();
-    const { player } = useEquilibrate();
+    const { equilibrate, player } = useEquilibrate();
 
     // clean up old ship logs from stale games the user has left
     useEffect(() => {
         cleanShipLogs();
     }, []);
 
-    // what would happen if the user clicked the focal star?
-    const focalStarClickAction: GameAction = useMemo(() => {
+
+    const getFocalStarClickAction: () => Promise<GameAction> = useCallback(async () => {
+        let playerState: PlayerState | null = gameContext.player?.player ?? null;
+        if (activeGame !== undefined) {
+            if (overridePlayer !== undefined) {
+                playerState = await equilibrate.getPlayerState(activeGame, overridePlayer)
+
+            }
+
+            // only try to get the player state for the configured player if
+            // we dont already have the player state from the game context, since
+            // they should be equivalent
+            if ((playerState === null) &&
+                (gameContext.player !== undefined) &&
+                (player !== undefined)
+            ) {
+                playerState = await equilibrate.getPlayerState(activeGame, player);
+            }
+        }
+
         const focalStarIndex: number | undefined = activeGalaxyContext.focalStar.index;
         let result: GameAction = GameAction.NO_OP;
         if (focalStarIndex !== undefined) {
             // player is in the game
-            if (gameContext.player !== null) {
+            if (playerState !== null) {
                 if (focalStarIndex === 0) {
                     result = GameAction.LEAVE;
 
-                } else if (gameContext.player.player?.bucket !== focalStarIndex) {
+                } else if (playerState.bucket !== focalStarIndex) {
                     result = GameAction.MOVE;
                 }
             } else {
@@ -60,22 +82,31 @@ export function Hud(): JSX.Element {
         }
         return result;
 
-    }, [activeGalaxyContext.focalStar.index, gameContext.player]);
+    }, [
+        activeGalaxyContext.focalStar.index,
+        gameContext.player,
+        player,
+        activeGame,
+        equilibrate.getPlayerState
+    ]);
 
 
     const enterSystem: (starIndex: number) => void = useCallback(starIndex => {
         gameContext.enterGame(
             starIndex,
-            ({transactionSignature: signature}) => {
-                if (signature !== undefined) {
-                    shipLogContext.record({
-                        text: "Entered the system.",
-                        url: makeTransactionUrl(signature)
-                    });
-                }
-                activeGalaxyContext.playerStar.set(starIndex);
-            },
-            e => notifyError("Unable to enter the system.", e)
+            {
+                player: overridePlayer,
+                onSuccess: ({transactionSignature: signature}) => {
+                    if (signature !== undefined) {
+                        shipLogContext.record({
+                            text: "Entered the system.",
+                            url: makeTransactionUrl(signature)
+                        });
+                    }
+                    activeGalaxyContext.playerStar.set(starIndex);
+                },
+                onError: e => notifyError("Unable to enter the system.", e)
+            }
         );
     }, [gameContext.enterGame, shipLogContext.record, activeGalaxyContext.playerStar.set]);
 
@@ -83,13 +114,16 @@ export function Hud(): JSX.Element {
     const moveShip: (starIndex: number) => void = useCallback(starIndex => {
         gameContext.moveBucket(
             starIndex,
-            ({transactionSignature: signature}) => {
-                if (signature !== undefined) {
-                    shipLogContext.record({ text: "Moved ship.", url: makeTransactionUrl(signature) });
-                }
-                activeGalaxyContext.playerStar.set(starIndex);
-            },
-            e => notifyError("Unable to move the ship.", e)
+            {
+                player: overridePlayer,
+                onSuccess: ({transactionSignature: signature}) => {
+                    if (signature !== undefined) {
+                        shipLogContext.record({ text: "Moved ship.", url: makeTransactionUrl(signature) });
+                    }
+                    activeGalaxyContext.playerStar.set(starIndex);
+                },
+                onError: e => notifyError("Unable to move the ship.", e)
+            }
         );
     }, [gameContext.moveBucket, shipLogContext.record, activeGalaxyContext.playerStar.set]);
 
@@ -97,23 +131,26 @@ export function Hud(): JSX.Element {
     const leaveSystem: () => void = useCallback(() => {
         gameContext.leaveGame(
             cancelOnLoss,
-            (result) => {
-                if (cancelOnLoss) {
-                    if (result.anchorErrorCode === "AbortLeaveOnLoss") {
-                        shipLogContext.record({ text: "Escape aborted." });
+            {
+                player: overridePlayer,
+                onSuccess: (result) => {
+                    if (cancelOnLoss) {
+                        if (result.anchorErrorCode === "AbortLeaveOnLoss") {
+                            shipLogContext.record({ text: "Escape aborted." });
+                        }
+                    } else {
+                        const signature: string | undefined = result.transactionSignature;
+                        if (signature !== undefined) {
+                            shipLogContext.record({
+                                text: "Escaped the system.",
+                                url: makeTransactionUrl(signature)
+                            });
+                        }
+                        shipLogContext.onEscapeSystem();
                     }
-                } else {
-                    const signature: string | undefined = result.transactionSignature;
-                    if (signature !== undefined) {
-                        shipLogContext.record({
-                            text: "Escaped the system.",
-                            url: makeTransactionUrl(signature)
-                        });
-                    }
-                    shipLogContext.onEscapeSystem();
-                }
-            },
-            e => notifyError("Unable to leave the system.", e)
+                },
+                onError: e => notifyError("Unable to leave the system.", e)
+            }
         );
     }, [
         gameContext.moveBucket,
@@ -124,25 +161,26 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const onStarClick: (starIndex: number) => void = useCallback(starIndex => {
+    const onStarClick: (starIndex: number) => Promise<void> = useCallback(async (starIndex) => {
         try {
-            if (focalStarClickAction === GameAction.ENTER) {
+            const action: GameAction = await getFocalStarClickAction();
+            if (action === GameAction.ENTER) {
                 enterSystem(starIndex);
 
-            } else if (focalStarClickAction === GameAction.MOVE) {
+            } else if (action === GameAction.MOVE) {
                 moveShip(starIndex);
 
-            } else if (focalStarClickAction === GameAction.LEAVE) {
+            } else if (action === GameAction.LEAVE) {
                 leaveSystem();
 
-            } else if (focalStarClickAction === GameAction.TRY_ENTER_CENTRAL) {
+            } else if (action === GameAction.TRY_ENTER_CENTRAL) {
                 Notifications.enterWormholeOrbit();
             }
         } catch (e) {
             console.error(e);
             notifyPotentialBug(`HUD error: ${(e as unknown as Error).message}`);
         }
-    }, [focalStarClickAction, enterSystem, moveShip, leaveSystem]);
+    }, [enterSystem, moveShip, leaveSystem]);
 
 
     // trigger a game action after user has connected wallet and clicked a star
@@ -158,22 +196,14 @@ export function Hud(): JSX.Element {
     // trigger a game action
     useEffect(() => {
         return activeGalaxyContext.focalStar.addOnClick(starIndex => {
-            //TODO replace this with a workflow that automatically figures out
-            // what the newly connected wallet's action should be before trying
-            // to perform it (right now it just will decide to enter the game
-            // if the player clicks without being connected first, because it
-            // doesnt know that the player is one in the game).
-            // TODO also note that the viewport isnt updating properly. It will show
-            // that the player isnt in the game even if they are connected, in some
-            // cases.
-            if (player === undefined) {
-                notifyWarning("Connect your wallet.", "You need to connect your wallet before you can enter the game.");
-                return;
-            }
+            connectWalletIfNeeded((player, neededToConnect) => {
+                if (neededToConnect) {
+                    setOverridePlayer(player);
 
-            //TODO can connectWalletIfNeeded be moved to onStarClick to avoid this
-            // messy setClickedStar and useEffect?
-            connectWalletIfNeeded(() => {
+                } else {
+                    setOverridePlayer(undefined);
+                }
+
                 // Ideally we'd directly call onStarClick, but this passes
                 // an outdated memoized version of the function which results
                 // in a failed call. This way we can still use the latest
@@ -198,6 +228,12 @@ export function Hud(): JSX.Element {
             }
         }
     }, [gameContext.error]);
+
+
+    // what would happen if the user clicked the focal star?
+    useEffect(() => {
+        getFocalStarClickAction().then(setFocalStarClickAction);
+    }, [getFocalStarClickAction, setFocalStarClickAction]);
 
 
     const clickActionHelp: ReactNode | undefined = useMemo(() => {

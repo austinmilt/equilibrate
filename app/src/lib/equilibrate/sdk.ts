@@ -281,11 +281,12 @@ export class EquilibrateSDK {
 
 
     /**
+     * @param player optional player to use as the player rather than the one configured on the provider
      * @returns a new request builder for a single request (multiple instructions) to the chain
      */
-    public request(): EquilibrateRequest {
+    public request(player?: PublicKey): EquilibrateRequest {
         Assert.notNullish(this.program, "program");
-        return EquilibrateRequest.new(this.program);
+        return EquilibrateRequest.new(this.program, player);
     }
 
 
@@ -378,14 +379,18 @@ export class EquilibrateSDK {
 
     /**
      * @param gameAddress address of game to check for player state
+     * @param player player address to check; defaults to one on the program provider
      * @returns player state if the player is in the game, `null` otherwise
      */
-    public async getPlayerState(gameAddress: PublicKey): Promise<PlayerState | null> {
+    public async getPlayerState(gameAddress: PublicKey, player?: PublicKey): Promise<PlayerState | null> {
         Assert.notNullish(this.program, "program");
-        Assert.notNullish(this.program.provider.publicKey, "player");
+
+        const targetPlayer: PublicKey | undefined = player ?? this.program.provider.publicKey;
+        Assert.notNullish(targetPlayer, "player");
+
         const playerStateAddress: PublicKey = await getPlayerStateAddress(
             gameAddress,
-            this.program.provider.publicKey,
+            targetPlayer,
             this.program.programId
         );
         return await this.program.account.playerState.fetchNullable(playerStateAddress);
@@ -796,6 +801,7 @@ interface RequestStep {
 export class EquilibrateRequest {
     private readonly program: anchor.Program<Equilibrate>;
     private readonly connection: Connection;
+    private readonly playerAddress: PublicKey;
     private readonly steps: RequestStep[] = [];
     private readonly config: {
         mint?: PublicKey;
@@ -810,13 +816,16 @@ export class EquilibrateRequest {
     private cancelOnLoss: boolean | undefined;
     private neededToCreatePlayerTokenAccount: boolean = false;
 
-    private constructor(program: anchor.Program<Equilibrate>) {
+    private constructor(program: anchor.Program<Equilibrate>, playerAddress: PublicKey) {
         this.program = program;
         this.connection = program.provider.connection;
+        this.playerAddress = playerAddress;
     }
 
-    public static new(program: anchor.Program<Equilibrate>): EquilibrateRequest {
-        return new EquilibrateRequest(program);
+    public static new(program: anchor.Program<Equilibrate>, overridePlayer?: PublicKey): EquilibrateRequest {
+        const playerAddress: PublicKey | undefined = overridePlayer ?? program.provider.publicKey;
+        Assert.notNullish(playerAddress, "player");
+        return new EquilibrateRequest(program, playerAddress);
     }
 
 
@@ -966,8 +975,6 @@ export class EquilibrateRequest {
      */
     public withCreateNewGame(finalizedCallback?: (gameAddress: PublicKey) => void): EquilibrateRequest {
         this.validateConfig();
-        Assert.notNullish(this.program.provider.publicKey, "player");
-        const player: PublicKey = this.program.provider.publicKey;
 
         this.withWrapSolInstructionsIfNeeded("create game: wrap SOL");
 
@@ -998,7 +1005,7 @@ export class EquilibrateRequest {
                     .accountsStrict({
                         poolManager: poolManagerAddress,
                         tokenPool: tokenPoolAddress,
-                        payer: player,
+                        payer: this.playerAddress,
                         gameMint: config.mint,
                         tokenProgram: TOKEN_PROGRAM_ID,
                         rent: RENT_SYSVAR,
@@ -1016,10 +1023,10 @@ export class EquilibrateRequest {
             if (finalizedCallback !== undefined) finalizedCallback(gameAddress);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                player,
+                this.playerAddress,
                 this.program.programId
             );
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(config.mint, player);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(config.mint, this.playerAddress);
             const newGameInstruction: TransactionInstruction = await this.program
                 .methods
                 .newGame(
@@ -1029,7 +1036,7 @@ export class EquilibrateRequest {
                 )
                 .accountsStrict({
                     tokenPool: tokenPoolAddress,
-                    payer: player,
+                    payer: this.playerAddress,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     rent: RENT_SYSVAR,
                     systemProgram: SYSTEM_PROGRAM_ID,
@@ -1127,15 +1134,13 @@ export class EquilibrateRequest {
         const mint: PublicKey = this.config.mint;
 
         if (mint.toBase58() === NATIVE_MINT.toBase58()) {
-            Assert.notNullish(this.program.provider.publicKey, "player");
             Assert.someNotNullish(
                 [this.config.entryFee, this.config.entryFeeDecimalTokens],
                 ["entryFee", "entryFeeDecimalTokens"]
             );
-            const player: PublicKey = this.program.provider.publicKey;
 
             this.addStep(stepName, async () => {
-                const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+                const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, this.playerAddress);
                 const entryFeeWithDecimals: anchor.BN = await this.resolveEntryFeeDecimalTokens();
                 const nativeTokenAccountExists: boolean = await accountExists(
                     playerTokenAccount,
@@ -1145,12 +1150,16 @@ export class EquilibrateRequest {
                 const instructions: TransactionInstruction[] = [];
                 if (!nativeTokenAccountExists) {
                     this.neededToCreatePlayerTokenAccount = true;
-                    instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+                    instructions.push(await this.makeCreateTokenAccountInstruction(
+                        mint,
+                        this.playerAddress,
+                        playerTokenAccount
+                    ));
 
                     const depositSolInstruction: TransactionInstruction = anchor.web3
                         .SystemProgram
                         .transfer({
-                            fromPubkey: player,
+                            fromPubkey: this.playerAddress,
                             toPubkey: playerTokenAccount,
                             lamports: entryFeeWithDecimals.toNumber()
                         });
@@ -1187,11 +1196,9 @@ export class EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
         Assert.notNullish(this.config.mint, "mint");
         Assert.notNullish(this.gameId, "gameId");
-        Assert.notNullish(this.program.provider.publicKey, "player");
         const bucketIndex: number = this.bucketIndex;
         const mint: PublicKey = this.config.mint;
         const gameId: number = this.gameId;
-        const player: PublicKey = this.program.provider.publicKey;
 
         this.withWrapSolInstructionsIfNeeded("enter game: wrap SOL");
 
@@ -1204,10 +1211,10 @@ export class EquilibrateRequest {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                player,
+                this.playerAddress,
                 this.program.programId
             );
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, this.playerAddress);
             const instruction: TransactionInstruction = await this.program
                 .methods
                 .enterGame(
@@ -1219,7 +1226,7 @@ export class EquilibrateRequest {
                     programFeeDestination: PROGRAM_FEE_DESTINATION,
                     depositSourceAccount: playerTokenAccount,
                     tokenPool: tokenPoolAddress,
-                    payer: player,
+                    payer: this.playerAddress,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     systemProgram: SYSTEM_PROGRAM_ID,
                     rent: RENT_SYSVAR,
@@ -1245,15 +1252,13 @@ export class EquilibrateRequest {
     public withMoveBucket(): EquilibrateRequest {
         Assert.notNullish(this.bucketIndex, "bucketIndex");
         Assert.notNullish(this.gameId, "gameId");
-        Assert.notNullish(this.program.provider.publicKey, "player");
         const bucketIndex: number = this.bucketIndex;
         const gameId: number = this.gameId;
-        const player: PublicKey = this.program.provider.publicKey;
         this.addStep("move bucket", async () => {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                player,
+                this.playerAddress,
                 this.program.programId
             );
             const instruction: TransactionInstruction = await this.program
@@ -1261,7 +1266,7 @@ export class EquilibrateRequest {
                 .moveBuckets(bucketIndex)
                 .accountsStrict({
                     game: gameAddress,
-                    payer: player,
+                    payer: this.playerAddress,
                     player: playerStateAddress
                 })
                 .instruction();
@@ -1283,15 +1288,13 @@ export class EquilibrateRequest {
         Assert.notNullish(this.config.mint, "mint");
         Assert.notNullish(this.gameId, "gameId");
         Assert.notNullish(this.cancelOnLoss, "cancelOnLoss");
-        Assert.notNullish(this.program.provider.publicKey, "player");
         const mint: PublicKey = this.config.mint;
         const gameId: number = this.gameId;
         const cancelOnLoss: boolean = this.cancelOnLoss;
-        const player: PublicKey = this.program.provider.publicKey;
         this.addStep("leave game", async () => {
             const instructions: TransactionInstruction[] = [];
 
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, this.playerAddress);
             const shouldCreateAndCloseTokenAccount = !await accountExists(
                 playerTokenAccount,
                 this.program.provider.connection
@@ -1300,7 +1303,11 @@ export class EquilibrateRequest {
             if (shouldCreateAndCloseTokenAccount) {
                 // really the only time we should get here is if playing with SOL, such that we
                 // already created and closed the wrapped SOL account to create or enter the game
-                instructions.push(await this.makeCreateTokenAccountInstruction(mint, player, playerTokenAccount));
+                instructions.push(await this.makeCreateTokenAccountInstruction(
+                    mint,
+                    this.playerAddress,
+                    playerTokenAccount
+                ));
                 this.neededToCreatePlayerTokenAccount = true;
             }
 
@@ -1312,7 +1319,7 @@ export class EquilibrateRequest {
             const gameAddress: PublicKey = await getGameAddress(gameId, this.program.programId);
             const playerStateAddress: PublicKey = await getPlayerStateAddress(
                 gameAddress,
-                player,
+                this.playerAddress,
                 this.program.programId
             );
             const game: Game = await getGame(gameAddress, this.program);
@@ -1321,7 +1328,7 @@ export class EquilibrateRequest {
                 .leaveGame(cancelOnLoss)
                 .accountsStrict({
                     game: gameAddress,
-                    payer: player,
+                    payer: this.playerAddress,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     systemProgram: SYSTEM_PROGRAM_ID,
                     player: playerStateAddress,
@@ -1367,23 +1374,21 @@ export class EquilibrateRequest {
 
     // https://spl.solana.com/token#example-wrapping-sol-in-a-token
     private withCloseTokenAccountInstructionIfNeeded(): EquilibrateRequest {
-        Assert.notNullish(this.program.provider.publicKey, "player");
         Assert.notNullish(this.config.mint, "mint");
 
         const mint: PublicKey = this.config.mint;
-        const player: PublicKey = this.program.provider.publicKey;
 
         this.addStep("close token account", async () => {
             if (!this.neededToCreatePlayerTokenAccount) return [];
-            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, player);
+            const playerTokenAccount: PublicKey = await getAssociatedTokenAddress(mint, this.playerAddress);
             const instruction: TransactionInstruction = await anchor.Spl
                 .token(this.program.provider)
                 .methods
                 .closeAccount()
                 .accountsStrict({
-                    authority: player,
+                    authority: this.playerAddress,
                     account: playerTokenAccount,
-                    destination: player
+                    destination: this.playerAddress
                 })
                 .instruction();
 
@@ -1455,8 +1460,12 @@ export class EquilibrateRequest {
 
         let result: RequestResult;
         if (simulateOnly) {
-            Assert.notNullish(this.program.provider.publicKey, "player");
-            transaction.feePayer = this.program.provider.publicKey;
+            // unlike other parts of the instructions, try to use the provider as the
+            // payer first and then fall back to the specified player (though the two
+            // being different will probably fail the transaction anyway)
+            const payer: PublicKey = this.program.provider.publicKey ?? this.playerAddress;
+            Assert.notNullish(payer, "payer");
+            transaction.feePayer = payer;
             const simulationResult = await this.program.provider.connection.simulateTransaction(transaction);
             result = { simulationResult: simulationResult.value };
 

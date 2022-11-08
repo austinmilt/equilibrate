@@ -13,14 +13,22 @@ interface OnErrorFunction {
     (error: Error): void;
 }
 
+
+interface GameActionOptions {
+    player?: PublicKey;
+    onSuccess?: OnSuccessFunction;
+    onError?: OnErrorFunction;
+}
+
+
 export interface GameContext {
     game: GameEvent | null;
     player: PlayerStateEvent | null;
     loading: boolean;
     error: Error | undefined;
-    enterGame: (bucketIndex: number, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
-    moveBucket: (bucketIndex: number, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
-    leaveGame: (cancelOnLoss: boolean, onSuccess?: OnSuccessFunction, onError?: OnErrorFunction) => void;
+    enterGame: (bucketIndex: number, options?: GameActionOptions) => void;
+    moveBucket: (bucketIndex: number, options?: GameActionOptions) => void;
+    leaveGame: (cancelOnLoss: boolean, options?: GameActionOptions) => void;
 }
 
 
@@ -32,7 +40,10 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     const [error, setError] = useState<Error | undefined>();
 
 
-    const enterGame: GameContext["enterGame"] = useCallback((bucketIndex, onSuccess, onError) => {
+    const enterGame: GameContext["enterGame"] = useCallback((bucketIndex, options) => {
+        const onSuccess: OnSuccessFunction | undefined = options?.onSuccess;
+        const onError: OnErrorFunction | undefined = options?.onError;
+        const overridePlayer: PublicKey | undefined = options?.player;
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
             throw UseGameError.enterNullGame(gameAddress);
@@ -43,11 +54,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
         } else if (bucketIndex === 0) {
             throw UseGameError.enterHoldingBucket(gameAddress);
 
-        } else if (player === undefined) {
+        } else if ((overridePlayer === undefined) && (player === undefined)) {
             throw UseGameError.enterNullPlayer(gameAddress);
         }
         setLoading(true);
-        equilibrate.request()
+        equilibrate.request(overridePlayer)
             // game ID is a unix timestamp so toNumber is safe
             .setGameId(game.id.toNumber())
             .setMint(game.config.mint)
@@ -67,7 +78,10 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     }, [gameEventsContext.event, equilibrate, equilibrateIsReady]);
 
 
-    const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex, onSuccess, onError) => {
+    const moveBucket: GameContext["moveBucket"] = useCallback((bucketIndex, options) => {
+        const onSuccess: OnSuccessFunction | undefined = options?.onSuccess;
+        const onError: OnErrorFunction | undefined = options?.onError;
+        const overridePlayer: PublicKey | undefined = options?.player;
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
             throw UseGameError.moveNullGame(gameAddress);
@@ -78,11 +92,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
         } else if (bucketIndex === 0) {
             throw UseGameError.moveHoldingBucket(gameAddress);
 
-        } else if (player === undefined) {
-            throw UseGameError.moveNullPlayer(gameAddress);
+        } else if ((overridePlayer === undefined) && (player === undefined)) {
+            throw UseGameError.enterNullPlayer(gameAddress);
         }
         setLoading(true);
-        equilibrate.request()
+        equilibrate.request(overridePlayer)
             // game ID is a unix timestamp so toNumber is safe
             .setGameId(game.id.toNumber())
             .setPlayerBucketIndex(bucketIndex)
@@ -100,7 +114,10 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
     }, [gameEventsContext.event, equilibrate, equilibrateIsReady]);
 
 
-    const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss, onSuccess, onError) => {
+    const leaveGame: GameContext["leaveGame"] = useCallback((cancelOnLoss, options) => {
+        const onSuccess: OnSuccessFunction | undefined = options?.onSuccess;
+        const onError: OnErrorFunction | undefined = options?.onError;
+        const overridePlayer: PublicKey | undefined = options?.player;
         const game: GameEnriched | null = gameEventsContext.event?.game ?? null;
         if (game === null) {
             throw UseGameError.leaveNullGame(gameAddress);
@@ -108,11 +125,11 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
         } else if (!equilibrateIsReady) {
             throw UseGameError.leaveSdkNotReady(gameAddress);
 
-        } else if (player === undefined) {
-            throw UseGameError.leaveNullPlayer(gameAddress);
+        } else if ((overridePlayer === undefined) && (player === undefined)) {
+            throw UseGameError.enterNullPlayer(gameAddress);
         }
         setLoading(true);
-        equilibrate.request()
+        equilibrate.request(overridePlayer)
             // game ID is a unix timestamp so toNumber is safe
             .setGameId(game.id.toNumber())
             .setMint(game.config.mint)
