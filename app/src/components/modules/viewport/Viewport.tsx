@@ -5,7 +5,7 @@ import { ActiveGalaxyProvider } from "../../shared/galaxy/provider";
 import { useActiveGame } from "../../shared/game/provider";
 import { Hud } from "../hud/Hud";
 import { Galaxy } from "./Galaxy";
-import "./Viewport.css";
+import styles from "./styles.module.css";
 
 export function Viewport(): JSX.Element {
     const viewportRef = useRef<HTMLElement>(null);
@@ -13,10 +13,10 @@ export function Viewport(): JSX.Element {
     const { address: gameAddress } = useActiveGame();
 
     return (
-        <section className="viewport" ref={viewportRef}>
+        <section className={styles["viewport"]} ref={viewportRef}>
             <ActiveGalaxyProvider>
                 <Stage
-                    className="stage"
+                    className={styles["stage"]}
                     width={width}
                     height={height}
                 >

@@ -1,17 +1,16 @@
 import { ScrollArea, Text, Anchor } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { SHIP_MAX_LOGS } from "../../../lib/shared/constants";
 import { useLocalStorageParam } from "../../shared/localStorage/provider";
-import "./ShipLog.css";
+import styles from "./styles.module.css";
 
 const LOGS_KEY_PREFIX: string = "ship-logs:";
-
 
 export function ShipLog(props: { gameAddress: PublicKey | undefined }): JSX.Element {
     const logsContext = useShipLogs(props.gameAddress);
 
-    return <ScrollArea className="ship-log">
+    return <ScrollArea className={styles["ship-log"]}>
         {
             logsContext.logs.map((log, i) =>
                 <LogEntryComponent log={log} key={i}/>

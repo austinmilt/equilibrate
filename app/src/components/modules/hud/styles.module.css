@@ -1,0 +1,25 @@
+.hud {
+    padding: 1rem;
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    width: 100%;
+    justify-content: space-between;
+}
+
+
+.ship-log {
+    height: 100%;
+    border: 1px solid gray;
+    display: flex;
+    width: 20rem;
+    flex-direction: column;
+    max-height: 10rem;
+}
+
+
+.star-status {
+    flex-direction: row;
+    display: flex;
+    gap: 1rem;
+}

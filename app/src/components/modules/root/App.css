@@ -1,7 +1,0 @@
-.main {
-  padding: 3em;
-  display: grid;
-  grid-template-columns: 25% 75%;
-  gap: 2rem;
-  justify-content: center;
-}

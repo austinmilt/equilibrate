@@ -9,9 +9,9 @@ import { Notifications, notifyError, notifyPotentialBug } from "../../../lib/sha
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
 import { PublicKey } from "@solana/web3.js";
-import "./Hud.css";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { PlayerState } from "../../../lib/equilibrate/types";
+import styles from "./styles.module.css";
 
 enum GameAction {
     ENTER,
@@ -252,7 +252,7 @@ export function Hud(): JSX.Element {
     }, [focalStarClickAction]);
 
 
-    return <div className="hud">
+    return <div className={styles["hud"]}>
         <StarStatus
             data={activeGalaxyContext.focalStar.data}
             galaxyState={activeGalaxyContext.galaxy?.state}

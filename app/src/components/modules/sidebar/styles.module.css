@@ -25,3 +25,11 @@
     border: none;
     padding: none;
 }
+
+.card {
+    composes: button-like from "../../shared/model/shared.css";
+}
+
+.card.selected {
+    background-color: var(--color-primary-dark);
+}

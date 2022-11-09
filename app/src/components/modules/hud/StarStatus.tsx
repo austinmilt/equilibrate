@@ -2,7 +2,7 @@ import { Paper, RingProgress, Center, Text, Image, Group } from "@mantine/core";
 import { useMemo } from "react";
 import { StarData } from "../../shared/galaxy/provider";
 import HydrogenIcon from "./hydrogen-icon.svg";
-import "./StarStatus.css";
+import styles from "./styles.module.css";
 
 
 interface StarStatusProps {
@@ -17,7 +17,7 @@ interface StarStatusProps {
 
 export function StarStatus(props: StarStatusProps): JSX.Element {
     return (
-        <div className="star-status">
+        <div className={styles["star-status"]}>
             <FuelGuage {...props}/>
             <SatelliteGuage {...props}/>
         </div>

@@ -1,5 +1,4 @@
 import {
-    Button,
     Card,
     Center,
     Group,
@@ -7,7 +6,6 @@ import {
     SegmentedControl,
     Image,
     Text,
-    createStyles,
     ScrollArea
 } from "@mantine/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
@@ -22,34 +20,10 @@ import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
 import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
-import { NewGameControl, NewGameModal } from "./NewGameControl";
-import "./GamesPanel.css";
-import { notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
-
-//TODO remove
-const useStyles = createStyles((theme) => ({
-    card: {
-        backgroundColor: theme.colorScheme === "dark" ? theme.colors.dark[7] : theme.white,
-        "&:hover": {
-            cursor: "pointer",
-            backgroundColor: theme.colors.dark[4]
-        },
-    },
-
-    "card-selected": {
-        backgroundColor: theme.colors.dark[4]
-    },
-
-    title: {
-        fontWeight: 700,
-        fontFamily: `Greycliff CF, ${theme.fontFamily}`,
-        lineHeight: 1.2,
-    },
-
-    body: {
-        padding: theme.spacing.md,
-    },
-}));
+import { NewGameControl } from "./NewGameControl";
+import { Notifications, notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
+import { Button } from "../../shared/model/Button";
+import styles from "./styles.module.css";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -166,7 +140,7 @@ function useGamesList(): UseGamesListContext {
 
     const onSelectGame: (game: PublicKey, expectExists: boolean) => void = useCallback(async (game, expectExists) => {
         if (!equilibrateIsReady) {
-            alert("SDK not ready DUDE");
+            Notifications.enterSdkNotReady();
         }
         if (expectExists && !await equilibrate.gameExists(game)) {
             notifyWarning("Game has ended.", "This game no longer exists and will be removed from the list.");
@@ -199,8 +173,6 @@ interface GameCardProps {
 
 // https://ui.mantine.dev/category/article-cards
 function GameCard(props: GameCardProps): JSX.Element {
-    const { classes } = useStyles();
-
     const userIsPlaying: boolean | undefined = props.entry.userIsPlaying;
     const gameConfig: GameConfigEnriched = props.entry.account.config;
     const buckets: Bucket[] = props.entry.account.state.buckets;
@@ -214,27 +186,19 @@ function GameCard(props: GameCardProps): JSX.Element {
     }, [props.entry, buckets]);
 
     return (
-        <button className="game-card-button" onClick={() => props.setGame(props.entry.publicKey)}>
-            <Card
-                withBorder
-                radius="md"
-                p={0}
-                className={`${classes.card} ${props.selected && classes["card-selected"]}`}
-            >
+        <button className={styles["game-card-button"]} onClick={() => props.setGame(props.entry.publicKey)}>
+            <Card className={`${styles["card"]} ${props.selected && styles["selected"]}`}>
                 <Group noWrap spacing={0}>
                     <Image
                         src={"https://www.petakids.com/wp-content/uploads/2015/11/Cute-Red-Bunny.jpg"}
                         height="10vh"
                         width="10vh"
                     />
-                    <div className={classes.body}>
-                        <Text transform="uppercase" color="dimmed" weight={700} size="xs">
+                    <div>
+                        <Text transform="uppercase" size="xs">
                             { props.entry.account.id.toNumber() }
                         </Text>
                         <Text
-                            className={classes.title}
-                            mt="xs"
-                            mb="md"
                             title={`Prize pool is ${totalTokensWithoutDecimals} tokens`}
                         >
                             {`🪙 ${totalTokensWithoutDecimals}`}
@@ -327,5 +291,9 @@ function AirdropButton(): JSX.Element {
     }, [endpoint, wallet, connection]);
 
 
-    return <Button onClick={ onAirdrop } disabled={loading}>{loading ? <Loader/> : "Airdrop"}</Button>;
+    return (
+        <Button onClick={ onAirdrop } disabled={loading}>
+            {loading ? <Loader/> : "Airdrop"}
+        </Button>
+    );
 }

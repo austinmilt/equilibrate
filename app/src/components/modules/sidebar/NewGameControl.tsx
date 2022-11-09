@@ -1,11 +1,11 @@
-import { Modal, Button, TextInput, Loader, NumberInput } from "@mantine/core";
+import { Modal, TextInput, Loader, NumberInput } from "@mantine/core";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { Notifications } from "../../../lib/shared/notifications";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
+import { Button } from "../../shared/model/Button";
 
 
 interface NewGameControlProps {

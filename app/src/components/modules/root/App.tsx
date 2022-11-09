@@ -6,8 +6,9 @@ import { ActiveGameProvider } from "../../shared/game/provider";
 import { LocalStorageProvider } from "../../shared/localStorage/provider";
 import { GamesPanel } from "../sidebar/GamesPanel";
 import { Viewport } from "../viewport/Viewport";
-import "./App.css";
 import { WelcomeModal } from "./WelcomeModal";
+import styles from "./styles.module.css";
+import "./root.css";
 
 export default function App(): JSX.Element {
     return (
@@ -25,7 +26,7 @@ export default function App(): JSX.Element {
                         <SolanaProvider>
                             <EquilibrateProgramProvider>
                                 <ActiveGameProvider>
-                                    <main className="main">
+                                    <main className={styles["main"]}>
                                         <GamesPanel/>
                                         <Viewport/>
                                         <WelcomeModal/>
