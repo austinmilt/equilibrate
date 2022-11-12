@@ -1,6 +1,7 @@
-import { Paper, RingProgress, Center, Text, Image, Group } from "@mantine/core";
+import { RingProgress, Center, Text, Image, Tooltip, SimpleGrid } from "@mantine/core";
 import { useMemo } from "react";
 import { StarData } from "../../shared/galaxy/provider";
+import { InlineStyles } from "../../shared/inline-styles";
 import HydrogenIcon from "./hydrogen-icon.svg";
 import styles from "./styles.module.css";
 
@@ -45,42 +46,34 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
     const fuelDirectionIndicator: React.ReactNode = useMemo(() => {
         if (props.data === undefined) {
-            return "?";
+            return "...";
         } else if (props.data.fuelChangeRate > 0) {
             return "▲";
         } else if (props.data.fuelChangeRate < 0) {
             return "⯆";
         } else {
-            return "";
+            return "...";
         }
     }, [props.data?.fuelChangeRate]);
 
 
     return (
-        <Paper withBorder radius="md" p="xs">
-            <Group>
+        <SimpleGrid cols={2}>
+            <Tooltip label={`${fuelDirectionIndicator} ${fuelFormatted ?? ""}`}>
                 <RingProgress
-                    size={80}
+                    size={InlineStyles.STAR_STATUS_GAUGE.size}
                     roundCaps
-                    thickness={8}
-                    sections={[{ value: ringPercent, color: "#ebb729" }]}
+                    thickness={3}
+                    sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorHydrogen }]}
                     label={
                         <Center>
-                            <Image src={HydrogenIcon} alt="H" className="hydrogen-icon" width={40}/>
+                            <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
                         </Center>
                     }
                 />
-
-                <div>
-                    <Text color="dimmed" size="xs" transform="uppercase" weight={700}>
-                        Hydrogen
-                    </Text>
-                    <Text weight={700} size="xl">
-                        { fuelDirectionIndicator } {fuelFormatted ?? "❔"}
-                    </Text>
-                </div>
-            </Group>
-        </Paper>
+            </Tooltip>
+            <Text size="md">{fuelFormatted && `${fuelDirectionIndicator} ${fuelFormatted}`}</Text>
+        </SimpleGrid>
     );
 }
 
@@ -96,30 +89,23 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
     }, [props.data]);
 
 
-    return (
-        <Paper withBorder radius="md" p="xs">
-            <Group>
-                <RingProgress
-                    size={80}
-                    roundCaps
-                    thickness={8}
-                    sections={[{ value: ringPercent, color: "grape" }]}
-                    label={
-                        <Center>
-                            🚀
-                        </Center>
-                    }
-                />
+    const showLabel: boolean = useMemo(() =>
+        (!props.isSourceStar && (props.data !== undefined)),
+    [props.isSourceStar, props.data]);
 
-                <div>
-                    <Text color="dimmed" size="xs" transform="uppercase" weight={700}>
-                        Ships
-                    </Text>
-                    <Text weight={700} size="xl">
-                        {props.isSourceStar ? 0 : (props.data?.satellites ?? "❔")}
-                    </Text>
-                </div>
-            </Group>
-        </Paper>
+
+    return (
+        <SimpleGrid cols={2}>
+            <Tooltip label={`${props.isSourceStar ? 0 : (props.data?.satellites ?? "...")}`}>
+                <RingProgress
+                    size={InlineStyles.STAR_STATUS_GAUGE.size}
+                    roundCaps
+                    thickness={3}
+                    sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorPlayer }]}
+                    label={<Center>🚀</Center>}
+                />
+            </Tooltip>
+            <Text size="md">{showLabel && `${props.isSourceStar ? 0 : props.data?.satellites}`}</Text>
+        </SimpleGrid>
     );
 }

@@ -1,6 +1,5 @@
 import Konva from "konva";
-import { Circle as CircleNode } from "konva/lib/shapes/Circle";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Circle } from "react-konva";
 
 interface Props {
@@ -16,7 +15,7 @@ interface Props {
 
 // https://konvajs.org/api/Konva.Circle.html
 export function Star(props: Props): JSX.Element {
-    const ref = useRef<CircleNode>(null);
+    const [ref, setRef] = useState<Konva.Circle | null>(null);
     const [color, setColor] = useState<string>("#ebb729");
 
     useEffect(() => {
@@ -35,17 +34,16 @@ export function Star(props: Props): JSX.Element {
 
     // pulse
     const onClick: () => void = useCallback(() => {
-        if (ref.current === null) return;
+        if (ref === null) return;
         props.onClick();
-        const refDefined: CircleNode = ref.current;
         const growBy: number = 10;
-        const startingRadius: number = refDefined.radius();
-        refDefined.to({
+        const startingRadius: number = ref.radius();
+        ref.to({
             width: startingRadius*2 + growBy,
             height: startingRadius*2 + growBy,
             duration: 0.05,
             onFinish: () => {
-                refDefined.to({
+                ref.to({
                     width: startingRadius*2,
                     height: startingRadius*2,
                     duration: 0.05
@@ -86,7 +84,7 @@ export function Star(props: Props): JSX.Element {
             visible={props.focused}
         />
         <Circle
-            ref={ref}
+            ref={setRef}
             radius={props.radius}
             x={props.x}
             y={props.y}

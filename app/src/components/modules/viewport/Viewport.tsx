@@ -6,70 +6,83 @@ import { useActiveGame } from "../../shared/game/provider";
 import { Hud } from "../hud/Hud";
 import { Galaxy } from "./Galaxy";
 import styles from "./styles.module.css";
+import { InlineStyles } from "../../shared/inline-styles";
 
 export function Viewport(): JSX.Element {
-    const viewportRef = useRef<HTMLElement>(null);
-    const [width, height] = useViewportDimenions(viewportRef);
     const { address: gameAddress } = useActiveGame();
+    const viewportRef = useRef<HTMLElement>(null);
+    const [viewportWidth, viewportHeight] = useElementDimensions(viewportRef);
+    const stageWidth: number = useMemo(() => viewportWidth, [viewportWidth]);
+    const stageHeight: number = useMemo(() => InlineStyles.STAGE.heightPropViewport*viewportHeight, [viewportHeight]);
 
     return (
         <section className={styles["viewport"]} ref={viewportRef}>
             <ActiveGalaxyProvider>
+                <Hud />
                 <Stage
-                    className={styles["stage"]}
-                    width={width}
-                    height={height}
+                    className={`${styles["stage"]} ${gameAddress && styles["stage-defined"]}`}
+                    width={stageWidth}
+                    height={stageHeight}
                 >
                     <Layer>
                         {
                             gameAddress === undefined ?
                                 <ViewportSkeleton
-                                    width={ width }
-                                    height={ height }
+                                    width={ stageWidth }
+                                    height={ stageHeight }
                                 /> :
                                 <ViewportDefined
-                                    width={ width }
-                                    height={ height }
+                                    width={ stageWidth }
+                                    height={ stageHeight }
                                 />
                         }
                     </Layer>
                 </Stage>
-                <Hud />
             </ActiveGalaxyProvider>
         </section>
     );
 }
 
 
-interface ViewportInnerProps {
+interface ScreenDimensions {
     width: number;
     height: number;
 }
 
 
 
-function ViewportSkeleton(props: ViewportInnerProps): JSX.Element {
+function ViewportSkeleton(props: ScreenDimensions): JSX.Element {
     const [ref, setRef] = useState<Konva.Text | null>(null);
+    const [x, setX] = useState<number>(0);
+    const [y, setY] = useState<number>(0);
 
-    const x: number = useMemo(() => (props.width - (ref?.width() ?? 0)) / 2, [props.width, ref]);
-    const y: number = useMemo(() => (props.height - (ref?.height() ?? 0)) / 2, [props.height, ref]);
+    const updateTextDimensions: () => void = useCallback(() => {
+        if (ref !== null) {
+            setX((props.width - ref.width()) / 2);
+            setY((props.height - ref.height()) / 2);
+        }
+    }, [ref, props.width, props.height]);
+
+    useEffect(() => {
+        updateTextDimensions();
+    }, [updateTextDimensions]);
 
     return (
         <Text
             ref={setRef}
-            text="Select or create a game"
+            text={((x > 0) && (y > 0)) ? "Select or create a game" : ""}
             x={x}
             y={y}
-            fill="white"
+            fill={InlineStyles.GLOBAL.colorTextBase}
             fontSize={30}
             align="center"
-            width={props.width / 2}
+            width={ props.width / 2 }
         />
     );
 }
 
 
-function ViewportDefined(props: ViewportInnerProps): JSX.Element {
+function ViewportDefined(props: ScreenDimensions): JSX.Element {
     return (
         <Galaxy
             viewportDimensions={{widthPixels: props.width, heightPixels: props.height}}
@@ -78,33 +91,35 @@ function ViewportDefined(props: ViewportInnerProps): JSX.Element {
 }
 
 
-function useViewportDimenions(viewportRef: RefObject<HTMLElement>): [number, number] {
+function useElementDimensions(element: RefObject<HTMLElement>): [number, number] {
     const [width, setWidth] = useState<number>(0);
     const [height, setHeight] = useState<number>(0);
 
     const updateDimensions: () => void = useCallback(() => {
-        if (viewportRef.current != null) {
-            const computedStyles = getComputedStyle(viewportRef.current);
-            // parse the dimensions of the viewport from the CSS computed styles, stripping the "px" off
+        if (element.current != null) {
+            const computedStyles = getComputedStyle(element.current);
+            // parse the dimensions of the element from the CSS computed styles, stripping the "px" off
             // the end before parsing to a float. This eliminates padding.
             const widthPixelsString: string = computedStyles.width.slice(0, computedStyles.width.length - 2);
             const heightPixelsString: string = computedStyles.height.slice(0, computedStyles.height.length - 2);
             setWidth(Number.parseFloat(widthPixelsString));
             setHeight(Number.parseFloat(heightPixelsString));
         }
-    }, [viewportRef]);
+    }, [element.current]);
 
     useEffect(() => {
         addEventListener("resize", updateDimensions);
+        addEventListener("load", updateDimensions);
 
         return () => {
             removeEventListener("resize", updateDimensions);
+            addEventListener("load", updateDimensions);
         };
     }, []);
 
     useEffect(() => {
         updateDimensions();
-    }, [viewportRef]);
+    }, [element]);
 
     return [width, height];
 }

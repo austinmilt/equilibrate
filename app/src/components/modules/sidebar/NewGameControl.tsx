@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { Notifications } from "../../../lib/shared/notifications";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
-import { Button } from "../../shared/model/Button";
+import { Button } from "../../shared/model/button";
+import styles from "./styles.module.css";
 
 
 interface NewGameControlProps {
@@ -27,7 +28,7 @@ export function NewGameControl(props: NewGameControlProps): JSX.Element {
 
     return (
         <>
-            <Button onClick={onClickOpenModal}>New Game</Button>
+            <NewGameButton onClick={onClickOpenModal}/>
             <NewGameModal
                 open={openModal}
                 onCloseIntent={() => setOpenModal(false)}
@@ -35,6 +36,26 @@ export function NewGameControl(props: NewGameControlProps): JSX.Element {
                 onSuccess={props.onSuccess}
             />
         </>
+    );
+}
+
+
+function NewGameButton(props: { onClick: () => void }): JSX.Element {
+    return (
+        <button className={styles["new-game-button"]} onClick={props.onClick}>
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                className={styles["new-game-icon"]}
+                stroke="currentColor"
+            >
+                <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 4.5v15m7.5-7.5h-15"
+                />
+            </svg>
+        </button>
     );
 }
 

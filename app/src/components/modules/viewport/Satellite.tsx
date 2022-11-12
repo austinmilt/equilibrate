@@ -49,7 +49,7 @@ export function Satellite(props: {
 
     return <>
         <Circle
-            ref={(ref) => setSatelliteRef(ref)}
+            ref={setSatelliteRef}
             x={x}
             y={y}
             radius={3}

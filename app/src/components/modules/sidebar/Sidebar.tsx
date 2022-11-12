@@ -1,19 +1,14 @@
 import {
     Card,
-    Center,
     Group,
-    Loader,
-    SegmentedControl,
     Image,
     Text,
-    ScrollArea
+    ScrollArea,
+    Center
 } from "@mantine/core";
-import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
-import { Endpoint, useEndpoint } from "../../../lib/solana/provider";
 import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types";
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
 import { useActiveGame } from "../../shared/game/provider";
@@ -21,32 +16,44 @@ import { useInterval } from "../../../lib/shared/useInterval";
 import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { NewGameControl } from "./NewGameControl";
-import { Notifications, notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
-import { Button } from "../../shared/model/Button";
+import { Notifications, notifyWarning } from "../../../lib/shared/notifications";
 import styles from "./styles.module.css";
+import { SettingsMenu } from "./SettingsMenu";
 
 interface SetGameFunction {
     (address: PublicKey): void;
 }
 
 
-export function GamesPanel(): JSX.Element {
-    const { isProd: endpointIsProd } = useEndpoint();
+export function Sidebar(): JSX.Element {
     const gamesListContext = useGamesList();
 
     return (
-        <nav className="games-nav">
-            <h1 className="games-header">Games</h1>
-            <Center><WalletMultiButton/></Center>
-            <ClusterControl/>
-            <Group>
-                { !endpointIsProd && <AirdropButton/> }
-                <NewGameControl
-                    onGameAddressResolved={ (address) => gamesListContext.selectGame(address, false) }
-                    onSuccess={gamesListContext.refreshList}
-                />
-            </Group>
-            <ScrollArea style={{height: "40vh", border: "1px solid gray"}}>
+        <nav className={styles["sidebar"]}>
+            <Text className={styles["title"]}>Solfield</Text>
+            <div className={styles["header"]}>
+                <Group spacing={3}>
+                    <Text>Games</Text>
+                    <NewGameControl
+                        onGameAddressResolved={ (address) => gamesListContext.selectGame(address, false) }
+                        onSuccess={gamesListContext.refreshList}
+                    />
+                </Group>
+                <Group spacing={0}>
+                    <a
+                        href="https://github.com/austinmilt/equilibrate"
+                        className={styles["github-link"]}
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        <Center>
+                            <GithubIcon/>
+                        </Center>
+                    </a>
+                    <SettingsMenu/>
+                </Group>
+            </div>
+            <ScrollArea classNames={{root: styles["games-list"]}}>
                 <Group spacing="sm">
                     {
                         gamesListContext.games.map(g =>
@@ -224,76 +231,18 @@ function GameCard(props: GameCardProps): JSX.Element {
 }
 
 
-//TODO move elsewhere
-function ClusterControl(): JSX.Element {
-    const { key: endpoint, setEndpoint } = useEndpoint();
-
-    return <Group position="center" my="xl">
-        <SegmentedControl
-            value={endpoint}
-            onChange={(value: string) => setEndpoint(value as Endpoint)}
-            data={[
-                {
-                    value: "local",
-                    label: (
-                        <Center>local</Center>
-                    ),
-                },
-                {
-                    value: "dev",
-                    label: (
-                        <Center>dev</Center>
-                    ),
-                },
-                {
-                    value: "main",
-                    label: (
-                        <Center>main</Center>
-                    ),
-                },
-            ]}
-        />
-    </Group>;
-}
-
-
-//TODO move to a devtools section
-function AirdropButton(): JSX.Element {
-    const wallet = useAnchorWallet();
-    const { connection } = useConnection();
-    const { key: endpoint, isProd: endpointIsProd } = useEndpoint();
-    const [loading, setLoading] = useState<boolean>(false);
-
-    const onAirdrop: () => Promise<void> = useCallback(async () => {
-        setLoading(true);
-        if (endpointIsProd) {
-            notifyPotentialBug("Airdrop only allowed on local and devnet.");
-
-        } else if (wallet === undefined) {
-            notifyWarning("No wallet connected.", "You must connect a wallet to use this.");
-
-        } else {
-            try {
-                const transactionId: string = await connection.requestAirdrop(wallet.publicKey, 1*LAMPORTS_PER_SOL);
-                const blockhash = await connection.getLatestBlockhash();
-                await connection.confirmTransaction({...blockhash, signature: transactionId}, "finalized");
-                const newSol: number = (await connection.getBalance(wallet.publicKey)) / LAMPORTS_PER_SOL;
-                notifySuccess(
-                    "Airdrop suceeded!",
-                    `New balance on ${wallet.publicKey.toBase58()} is ${newSol.toFixed(3)} SOL.`
-                );
-
-            } finally {
-                setLoading(false);
-            }
-        }
-        setLoading(false);
-    }, [endpoint, wallet, connection]);
-
-
+function GithubIcon(): JSX.Element {
     return (
-        <Button onClick={ onAirdrop } disabled={loading}>
-            {loading ? <Loader/> : "Airdrop"}
-        </Button>
+        <svg
+            className={styles["github-icon"]}
+            viewBox="0 0 1024 1024"
+            xmlns="http://www.w3.org/2000/svg"
+        >
+            <path
+                // eslint-disable-next-line max-len
+                d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z"
+                transform="scale(64)"
+            />
+        </svg>
     );
 }

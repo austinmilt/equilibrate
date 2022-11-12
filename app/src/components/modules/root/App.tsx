@@ -4,7 +4,7 @@ import { EquilibrateProgramProvider } from "../../../lib/equilibrate/provider";
 import { EndpointProvider, SolanaProvider } from "../../../lib/solana/provider";
 import { ActiveGameProvider } from "../../shared/game/provider";
 import { LocalStorageProvider } from "../../shared/localStorage/provider";
-import { GamesPanel } from "../sidebar/GamesPanel";
+import { Sidebar } from "../sidebar/Sidebar";
 import { Viewport } from "../viewport/Viewport";
 import { WelcomeModal } from "./WelcomeModal";
 import styles from "./styles.module.css";
@@ -27,7 +27,7 @@ export default function App(): JSX.Element {
                             <EquilibrateProgramProvider>
                                 <ActiveGameProvider>
                                     <main className={styles["main"]}>
-                                        <GamesPanel/>
+                                        <Sidebar/>
                                         <Viewport/>
                                         <WelcomeModal/>
                                     </main>

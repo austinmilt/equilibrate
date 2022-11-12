@@ -1,4 +1,4 @@
-import { Text, Switch, SimpleGrid } from "@mantine/core";
+import { Text, Switch, SimpleGrid, Tooltip } from "@mantine/core";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
 import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/provider";
@@ -12,6 +12,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { PlayerState } from "../../../lib/equilibrate/types";
 import styles from "./styles.module.css";
+import { InlineStyles } from "../../shared/inline-styles";
 
 enum GameAction {
     ENTER,
@@ -26,7 +27,7 @@ export function Hud(): JSX.Element {
     const [cancelOnLoss, setCancelOnLoss] = useState<boolean>(false);
     const [clickedStar, setClickedStar] = useState<number | undefined>();
     const [overridePlayer, setOverridePlayer] = useState<PublicKey | undefined>();
-    const [focalStarClickAction, setFocalStarClickAction] = useState<GameAction>(GameAction.NO_OP)
+    const [focalStarClickAction, setFocalStarClickAction] = useState<GameAction>(GameAction.NO_OP);
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
@@ -45,8 +46,7 @@ export function Hud(): JSX.Element {
         let playerState: PlayerState | null = gameContext.player?.player ?? null;
         if (activeGame !== undefined) {
             if (overridePlayer !== undefined) {
-                playerState = await equilibrate.getPlayerState(activeGame, overridePlayer)
-
+                playerState = await equilibrate.getPlayerState(activeGame, overridePlayer);
             }
 
             // only try to get the player state for the configured player if
@@ -248,26 +248,34 @@ export function Hud(): JSX.Element {
             helpText = "leave";
 
         }
-        return helpText === undefined ? undefined : <Text size="md">{`👆 to ${helpText}`}</Text>;
+        //TODO move this to star hover
+        return undefined;
+        // return <Text size="md">{helpText ? `👆 to ${helpText}` : ""}</Text>;
     }, [focalStarClickAction]);
 
 
+    const abortSwitchTooltip: string = useMemo(() =>
+        cancelOnLoss ?
+            "The game will reject your attempt to leave if you would lose tokens." :
+            "The game will approve your attempt to leave regardless of your winnings.",
+    [cancelOnLoss]);
+
+
     return <div className={styles["hud"]}>
-        <StarStatus
-            data={activeGalaxyContext.focalStar.data}
-            galaxyState={activeGalaxyContext.galaxy?.state}
-            isSourceStar={activeGalaxyContext.focalStar.isSource}
-        />
-        <SimpleGrid cols={1}>
-            <Switch
-                checked={cancelOnLoss}
-                onChange={() => setCancelOnLoss(!cancelOnLoss)}
-                size="lg"
-                onLabel="Stay on loss"
-                offLabel="Always leave"
-            />
-            { clickActionHelp }
-        </SimpleGrid>
-        <ShipLog gameAddress={activeGame}/>
+        {activeGame && (
+            <>
+                <ShipLog gameAddress={activeGame}/>
+                <StarStatus
+                    data={activeGalaxyContext.focalStar.data}
+                    galaxyState={activeGalaxyContext.galaxy?.state}
+                    isSourceStar={activeGalaxyContext.focalStar.isSource}
+                />
+                <Tooltip label={abortSwitchTooltip} multiline width={300}>
+                    <button className={styles["abort-switch"]} onClick={() => setCancelOnLoss(!cancelOnLoss)}>
+                        { cancelOnLoss ? "💎" : "📃" }
+                    </button>
+                </Tooltip>
+            </>
+        )}
     </div>;
 }

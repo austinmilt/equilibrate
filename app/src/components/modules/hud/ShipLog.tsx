@@ -1,11 +1,12 @@
 import { ScrollArea, Text, Anchor } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { SHIP_MAX_LOGS } from "../../../lib/shared/constants";
 import { useLocalStorageParam } from "../../shared/localStorage/provider";
 import styles from "./styles.module.css";
 
 const LOGS_KEY_PREFIX: string = "ship-logs:";
+const LOGS_KEY_DUMMY_SUFFIX: string = "dummy";
 
 export function ShipLog(props: { gameAddress: PublicKey | undefined }): JSX.Element {
     const logsContext = useShipLogs(props.gameAddress);
@@ -54,8 +55,17 @@ interface ShipLogsLocalStorageValue {
 
 export function useShipLogs(gameAddress: PublicKey | undefined): UseShipLogsContext {
     const localStorageContext = useLocalStorageParam<ShipLogsLocalStorageValue>(
-        `${LOGS_KEY_PREFIX}${gameAddress?.toBase58() ?? "dummy"}`
+        `${LOGS_KEY_PREFIX}${gameAddress?.toBase58() ?? LOGS_KEY_DUMMY_SUFFIX}`
     );
+
+
+    // remove dummy logs that might have gotten created along the way
+    // ... would be better to avoid ever making these, though
+    useEffect(() => {
+        return () => {
+            localStorage.removeItem(`${LOGS_KEY_PREFIX}${LOGS_KEY_DUMMY_SUFFIX}`);
+        };
+    }, []);
 
 
     const logs: LogEntry[] = useMemo(() =>

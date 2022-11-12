@@ -1,7 +1,10 @@
 .main {
-    padding: 3em;
-    display: grid;
-    grid-template-columns: 25% 75%;
-    gap: 2rem;
+    padding: 2rem;
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
     justify-content: center;
+    height: 100vh;
+    width: 100%;
+    background-color: var(--color-primary-darkest);
 }

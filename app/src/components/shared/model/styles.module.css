@@ -1,0 +1,23 @@
+.container-button {
+    background-color: transparent;
+    color: var(--color-text-base);
+    border: transparent;
+    justify-content: center;
+    align-content: center;
+    display: flex;
+    border-radius: 0.25rem;
+    padding: 0.2rem;
+}
+
+.container-button:hover {
+    background-color: var(--color-primary-dark);
+    cursor: pointer;
+}
+
+.container-button:active {
+    scale: 0.98;
+}
+
+.container-button:disabled:hover {
+    background-color: initial;
+}
