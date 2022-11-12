@@ -1,10 +1,12 @@
-import { Modal, TextInput, Loader, NumberInput } from "@mantine/core";
+import { Modal, Loader, NumberInput, Text, Group, Autocomplete } from "@mantine/core";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
+import { MintData, useMintList } from "../../../lib/shared/mint-list";
 import { Notifications } from "../../../lib/shared/notifications";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
+import { InlineStyles } from "../../shared/inline-styles";
 import { Button } from "../../shared/model/button";
 import styles from "./styles.module.css";
 
@@ -66,6 +68,7 @@ interface NewGameModalProps {
     onSuccess: () => void;
     onCloseIntent: () => void;
 }
+
 
 
 // https://mantine.dev/core/modal/
@@ -135,8 +138,13 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             closeOnClickOutside={false}
             size="auto"
             title="Create a new game"
+            classNames={{
+                modal: styles["new-game-modal"],
+                header: styles["new-game-modal-header"],
+                body: styles["new-game-modal-body"]
+            }}
         >
-            <PubkeyInput label="Mint" defaultValue={NATIVE_MINT} onChange={setMint}/>
+            <MintSelect onMintSelect={setMint}/>
             <NumberInput
                 value={entryFee}
                 label="Entry Fuel (tokens)"
@@ -144,14 +152,6 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                 min={1e-9}
                 precision={9}
                 step={0.01}
-            />
-            <NumberInput
-                value={spillRate}
-                label="Hydrogen Escape Rate (tokens per player per second)"
-                onChange={setSpillRate}
-                min={1e-9}
-                precision={9}
-                step={0.0001}
             />
             <NumberInput
                 value={players}
@@ -171,6 +171,14 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                 step={1}
                 precision={0}
             />
+            <NumberInput
+                value={spillRate}
+                label={<Text>Hydrogen Escape Rate<br/>(tokens per player per second)</Text>}
+                onChange={setSpillRate}
+                min={1e-9}
+                precision={9}
+                step={0.0001}
+            />
             <Button onClick={onNewGame}>{ loading ? <Loader/> : "Create Game" }</Button>
         </Modal>
     );
@@ -184,37 +192,93 @@ function validateArg<T>(arg: T | undefined | null, name: string): asserts arg is
 }
 
 
-// https://ui.mantine.dev/category/inputs
-function PubkeyInput(props: {
-    label: string,
-    defaultValue: PublicKey,
-    onChange: (value: PublicKey | null) => void
-}): JSX.Element {
-    const [stringValue, setStringValue] = useState<string>(props.defaultValue.toBase58());
-    const [value, setValue] = useState<PublicKey | null>(null);
-    const [error, setError] = useState<string | undefined>();
+interface AutoCompleteItemProps extends MintData {
+    value: string;
+}
 
-    useEffect(() => {
+
+const AutoCompleteItem = forwardRef<HTMLDivElement, MintData>(
+    ({ name, address, ...others }: MintData, ref) => (
+        <div ref={ref} {...others}>
+            <Group noWrap>
+                <div>
+                    <Text>{name}</Text>
+                    <Text size="xs" color="dimmed">
+                        {address}
+                    </Text>
+                </div>
+            </Group>
+        </div>
+    )
+);
+
+AutoCompleteItem.displayName = "AutoCompleteItem";
+
+
+function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Element {
+    const [nameOrAddress, setNameOrAddress] = useState<string>(NATIVE_MINT.toBase58());
+    const [lastValidMintAddress, setLastValidMintAddress] = useState<string | undefined>();
+    const mintListContext = useMintList();
+
+    const selectItems: AutoCompleteItemProps[] = useMemo(() =>
+        mintListContext.mints?.map(mint =>
+            ({...mint, value: mint.address})
+        ) ?? [],
+    [mintListContext.mints]);
+
+
+    const searchMatch: (searchValue: string, item: AutoCompleteItemProps) => boolean = useCallback(
+        (searchValue, item) => {
+            const trimmedKey: string = searchValue.trim();
+            const lowercaseKey: string = trimmedKey.toLowerCase();
+            return item.address.includes(trimmedKey) || item.name.toLowerCase().includes(lowercaseKey);
+        },
+        []
+    );
+
+
+    const mintPubkey: PublicKey | undefined = useMemo(() => {
         try {
-            setValue(new PublicKey(stringValue));
-            setError(undefined);
+            return new PublicKey(nameOrAddress);
+        } catch (e) {
+            return undefined;
+        }
+    }, [nameOrAddress]);
 
-        } catch {
-            if (value !== null) {
-                setValue(null);
-                setError("Not a valid PublicKey");
+
+    // update the selected mint for the game form and to display more info the user
+    useEffect(() => {
+        if ((mintPubkey !== undefined) && (nameOrAddress !== lastValidMintAddress)) {
+            try {
+                setLastValidMintAddress(nameOrAddress);
+                props.onMintSelect(mintPubkey);
+
+            } catch(e) {
+                // swallow because the user may still be entering a value
             }
         }
-    }, [stringValue]);
+    }, [mintPubkey, props.onMintSelect]);
 
-    useEffect(() => {
-        props.onChange(value);
-    }, [value]);
 
-    return <TextInput
-        label={props.label}
-        value={stringValue}
-        error={error}
-        onChange={(e) => setStringValue(e.currentTarget.value)}
-    />;
+    const description: string | undefined = useMemo(() => {
+        let result: string | undefined;
+        if (mintPubkey !== undefined) {
+            result = selectItems.find(item => item.address === lastValidMintAddress)?.name ?? "Custom Mint";
+        }
+        return result;
+    }, [mintPubkey, lastValidMintAddress]);
+
+
+    return (
+        <Autocomplete
+            value={nameOrAddress}
+            onChange={setNameOrAddress}
+            label="Token Mint Address"
+            data={selectItems}
+            itemComponent={AutoCompleteItem}
+            filter={searchMatch}
+            description={description}
+            maxDropdownHeight={InlineStyles.MINT_SELECT.dropdownMaxHeightPixels}
+        />
+    );
 }

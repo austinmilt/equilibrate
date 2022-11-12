@@ -9,6 +9,7 @@ import { Viewport } from "../viewport/Viewport";
 import { WelcomeModal } from "./WelcomeModal";
 import styles from "./styles.module.css";
 import "./root.css";
+import { StartupProvider } from "../../shared/startup/provider";
 
 export default function App(): JSX.Element {
     return (
@@ -26,11 +27,13 @@ export default function App(): JSX.Element {
                         <SolanaProvider>
                             <EquilibrateProgramProvider>
                                 <ActiveGameProvider>
-                                    <main className={styles["main"]}>
-                                        <Sidebar/>
-                                        <Viewport/>
-                                        <WelcomeModal/>
-                                    </main>
+                                    <StartupProvider>
+                                        <main className={styles["main"]}>
+                                            <Sidebar/>
+                                            <Viewport/>
+                                            <WelcomeModal/>
+                                        </main>
+                                    </StartupProvider>
                                 </ActiveGameProvider>
                             </EquilibrateProgramProvider>
                         </SolanaProvider>

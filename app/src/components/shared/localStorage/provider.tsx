@@ -106,8 +106,8 @@ export function LocalStorageProvider(props: { children: ReactNode }): JSX.Elemen
 
 interface UseLocalStorageParamContext<T> {
     /**
-     * Value in local storage, if it exists, null otherwise. Automatically updated
-     * after calling `set` or `remove`
+     * Value in local storage, if it exists (and hasnt expired), `null` otherwise. Automatically updated
+     * after calling `set` or `remove`, and upon automatic expiration.
      */
     value: T | null
 
