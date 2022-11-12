@@ -16,4 +16,8 @@ export class InlineStyles {
         size: 45,
         labelSize: 20
     };
+
+    public static MINT_SELECT = {
+        dropdownMaxHeightPixels: 200
+    };
 }

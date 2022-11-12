@@ -17,8 +17,8 @@ import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { NewGameControl } from "./NewGameControl";
 import { Notifications, notifyWarning } from "../../../lib/shared/notifications";
-import styles from "./styles.module.css";
 import { SettingsMenu } from "./SettingsMenu";
+import styles from "./styles.module.css";
 
 interface SetGameFunction {
     (address: PublicKey): void;

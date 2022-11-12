@@ -2,8 +2,10 @@ import { Center, Group, Loader, SegmentedControl } from "@mantine/core";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
+import { useOnClickOutside } from "../../../lib/shared/useOnClickOutside";
+import { useOnEscape } from "../../../lib/shared/useOnEscape";
 import { useEndpoint, Endpoint } from "../../../lib/solana/provider";
 import { Button, ContainerButton } from "../../shared/model/button";
 import styles from "./styles.module.css";
@@ -13,31 +15,15 @@ export function SettingsMenu(): JSX.Element {
     const [openMenu, setOpenMenu] = useState<boolean>(false);
     const menuContentRef = useRef<HTMLDivElement>(null);
     const menuButtonRef = useRef<HTMLButtonElement>(null);
-
-    // https://stackoverflow.com/a/42234988/3314063
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            const eventTarget: Node | null = event.target as Node;
-            const clickedMenuButton: boolean = menuContentRef.current?.contains(eventTarget) ?? false;
-            const clickedMenuContent: boolean = menuButtonRef.current?.contains(eventTarget) ?? false;
-            if (!clickedMenuButton && !clickedMenuContent) {
-                setOpenMenu(false);
-            }
-        }
-        addEventListener("mousedown", handleClickOutside);
-
-        return () => {
-            removeEventListener("mousedown", handleClickOutside);
-        };
-    }, [menuContentRef, menuButtonRef, setOpenMenu]);
-
+    useOnEscape(() => setOpenMenu(false));
+    useOnClickOutside([menuContentRef, menuButtonRef], () => setOpenMenu(false));
 
     return <>
         <div className={styles["settings-menu-container"]}>
             <SettingsButton onClick={() => setOpenMenu(!openMenu)} innerRef={menuButtonRef}/>
             { openMenu && (
                 <menu className={styles["settings-menu-content"]} ref={menuContentRef}>
-                    <WalletMultiButton/>
+                    <WalletMultiButton className={styles["wallet-connect-button"]}/>
                     <ClusterControl/>
                     { !endpointIsProd && <AirdropButton/> }
                 </menu>
@@ -79,6 +65,11 @@ function ClusterControl(): JSX.Element {
         <SegmentedControl
             value={endpoint}
             onChange={(value: string) => setEndpoint(value as Endpoint)}
+            classNames={{
+                label: styles["cluster-control-label"],
+                labelActive: styles["cluster-control-label-active"],
+                root: styles["cluster-control"]
+            }}
             data={[
                 {
                     value: "local",
