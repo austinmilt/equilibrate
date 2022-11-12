@@ -116,8 +116,11 @@ interface UseLocalStorageParamContext<T> {
      * `remove` rather than trying to set the value to empty/null.
      *
      * @param value value to set in local storage
+     * @param expiration date at which the value should automatically expire, default is no expiration.
+     * The expiration is lazily enforced, such that the value may remain in local storage until this
+     * hook is used.
      */
-    set: (value: T) => void
+    set: (value: T, expiration?: Date) => void
 
     /**
      * Removes the value from local storage if it exists. Safe to call without knowing
@@ -154,6 +157,7 @@ interface Options<T> {
  */
 export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseLocalStorageParamContext<T> {
     const localStorageContext = useContext(LocalStorageContext);
+    const [removeTimeoutId, setRemoveTimeoutId] = useState<NodeJS.Timeout | undefined>();
 
     const serialize: Options<T>["serialize"] = useMemo(() =>
         options?.serialize ?? JSON.stringify,
@@ -165,22 +169,48 @@ export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseL
     [options?.deserialize]);
 
 
-    const stringValue: string | undefined = useMemo(() =>
-        localStorageContext.values[key],
-    [key, localStorageContext]);
+    const removeTimeoutIfNeeded: () => void = useCallback(() => {
+        if (removeTimeoutId !== undefined) {
+            clearTimeout(removeTimeoutId);
+            setRemoveTimeoutId(undefined);
+        }
+    }, [removeTimeoutId]);
 
 
     const value: T | null = useMemo(() => {
         let result: T | null = null;
-        if (stringValue !== undefined) {
-            result = deserialize(stringValue);
+        if (localStorageContext.initialized) {
+            const wrappedValue: WrappedStorageValue<T> | null = parseWrappedLocalStorageValue(
+                localStorageContext.values[key],
+                deserialize
+            );
+            if (wrappedValue == null) {
+                localStorageContext.remove(key);
+                removeTimeoutIfNeeded();
+
+            } else if (wrappedValue.expiration != null) {
+                // set/update up automatic expiration
+                removeTimeoutIfNeeded();
+                const ttlMs: number = wrappedValue.expiration.getTime() - new Date().getTime();
+                if (ttlMs > 0) {
+                    const newTimeoutId: NodeJS.Timeout = setTimeout(() => { localStorage.removeItem(key); }, ttlMs);
+                    setRemoveTimeoutId(newTimeoutId);
+                }
+            }
+
+            result = wrappedValue?.value ?? null;
         }
         return result;
-    }, [stringValue]);
+
+    }, [key, localStorageContext.values[key], deserialize]);
 
 
-    const set: UseLocalStorageParamContext<T>["set"] = useCallback((value) => {
-        localStorageContext.set(key, serialize(value));
+    const set: UseLocalStorageParamContext<T>["set"] = useCallback((value, expiration) => {
+        const storageValue: WrappedStorageValueInternal = {
+            stringValue: serialize(value),
+            expirationEpochMs: expiration?.getTime()
+        };
+        localStorageContext.set(key, JSON.stringify(storageValue));
     }, [key, serialize, localStorageContext.set]);
 
 
@@ -194,5 +224,42 @@ export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseL
         set: set,
         remove: remove,
         intialized: localStorageContext.initialized
+    };
+}
+
+interface WrappedStorageValue<T> {
+    value: T;
+    expiration: Date | undefined;
+    expired: boolean;
+}
+
+
+interface WrappedStorageValueInternal {
+    stringValue: string
+    expirationEpochMs: number | undefined | null
+}
+
+
+function parseWrappedLocalStorageValue<T>(
+    stringWrappedValue: string | null,
+    deserialize: (valueString: string) => T = JSON.parse
+): WrappedStorageValue<T> | null {
+    let value: T | null = null;
+    let expiration: Date | undefined;
+    let expired: boolean = false;
+    if (stringWrappedValue != null) {
+        const wrappedValue: WrappedStorageValueInternal = JSON.parse(stringWrappedValue);
+        value = deserialize(wrappedValue.stringValue);
+        if (wrappedValue.expirationEpochMs != null) {
+            const expirationEpochMs: number = wrappedValue.expirationEpochMs;
+            expiration = new Date(expirationEpochMs);
+            expired = expirationEpochMs < new Date().getTime();
+        }
+    }
+
+    return (value === null) ? null : {
+        value: value,
+        expiration: expiration,
+        expired: expired
     };
 }
