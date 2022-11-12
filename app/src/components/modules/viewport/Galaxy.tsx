@@ -22,10 +22,11 @@ export function Galaxy(props: GalaxyProps): JSX.Element {
     );
 
     const onStarMousedOverChange: (index: number, mousedOver: boolean) => void = useCallback((index, mousedOver) => {
+        activeGalaxyContext.focalStar.onHoverChange(mousedOver);
         if (mousedOver) {
             activeGalaxyContext.focalStar.set(index);
         }
-    }, [activeGalaxyContext.focalStar.set]);
+    }, [activeGalaxyContext.focalStar.set, activeGalaxyContext.focalStar.onHoverChange]);
 
     return <>
         {stars.map((star, iStar) =>

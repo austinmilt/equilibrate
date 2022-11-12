@@ -95,7 +95,6 @@ function ClusterControl(): JSX.Element {
 }
 
 
-//TODO move to a devtools section
 function AirdropButton(): JSX.Element {
     const wallet = useAnchorWallet();
     const { connection } = useConnection();

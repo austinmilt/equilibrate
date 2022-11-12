@@ -58,7 +58,7 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
 
     return (
-        <SimpleGrid cols={2}>
+        <div className={styles["status-gauge"]}>
             <Tooltip label={`${fuelDirectionIndicator} ${fuelFormatted ?? ""}`}>
                 <RingProgress
                     size={InlineStyles.STAR_STATUS_GAUGE.size}
@@ -73,7 +73,7 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
                 />
             </Tooltip>
             <Text size="md">{fuelFormatted && `${fuelDirectionIndicator} ${fuelFormatted}`}</Text>
-        </SimpleGrid>
+        </div>
     );
 }
 
@@ -95,7 +95,7 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
 
 
     return (
-        <SimpleGrid cols={2}>
+        <div className={styles["status-gauge"]}>
             <Tooltip label={`${props.isSourceStar ? 0 : (props.data?.satellites ?? "...")}`}>
                 <RingProgress
                     size={InlineStyles.STAR_STATUS_GAUGE.size}
@@ -106,6 +106,6 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
                 />
             </Tooltip>
             <Text size="md">{showLabel && `${props.isSourceStar ? 0 : props.data?.satellites}`}</Text>
-        </SimpleGrid>
+        </div>
     );
 }

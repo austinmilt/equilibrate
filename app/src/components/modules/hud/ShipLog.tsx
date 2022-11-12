@@ -3,7 +3,11 @@ import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo } from "react";
 import { SHIP_MAX_LOGS } from "../../../lib/shared/constants";
 import { Duration } from "../../../lib/shared/duration";
-import { useLocalStorageParam } from "../../shared/localStorage/provider";
+import {
+    parseWrappedLocalStorageValue,
+    useLocalStorage,
+    useLocalStorageParam
+} from "../../shared/localStorage/provider";
 import styles from "./styles.module.css";
 
 const LOGS_KEY_PREFIX: string = "ship-logs:";
@@ -12,13 +16,15 @@ const LOGS_KEY_DUMMY_SUFFIX: string = "dummy";
 export function ShipLog(props: { gameAddress: PublicKey | undefined }): JSX.Element {
     const logsContext = useShipLogs(props.gameAddress);
 
-    return <ScrollArea className={styles["ship-log"]}>
-        {
-            logsContext.logs.map((log, i) =>
-                <LogEntryComponent log={log} key={i}/>
-            )
-        }
-    </ScrollArea>;
+    return <div className={styles["ship-log"]}>
+        <ScrollArea>
+            {
+                logsContext.logs.map((log, i) =>
+                    <LogEntryComponent log={log} key={i}/>
+                )
+            }
+        </ScrollArea>
+    </div>;
 }
 
 
@@ -55,28 +61,21 @@ interface ShipLogsLocalStorageValue {
 
 
 export function useShipLogs(gameAddress: PublicKey | undefined): UseShipLogsContext {
-    const localStorageContext = useLocalStorageParam<ShipLogsLocalStorageValue>(
-        `${LOGS_KEY_PREFIX}${gameAddress?.toBase58() ?? LOGS_KEY_DUMMY_SUFFIX}`
-    );
+    const key: string = useMemo(() =>
+        `${LOGS_KEY_PREFIX}${gameAddress?.toBase58() ?? LOGS_KEY_DUMMY_SUFFIX}`,
+    [gameAddress]);
 
-
-    // remove dummy logs that might have gotten created along the way
-    // ... would be better to avoid ever making these, though
-    useEffect(() => {
-        return () => {
-            localStorage.removeItem(`${LOGS_KEY_PREFIX}${LOGS_KEY_DUMMY_SUFFIX}`);
-        };
-    }, []);
+    const localStorageContext = useLocalStorageParam<ShipLogsLocalStorageValue>(key);
 
 
     const logs: LogEntry[] = useMemo(() =>
         localStorageContext.value?.logs ?? [],
-    [localStorageContext.value?.logs]);
+    [localStorageContext.value]);
 
 
     const stale: boolean = useMemo(() =>
         localStorageContext.value?.stale ?? false,
-    [localStorageContext.value?.stale]);
+    [localStorageContext.value]);
 
 
     const record: UseShipLogsContext["record"] = useCallback((log) => {
@@ -87,7 +86,7 @@ export function useShipLogs(gameAddress: PublicKey | undefined): UseShipLogsCont
         // setting an expiration ensures that if the game somehow ends without the user
         // being actively participating or watching, it wont clog up their local storage
         localStorageContext.set({stale: stale, logs: logs}, Duration.ofDays(90).fromNow());
-    }, [stale, logs]);
+    }, [stale, logs, localStorageContext.set]);
 
 
     const onEscapeSystem: UseShipLogsContext["onEscapeSystem"] = useCallback(() => {
@@ -106,19 +105,23 @@ export function useShipLogs(gameAddress: PublicKey | undefined): UseShipLogsCont
 /**
  * Removes stale logs for old games the user has left.
  */
-export function cleanShipLogs(): void {
-    for (let i = 0; i < localStorage.length; i++) {
-        const key: string | null = localStorage.key(i);
-        if ((key !== null) && isLogsLocalStorageKey(key)) {
-            const stringValue: string | null = localStorage.getItem(key);
-            if (stringValue !== null) {
-                const value: ShipLogsLocalStorageValue = JSON.parse(stringValue);
-                if (value.stale) {
-                    localStorage.removeItem(key);
+export function useCleanShipLogs(): void {
+    const localStorageContext = useLocalStorage();
+
+    useEffect(() => {
+        for (const [key, value] of Object.entries(localStorageContext.values)) {
+            if (key === `${LOGS_KEY_PREFIX}${LOGS_KEY_DUMMY_SUFFIX}`) {
+                localStorageContext.remove(key);
+
+            } else if (isLogsLocalStorageKey(key)) {
+                const parsedValue = parseWrappedLocalStorageValue<ShipLogsLocalStorageValue>(value);
+                const isStale: boolean = (parsedValue !== null) && (parsedValue.value.stale);
+                if (isStale) {
+                    localStorageContext.remove(key);
                 }
             }
         }
-    }
+    }, []);
 }
 
 

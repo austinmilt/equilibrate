@@ -1,10 +1,10 @@
-import { Text, Switch, SimpleGrid, Tooltip } from "@mantine/core";
+import { Tooltip, Text } from "@mantine/core";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
 import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/provider";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
 import { StarStatus } from "./StarStatus";
-import { ShipLog, cleanShipLogs, useShipLogs } from "./ShipLog";
+import { ShipLog, useCleanShipLogs, useShipLogs } from "./ShipLog";
 import { Notifications, notifyError, notifyPotentialBug } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
@@ -12,7 +12,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { PlayerState } from "../../../lib/equilibrate/types";
 import styles from "./styles.module.css";
-import { InlineStyles } from "../../shared/inline-styles";
+import { useMousePosition } from "../../../lib/shared/useMousePosition";
 
 enum GameAction {
     ENTER,
@@ -35,14 +35,11 @@ export function Hud(): JSX.Element {
     const shipLogContext = useShipLogs(activeGame);
     const connectWalletIfNeeded = useInsertConnectWallet();
     const { equilibrate, player } = useEquilibrate();
-
-    // clean up old ship logs from stale games the user has left
-    useEffect(() => {
-        cleanShipLogs();
-    }, []);
+    const [mouseX, mouseY] = useMousePosition();
+    useCleanShipLogs();
 
 
-    const getFocalStarClickAction: () => Promise<GameAction> = useCallback(async () => {
+    const computeFocalStarClickAction: () => Promise<GameAction> = useCallback(async () => {
         let playerState: PlayerState | null = gameContext.player?.player ?? null;
         if (activeGame !== undefined) {
             if (overridePlayer !== undefined) {
@@ -87,7 +84,8 @@ export function Hud(): JSX.Element {
         gameContext.player,
         player,
         activeGame,
-        equilibrate.getPlayerState
+        equilibrate.getPlayerState,
+        shipLogContext.record
     ]);
 
 
@@ -108,7 +106,11 @@ export function Hud(): JSX.Element {
                 onError: e => notifyError("Unable to enter the system.", e)
             }
         );
-    }, [gameContext.enterGame, shipLogContext.record, activeGalaxyContext.playerStar.set]);
+    }, [
+        gameContext.enterGame,
+        shipLogContext.record,
+        activeGalaxyContext.playerStar.set
+    ]);
 
 
     const moveShip: (starIndex: number) => void = useCallback(starIndex => {
@@ -125,7 +127,11 @@ export function Hud(): JSX.Element {
                 onError: e => notifyError("Unable to move the ship.", e)
             }
         );
-    }, [gameContext.moveBucket, shipLogContext.record, activeGalaxyContext.playerStar.set]);
+    }, [
+        gameContext.moveBucket,
+        shipLogContext.record,
+        activeGalaxyContext.playerStar.set
+    ]);
 
 
     const leaveSystem: () => void = useCallback(() => {
@@ -163,7 +169,7 @@ export function Hud(): JSX.Element {
 
     const onStarClick: (starIndex: number) => Promise<void> = useCallback(async (starIndex) => {
         try {
-            const action: GameAction = await getFocalStarClickAction();
+            const action: GameAction = await computeFocalStarClickAction();
             if (action === GameAction.ENTER) {
                 enterSystem(starIndex);
 
@@ -180,7 +186,7 @@ export function Hud(): JSX.Element {
             console.error(e);
             notifyPotentialBug(`HUD error: ${(e as unknown as Error).message}`);
         }
-    }, [enterSystem, moveShip, leaveSystem]);
+    }, [enterSystem, moveShip, leaveSystem, computeFocalStarClickAction]);
 
 
     // trigger a game action after user has connected wallet and clicked a star
@@ -232,25 +238,28 @@ export function Hud(): JSX.Element {
 
     // what would happen if the user clicked the focal star?
     useEffect(() => {
-        getFocalStarClickAction().then(setFocalStarClickAction);
-    }, [getFocalStarClickAction, setFocalStarClickAction]);
+        computeFocalStarClickAction().then(setFocalStarClickAction);
+    }, [computeFocalStarClickAction, setFocalStarClickAction]);
 
 
     const clickActionHelp: ReactNode | undefined = useMemo(() => {
-        let helpText: string | undefined;
-        if (focalStarClickAction === GameAction.ENTER) {
-            helpText = "enter";
+        if (activeGalaxyContext.focalStar.isHovered) {
+            let helpText: string | undefined;
+            if (focalStarClickAction === GameAction.ENTER) {
+                helpText = "orbit";
 
-        } else if (focalStarClickAction === GameAction.MOVE) {
-            helpText = "move";
+            } else if (focalStarClickAction === GameAction.MOVE) {
+                helpText = "move";
 
-        } else if (focalStarClickAction === GameAction.LEAVE) {
-            helpText = "leave";
+            } else if (focalStarClickAction === GameAction.LEAVE) {
+                helpText = "escape";
 
+            } else if (activeGalaxyContext.playerStar.index === activeGalaxyContext.focalStar.index) {
+                helpText = "your orbit";
+            }
+            return helpText === undefined ? undefined : <Text size="md">{helpText}</Text>;
         }
-        //TODO move this to star hover
         return undefined;
-        // return <Text size="md">{helpText ? `👆 to ${helpText}` : ""}</Text>;
     }, [focalStarClickAction]);
 
 
@@ -275,6 +284,19 @@ export function Hud(): JSX.Element {
                         { cancelOnLoss ? "💎" : "📃" }
                     </button>
                 </Tooltip>
+                { activeGalaxyContext.focalStar.isHovered && (
+                    <div
+                        className={styles["star-hover-help"]}
+                        style={{
+                            position: "fixed",
+                            top: `${mouseY}px`,
+                            left: `${mouseX}px`
+                        }}
+                    >
+                        {clickActionHelp}
+                    </div>
+                )}
+
             </>
         )}
     </div>;

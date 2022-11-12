@@ -45,9 +45,11 @@ export interface ActiveGalaxyContextState {
 
     focalStar: {
         isSource: boolean;
+        isHovered: boolean;
         data: StarData | undefined;
         index: number | undefined;
         set: (index: number | undefined) => void;
+        onHoverChange: (hovered: boolean) => void;
         onClick: (index: number) => void;
         addOnClick: (listener: OnClick) => () => void;
     }
@@ -97,6 +99,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
     const { game: gameEvent, player: playerEvent } = useGame(activeGame);
     const [stars, setStars] = useState<StarData[] | undefined>();
     const [focalStarIndex, setFocalStarIndex] = useState<ActiveGalaxyContextState["focalStar"]["index"]>();
+    const [focalStarHovered, setFocalStarHovered] = useState<boolean>(false);
     const [playerStarIndex, setPlayerStarIndex] = useState<ActiveGalaxyContextState["playerStar"]["index"]>();
     const [focalStarClickListeners, focalStarClickListenersDispatch] = useReducer(addOnClickReducer, []);
 
@@ -196,12 +199,14 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
         focalStar: {
             data: focalStar,
             index: focalStarIndex,
+            isHovered: focalStarHovered,
             set: setFocalStarIndex,
             isSource: focalStarIndex === 0,
+            onHoverChange: setFocalStarHovered,
             addOnClick: addFocalStarOnClick,
             onClick: focalStarOnClick
         }
-    }), [stars, focalStar, galaxyConstants, galaxyState, activeGame, playerStar]);
+    }), [stars, focalStar, galaxyConstants, galaxyState, activeGame, playerStar, focalStarHovered]);
 
 
     return (

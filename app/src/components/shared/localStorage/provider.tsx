@@ -5,6 +5,8 @@ interface LocalStorageContextState {
     set: (key: string, value: string) => void;
     remove: (key: string) => void;
     initialized: boolean;
+    // hack to get callers to be able to refresh stuff when values change
+    updates: number;
 }
 
 
@@ -15,10 +17,18 @@ const LocalStorageContext = createContext<LocalStorageContextState>(
 
 function valuesReducer(
     values: {[key: string]: string},
-    data: {action: "set" | "remove" | "clear", key?: string, value?: string | undefined}
+    data: {
+        action: "set" | "remove" | "clear",
+        onDiff: () => void,
+        key?: string,
+        value?: string | undefined,
+    }
 ): {[key: string]: string} {
     switch (data.action) {
-    case "clear": return {};
+    case "clear": {
+        data.onDiff();
+        return {};
+    }
     case "set": {
         if (data.key === undefined) {
             throw new Error("Tried to set a value without giving the key.");
@@ -27,6 +37,7 @@ function valuesReducer(
             throw new Error("Tried to set a value to nullish.");
         }
         values[data.key] = data.value;
+        data.onDiff();
         return values;
     }
     case "remove": {
@@ -34,6 +45,7 @@ function valuesReducer(
             throw new Error("Tried to remove a value without giving the key.");
         }
         delete values[data.key];
+        data.onDiff();
         return values;
     }
     default: throw new Error(`Unsupported action ${data.action}.`);
@@ -44,31 +56,34 @@ function valuesReducer(
 export function LocalStorageProvider(props: { children: ReactNode }): JSX.Element {
     const [values, reducer] = useReducer(valuesReducer, {});
     const [initialized, setInitialized] = useState<boolean>(false);
-    const [triggerUpdate, setTriggerUpdate] = useState<boolean>(false);
+    const [updateCount, setUpdateCount] = useState<number>(0);
+
+    const incrementUpdateCount: () => void = useCallback(() => {
+        setUpdateCount(updateCount + 1);
+    }, [updateCount, setUpdateCount]);
+
 
     const refresh: (key: string) => void = useCallback((key) => {
         const value: string | null = localStorage.getItem(key);
         if (value === null) {
-            reducer({action: "remove", key: key});
+            reducer({action: "remove", key: key, onDiff: incrementUpdateCount});
 
         } else {
-            reducer({action: "set", key: key, value: value});
+            reducer({action: "set", key: key, value: value, onDiff: incrementUpdateCount});
         }
-        // hack because `values` isnt triggering a re-render
-        setTriggerUpdate(true);
-    }, [reducer]);
+    }, [reducer, incrementUpdateCount]);
 
 
     const set: (key: string, value: string) => void = useCallback((key, value) => {
         localStorage.setItem(key, value);
-        refresh(key);
-    }, [refresh]);
+        reducer({action: "set", key: key, value: value, onDiff: incrementUpdateCount});
+    }, [incrementUpdateCount]);
 
 
     const remove: (key: string) => void = useCallback((key) => {
         localStorage.removeItem(key);
-        refresh(key);
-    }, [refresh]);
+        reducer({action: "remove", key: key, onDiff: incrementUpdateCount});
+    }, [incrementUpdateCount]);
 
 
     // initial load of everything
@@ -84,14 +99,14 @@ export function LocalStorageProvider(props: { children: ReactNode }): JSX.Elemen
 
 
     const state: LocalStorageContextState = useMemo(() => {
-        setTriggerUpdate(false);
         return {
             values: values,
             set: set,
             remove: remove,
-            initialized: initialized
+            initialized: initialized,
+            updates: updateCount
         };
-    }, [set, remove, initialized, triggerUpdate]);
+    }, [set, remove, initialized, updateCount]);
 
 
     return (
@@ -129,6 +144,7 @@ interface UseLocalStorageParamContext<T> {
     remove: () => void
 
     intialized: boolean;
+    updates: number;
 }
 
 
@@ -150,7 +166,17 @@ interface Options<T> {
 
 
 /**
- * Hook to interact with local storage
+ * Hook to interact with the local storage provider.
+ *
+ * @returns
+ */
+export function useLocalStorage(): LocalStorageContextState {
+    return useContext(LocalStorageContext);
+}
+
+
+/**
+ * Hook to interact with a single local storage param
  *
  * @param key key of the value to get/store in local storage
  * @returns hook with context for interacting with local storage
@@ -177,11 +203,19 @@ export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseL
     }, [removeTimeoutId]);
 
 
+    const stringValue: string | undefined = useMemo(() => {
+        if (localStorageContext.initialized) {
+            return localStorageContext.values[key];
+        }
+        return undefined;
+    }, [localStorageContext.initialized, localStorageContext.updates, key]);
+
+
     const value: T | null = useMemo(() => {
         let result: T | null = null;
-        if (localStorageContext.initialized) {
+        if (stringValue != null) {
             const wrappedValue: WrappedStorageValue<T> | null = parseWrappedLocalStorageValue(
-                localStorageContext.values[key],
+                stringValue,
                 deserialize
             );
             if (wrappedValue == null) {
@@ -202,7 +236,7 @@ export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseL
         }
         return result;
 
-    }, [key, localStorageContext.values[key], deserialize]);
+    }, [key, stringValue, deserialize]);
 
 
     const set: UseLocalStorageParamContext<T>["set"] = useCallback((value, expiration) => {
@@ -223,11 +257,12 @@ export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseL
         value: value,
         set: set,
         remove: remove,
-        intialized: localStorageContext.initialized
+        intialized: localStorageContext.initialized,
+        updates: localStorageContext.updates
     };
 }
 
-interface WrappedStorageValue<T> {
+export interface WrappedStorageValue<T> {
     value: T;
     expiration: Date | undefined;
     expired: boolean;
@@ -240,7 +275,7 @@ interface WrappedStorageValueInternal {
 }
 
 
-function parseWrappedLocalStorageValue<T>(
+export function parseWrappedLocalStorageValue<T>(
     stringWrappedValue: string | null,
     deserialize: (valueString: string) => T = JSON.parse
 ): WrappedStorageValue<T> | null {
