@@ -2,6 +2,7 @@ import { ScrollArea, Text, Anchor } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo } from "react";
 import { SHIP_MAX_LOGS } from "../../../lib/shared/constants";
+import { Duration } from "../../../lib/shared/duration";
 import { useLocalStorageParam } from "../../shared/localStorage/provider";
 import styles from "./styles.module.css";
 
@@ -83,7 +84,9 @@ export function useShipLogs(gameAddress: PublicKey | undefined): UseShipLogsCont
             logs.shift();
         }
         logs.push(log);
-        localStorageContext.set({stale: stale, logs: logs});
+        // setting an expiration ensures that if the game somehow ends without the user
+        // being actively participating or watching, it wont clog up their local storage
+        localStorageContext.set({stale: stale, logs: logs}, Duration.ofDays(90).fromNow());
     }, [stale, logs]);
 
 
