@@ -59,19 +59,17 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
     return (
         <div className={styles["status-gauge"]}>
-            <Tooltip label={`${fuelDirectionIndicator} ${fuelFormatted ?? ""}`}>
-                <RingProgress
-                    size={InlineStyles.STAR_STATUS_GAUGE.size}
-                    roundCaps
-                    thickness={3}
-                    sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorHydrogen }]}
-                    label={
-                        <Center>
-                            <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
-                        </Center>
-                    }
-                />
-            </Tooltip>
+            <RingProgress
+                size={InlineStyles.STAR_STATUS_GAUGE.size}
+                roundCaps
+                thickness={3}
+                sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorHydrogen }]}
+                label={
+                    <Center>
+                        <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
+                    </Center>
+                }
+            />
             <Text size="md">{fuelFormatted && `${fuelDirectionIndicator} ${fuelFormatted}`}</Text>
         </div>
     );
@@ -96,15 +94,13 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
 
     return (
         <div className={styles["status-gauge"]}>
-            <Tooltip label={`${props.isSourceStar ? 0 : (props.data?.satellites ?? "...")}`}>
-                <RingProgress
-                    size={InlineStyles.STAR_STATUS_GAUGE.size}
-                    roundCaps
-                    thickness={3}
-                    sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorPlayer }]}
-                    label={<Center>🚀</Center>}
-                />
-            </Tooltip>
+            <RingProgress
+                size={InlineStyles.STAR_STATUS_GAUGE.size}
+                roundCaps
+                thickness={3}
+                sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorPlayer }]}
+                label={<Center>🚀</Center>}
+            />
             <Text size="md">{showLabel && `${props.isSourceStar ? 0 : props.data?.satellites}`}</Text>
         </div>
     );
