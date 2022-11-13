@@ -1,0 +1,11 @@
+.main {
+    padding: 2rem;
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    justify-content: center;
+    height: 100vh;
+    width: 100%;
+    background-color: var(--color-primary-darkest);
+    align-items: flex-end;
+}

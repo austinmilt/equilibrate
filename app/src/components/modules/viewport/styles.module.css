@@ -1,0 +1,24 @@
+.viewport {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 89vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+/* stage dimensions are handled in code because I couldnt get everything to work
+    properly from CSS
+*/
+.stage {
+    background-color: transparent;
+    border: 1px solid var(--color-primary-lightest);
+    border-radius: 1rem;
+}
+
+
+.stage .stage-defined {
+    background-color: black;
+}

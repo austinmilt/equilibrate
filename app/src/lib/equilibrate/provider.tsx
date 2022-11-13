@@ -10,10 +10,12 @@ import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { EquilibrateSDK } from "./sdk";
 import { Equilibrate, IDL } from "../../../../target/types/equilibrate";
 import { PROGRAM_ID } from "./constants";
+import { PublicKey } from "@solana/web3.js";
 
 export interface EquilibrateProgramContextState {
     equilibrate: EquilibrateSDK;
     equilibrateIsReady: boolean;
+    player: PublicKey | undefined;
 }
 
 export const EquilibrateProgramContext = createContext<EquilibrateProgramContextState>(
@@ -26,28 +28,28 @@ export function useEquilibrate(): EquilibrateProgramContextState {
 
 export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.Element {
     const [sdk, setSdk] = useState<EquilibrateSDK>(EquilibrateSDK.dummy());
-    const userWallet = useAnchorWallet();
+    const anchorWallet = useAnchorWallet();
     const { connection } = useConnection();
 
     useEffect(() => {
-        if (userWallet?.publicKey != null) {
-            const provider = new anchor.AnchorProvider(
-                connection,
-                userWallet,
-                anchor.AnchorProvider.defaultOptions()
-            );
-            const program: anchor.Program<Equilibrate> = new anchor.Program(
-                IDL as unknown as Equilibrate,
-                PROGRAM_ID,
-                provider
-            );
-            setSdk(EquilibrateSDK.from(program, userWallet.publicKey, userWallet.signTransaction));
-        }
-    }, [userWallet, connection, setSdk]);
+        const provider: anchor.AnchorProvider = new anchor.AnchorProvider(
+            connection,
+            // fallback value allows querying the program without having a wallet connected
+            anchorWallet ?? ({} as anchor.Wallet),
+            anchor.AnchorProvider.defaultOptions()
+        );
+        const program: anchor.Program<Equilibrate> = new anchor.Program(
+            IDL as unknown as Equilibrate,
+            PROGRAM_ID,
+            provider ?? ({} as anchor.AnchorProvider)
+        );
+        setSdk(EquilibrateSDK.from(program));
+    }, [anchorWallet, connection, setSdk]);
 
     const value: EquilibrateProgramContextState = {
         equilibrate: sdk,
         equilibrateIsReady: sdk.isReady(),
+        player: anchorWallet?.publicKey
     };
 
     return (

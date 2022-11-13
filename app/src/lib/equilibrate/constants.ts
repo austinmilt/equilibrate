@@ -18,3 +18,4 @@ export const SPILL_RATE_MIN_EXCLUSIVE: number = 0;
 export const GAME_MAX_PLAYERS_MAX: number = 10000;
 export const GAME_MAX_PLAYERS_MIN: number = 2;
 export const PLAYER_BUCKET_INDEX_MIN: number = 1;
+export const PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS: string = "AbortLeaveOnLoss";

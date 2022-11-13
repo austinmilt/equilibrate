@@ -69,11 +69,12 @@ export async function getAssociatedTokenAddress(mint: PublicKey, owner: PublicKe
 }
 
 
-export async function getGame(gameAddress: PublicKey, program: anchor.Program<Equilibrate>): Promise<Game> {
-    return (await program.account.game.fetch(gameAddress)) as Game;
+export async function getMintDecimals(mint: PublicKey, connection: Connection): Promise<number> {
+    return (await connection.getTokenSupply(mint)).value.decimals;
 }
 
 
-export async function getMintDecimals(mint: PublicKey, connection: Connection): Promise<number> {
-    return (await connection.getTokenSupply(mint)).value.decimals;
+export async function accountExists(address: PublicKey, connection: Connection): Promise<boolean> {
+    const account: anchor.web3.AccountInfo<Buffer> | null = await connection.getAccountInfo(address);
+    return (account !== null) && (account.data.length > 0);
 }

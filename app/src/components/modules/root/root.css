@@ -1,0 +1,14 @@
+:root {
+  --color-primary-darkest: #1E1E1E;
+  --color-primary-darker: #242424;
+  --color-primary-dark: #2e2e2e;
+  --color-primary-medium: #4d4d4d;
+  --color-primary-light: #8a8a8a;
+  --color-primary-lighter: #bdbdbd;
+  --color-primary-lightest: #e6e6e6;
+  --color-hydrogen: #EBB729;
+  --color-cooling: #2F488A;
+  --color-player: #D9594C;
+  --color-text-base: var(--color-primary-lightest);
+  --color-text-disabled: var(--color-primary-light);
+}
