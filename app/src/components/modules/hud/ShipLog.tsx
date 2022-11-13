@@ -7,7 +7,7 @@ import {
     parseWrappedLocalStorageValue,
     useLocalStorage,
     useLocalStorageParam
-} from "../../shared/localStorage/provider";
+} from "../../../lib/shared/local-storage";
 import styles from "./styles.module.css";
 
 const LOGS_KEY_PREFIX: string = "ship-logs:";

@@ -1,6 +1,6 @@
 import { Accordion, Button, Group, List, Modal, SimpleGrid, Text } from "@mantine/core";
 import { useEffect, useMemo } from "react";
-import { useLocalStorageParam } from "../../shared/localStorage/provider";
+import { useLocalStorageParam } from "../../../lib/shared/local-storage";
 
 
 export function WelcomeModal(): JSX.Element {
@@ -9,17 +9,17 @@ export function WelcomeModal(): JSX.Element {
     // on initial load of the app, check if the local storage state
     // was one which should cause the modal to be displayed when they re-open
     useEffect(() => {
-        if (showWelcomeContext.intialized && (showWelcomeContext.value === "read")) {
+        if (showWelcomeContext.initialized && (showWelcomeContext.value === "read")) {
             showWelcomeContext.set("unread");
         }
-    }, [showWelcomeContext.intialized]);
+    }, [showWelcomeContext.initialized]);
 
     const show: boolean = useMemo(() =>
-        showWelcomeContext.intialized && (
+        showWelcomeContext.initialized && (
             showWelcomeContext.value === null ||
             showWelcomeContext.value === "unread"
         ),
-    [showWelcomeContext.intialized, showWelcomeContext.value]);
+    [showWelcomeContext.initialized, showWelcomeContext.value]);
 
     return (
         <WelcomeModalControlled

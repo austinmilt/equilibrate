@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocalStorageParam } from "../../components/shared/localStorage/provider";
 import { Duration } from "./duration";
+import { useLocalStorageParam } from "./local-storage";
 
 const LOCAL_STORAGE_KEY: string = "mint-list";
 
@@ -46,7 +46,7 @@ export function useMintList(): UseMintListContext {
 
     return {
         mints: localStorageContext.value,
-        loading: localStorageContext.intialized
+        loading: localStorageContext.initialized
     };
 }
 
@@ -90,10 +90,10 @@ export function useLoadMintList(): boolean {
 
     // fetch the mint list and set it for the app to use
     useEffect(() => {
-        if (localStorageContext.intialized && (localStorageContext.value === null)) {
+        if (localStorageContext.initialized && (localStorageContext.value === null)) {
             updateList();
         }
-    }, [localStorageContext.intialized, localStorageContext.value]);
+    }, [localStorageContext.initialized, localStorageContext.value]);
 
     return initialized;
 }
