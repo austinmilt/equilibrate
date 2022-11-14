@@ -18,6 +18,7 @@ interface GameActionOptions {
     player?: PublicKey;
     onSuccess?: OnSuccessFunction;
     onError?: OnErrorFunction;
+    simulateOnly?: boolean;
 }
 
 
@@ -65,7 +66,7 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             .setPlayerBucketIndex(bucketIndex)
             .setEntryFeeDecimalTokens(game.config.entryFeeDecimalTokens.toNumber())
             .withEnterGame()
-            .signAndSend()
+            .signAndSend(options?.simulateOnly ?? false)
             .then(signature => {
                 if (onSuccess) onSuccess(signature);
             })
@@ -101,7 +102,7 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             .setGameId(game.id.toNumber())
             .setPlayerBucketIndex(bucketIndex)
             .withMoveBucket()
-            .signAndSend()
+            .signAndSend(options?.simulateOnly ?? false)
             .then(signature => {
                 if (onSuccess) onSuccess(signature);
             })
@@ -135,7 +136,7 @@ export function useGame(gameAddress: PublicKey | undefined): GameContext {
             .setMint(game.config.mint)
             .setCancelOnLoss(cancelOnLoss)
             .withLeaveGame()
-            .signAndSend()
+            .signAndSend(options?.simulateOnly ?? false)
             .then(signature => {
                 if (onSuccess) onSuccess(signature);
             })
