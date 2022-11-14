@@ -28,8 +28,16 @@ impl Game {
         // compute the spillover from each bucket, then
         // equally distribute that across other buckets
         let n_buckets_including_holding = self.state.buckets.len();
-        let n_buckets_playable = (n_buckets_including_holding as u64) - 1;
         let mut inflow: Vec<u64> = vec![0; n_buckets_including_holding];
+        let mut outflow: Vec<u64> = vec![0; n_buckets_including_holding];
+
+        let bucket_players = self
+            .state
+            .buckets
+            .iter()
+            .map(|b| b.players)
+            .collect::<Vec<u16>>();
+
         let buckets = &mut self.state.buckets;
         for i in 0..n_buckets_including_holding {
             let bucket = &mut buckets[i];
@@ -37,45 +45,46 @@ impl Game {
                 self.config.spill_rate_decimal_tokens_per_second_per_player,
                 seconds_since_last_update,
             );
-            let spillover_to_j = match i {
-                // the holding bucket spills into every other bucket, but self.config.n_buckets
-                // does not include the holding bucket (so add 1)
-                0 => spillover_div_peers(spillover_i_desired, n_buckets_playable + 1),
-                _ => spillover_div_peers(spillover_i_desired, n_buckets_playable),
+            // only spill over to buckets with fewer players than this one
+            let target_indices = (0..n_buckets_including_holding)
+                .collect::<Vec<usize>>()
+                .into_iter()
+                .filter_map(|j| {
+                    if (j != 0) && (j != i) && (&bucket_players[j] < &bucket.players) {
+                        Some(j)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<usize>>();
+
+            let target_count = target_indices.len() as u64;
+            let spillover_to_j = match target_count {
+                0 => 0,
+                _ => spillover_i_desired.checked_div(target_count).unwrap(),
             };
             // Ideally spillover_i_desired and spillover_i would be equal. However, because
             // spillover_to_j uses integer division, the cumulative spillover from i to other
             // buckets (spillover_to_j) will in general be less than than the desired amount
             // (spillover_i_desired). Thus, the final spillover_i should take into account
             // how  much is actually going into other buckets.
-            let spillover_i = match i {
-                0 => spillover_to_j.checked_mul(n_buckets_playable).unwrap(),
-                _ => spillover_to_j.checked_mul(n_buckets_playable - 1).unwrap(),
-            };
-            for j in (i + 1)..n_buckets_including_holding {
-                let bucket = &mut buckets[j];
-                let spillover_j = bucket.compute_spillover(
-                    self.config.spill_rate_decimal_tokens_per_second_per_player,
-                    seconds_since_last_update,
-                );
-                let spillover_to_i = match i {
-                    // the holding bucket only flows out, not in (except for getting the entry fees)
-                    0 => 0,
-                    _ => spillover_div_peers(spillover_j, n_buckets_playable),
-                };
-                let inflow_i = inflow[i].checked_add(spillover_to_i).unwrap();
+            let spillover_i = spillover_to_j.checked_mul(target_count).unwrap();
+            outflow[i] = spillover_i;
+            for j in target_indices {
                 let inflow_j = inflow[j].checked_add(spillover_to_j).unwrap();
-                let _ = replace(&mut inflow[i], inflow_i);
                 let _ = replace(&mut inflow[j], inflow_j);
             }
+        }
+        for i in 0..n_buckets_including_holding {
             let bucket = &mut buckets[i];
             bucket.decimal_tokens = bucket
                 .decimal_tokens
                 .checked_add(inflow[i])
                 .unwrap()
-                .checked_sub(spillover_i)
+                .checked_sub(outflow[i])
                 .unwrap();
         }
+        msg!("{:?}", inflow);
     }
 
     pub fn get_player_count(&self) -> u16 {
@@ -95,14 +104,6 @@ impl Game {
     pub fn log_end(&self) {
         msg!("Ended game {}", self.id);
     }
-}
-
-fn spillover_div_peers(spillover: u64, n_peers: u64) -> u64 {
-    spillover
-        // computing spillover to other buckets players can enter, i.e.
-        // this doesnt include the holding bucket
-        .checked_div(n_peers.checked_sub(1).unwrap())
-        .unwrap()
 }
 
 #[derive(Debug, PartialEq, AnchorSerialize, AnchorDeserialize, Clone)]

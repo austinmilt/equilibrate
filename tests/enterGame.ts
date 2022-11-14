@@ -215,9 +215,9 @@ describe("EnterGame Instruction Tests", () => {
                 program.programId,
                 program.provider.connection
             );
-            const expectedTokenTotal: number =
-        (nOtherPlayers + 1) *
-        context.newGame.gameConfig.entryFeeDecimalTokens.toNumber();
+            const expectedTokenTotal: number = (nOtherPlayers + 1) *
+                context.newGame.gameConfig.entryFeeDecimalTokens.toNumber();
+
             assert.strictEqual(bucketTokenTotal, expectedTokenTotal);
             assert.strictEqual(tokenPoolBalance, expectedTokenTotal);
         })
