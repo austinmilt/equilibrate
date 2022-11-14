@@ -84,7 +84,6 @@ impl Game {
                 .checked_sub(outflow[i])
                 .unwrap();
         }
-        msg!("{:?}", inflow);
     }
 
     pub fn get_player_count(&self) -> u16 {
