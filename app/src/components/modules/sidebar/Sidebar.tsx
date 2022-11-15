@@ -19,6 +19,8 @@ import { NewGameControl } from "./NewGameControl";
 import { Notifications, notifyWarning } from "../../../lib/shared/notifications";
 import { SettingsMenu } from "./SettingsMenu";
 import styles from "./styles.module.css";
+import { useMintList } from "../../../lib/shared/mint-list";
+import { NATIVE_MINT } from "@solana/spl-token";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -54,7 +56,7 @@ export function Sidebar(): JSX.Element {
                 </Group>
             </div>
             <ScrollArea classNames={{root: styles["games-list"]}}>
-                <Group spacing="sm">
+                <Group spacing="xs">
                     {
                         gamesListContext.games.map(g =>
                             <GameCard
@@ -74,24 +76,43 @@ export function Sidebar(): JSX.Element {
 
 
 interface UseGamesListContext {
-    games: GamesListEntry[];
+    games: GamesListEntryEnriched[];
     activeGame: PublicKey | undefined;
     selectGame: (address: PublicKey, expectExists: boolean) => void;
     refreshList: () => void;
 }
 
 
+interface GamesListEntryEnriched extends GamesListEntry {
+    mintName: string | undefined;
+}
+
+
 function useGamesList(): UseGamesListContext {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
-    const [gamesList, setGamesList] = useState<GamesListEntry[] | undefined>();
+    const [gamesList, setGamesList] = useState<GamesListEntryEnriched[] | undefined>();
     const activeGameContext = useActiveGame();
     const { game: gameEvent } = useGame(activeGameContext.address);
+    const mintListContext = useMintList();
+
+    const mintNameMap: {[mint: string]: string} = useMemo(() => {
+        if (!mintListContext.initialized || (mintListContext.mints == null)) return {};
+        return Object.fromEntries(mintListContext.mints.map(mint => [mint.address, mint.name]));
+    },
+    [mintListContext.mints, mintListContext.initialized]);
 
     const refreshList: () => void = useCallback(() => {
         if (equilibrateIsReady) {
-            equilibrate.getGamesList().then(setGamesList);
+            equilibrate.getGamesList()
+                .then(list => list.map(entry => (
+                    {
+                        ...entry,
+                        mintName: mintNameMap[entry.account.config.mint.toBase58()]
+                    }
+                )))
+                .then(setGamesList);
         }
-    }, [equilibrate, equilibrateIsReady]);
+    }, [equilibrate, equilibrateIsReady, mintNameMap]);
 
 
     // initial fetch
@@ -119,7 +140,7 @@ function useGamesList(): UseGamesListContext {
     useInterval(refreshList, GAMES_LIST_UPDATE_INTERVAL.asMilliseconds());
 
 
-    const gamesSorted: GamesListEntry[] = useMemo(() =>
+    const gamesSorted: GamesListEntryEnriched[] = useMemo(() =>
         (gamesList ?? []).sort((a, b) => {
             // selected game is always at the top
             const activeAddressString: string | undefined = activeGameContext.address?.toBase58();
@@ -172,7 +193,7 @@ function computeGamePoolTotal(game: Game): number {
 
 
 interface GameCardProps {
-    entry: GamesListEntry;
+    entry: GamesListEntryEnriched;
     setGame: SetGameFunction;
     selected: boolean;
 }
@@ -184,6 +205,14 @@ function GameCard(props: GameCardProps): JSX.Element {
     const gameConfig: GameConfigEnriched = props.entry.account.config;
     const buckets: Bucket[] = props.entry.account.state.buckets;
 
+    const entryFeeWithoutDecimals: number = useMemo(() => {
+        let result: number = gameConfig.entryFeeDecimalTokens.toNumber();
+        if (gameConfig.mintDecimals !== null) {
+            result /= Math.pow(10, gameConfig.mintDecimals);
+        }
+        return result;
+    }, [gameConfig.entryFeeDecimalTokens, gameConfig.mintDecimals]);
+
     const totalTokensWithoutDecimals: number = useMemo(() => {
         let result: number = buckets.reduce((sum, bucket) => sum + bucket.decimalTokens.toNumber(), 0);
         if (gameConfig.mintDecimals !== null) {
@@ -192,40 +221,42 @@ function GameCard(props: GameCardProps): JSX.Element {
         return result;
     }, [props.entry, buckets]);
 
+    const mintName: string = useMemo(() => {
+        let result: string = props.entry.mintName ?? "";
+        if (gameConfig.mint.toBase58() === NATIVE_MINT.toBase58()) {
+            result = "SOL";
+        }
+        return result;
+    }, [props.entry.mintName, gameConfig.mint]);
+
     return (
-        <button className={styles["game-card-button"]} onClick={() => props.setGame(props.entry.publicKey)}>
-            <Card className={`${styles["card"]} ${props.selected && styles["selected"]}`}>
-                <Group noWrap spacing={0}>
-                    <Image
-                        src={"https://www.petakids.com/wp-content/uploads/2015/11/Cute-Red-Bunny.jpg"}
-                        height="10vh"
-                        width="10vh"
-                    />
-                    <div>
-                        <Text transform="uppercase" size="xs">
-                            { props.entry.account.id.toNumber() }
-                        </Text>
-                        <Text
-                            title={`Prize pool is ${totalTokensWithoutDecimals} tokens`}
-                        >
-                            {`🪙 ${totalTokensWithoutDecimals}`}
-                        </Text>
-                        <Group noWrap spacing="xs">
-                            <Group spacing="xs" noWrap>
-                                <Text size="xs">{`🚀 ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
-                                {
-                                    userIsPlaying && <Text size="xs" title="You're in this game">🥊</Text>
-                                }
-                                {
-                                    (userIsPlaying === undefined) && (
-                                        <Text size="xs" title="Unsure if you're in this game">❔</Text>
-                                    )
-                                }
-                            </Group>
-                        </Group>
-                    </div>
-                </Group>
-            </Card>
+        <button
+            className={`${styles["card"]} ${props.selected && styles["selected"]}`}
+            onClick={() => props.setGame(props.entry.publicKey)}
+        >
+            <Group noWrap>
+                <Text title={`Prize pool is ${totalTokensWithoutDecimals} tokens`}>
+                    {`🪙 ${totalTokensWithoutDecimals}`}
+                </Text>
+                <Text title={`Entry fee is ${entryFeeWithoutDecimals} tokens`} color="dimmed" size="xs">
+                    {`(${entryFeeWithoutDecimals} ${mintName})`}
+                </Text>
+            </Group>
+            <Group noWrap spacing="xs">
+                <Text
+                    size="xs"
+                    title={`${buckets[0].players} of ${gameConfig.maxPlayers} currently playing`}
+                >{`🚀 ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
+                {
+                    userIsPlaying && <Text size="xs" title="You're in this game">🔆</Text>
+                }
+                {
+                    !userIsPlaying && <Text size="xs" title="Unsure if you're in this game">❔</Text>
+                }
+            </Group>
+            <Text transform="uppercase" size="xs" color="dimmed" title="Game ID">
+                { props.entry.account.id.toNumber() }
+            </Text>
         </button>
     );
 }
