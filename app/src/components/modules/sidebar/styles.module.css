@@ -23,25 +23,26 @@
 
 .games-list {
     display: flex;
-    width: 100%;
+    flex-direction: column;
     height: 100%;
+    max-width: 10rem;
     background-color: transparent;
     border: 1px solid var(--color-primary-lightest);
     border-radius: 0.5rem;
 }
 
-.game-card-button {
-    background: none;
-    border: none;
-    padding: none;
-}
-
 .card {
     composes: button-like from "../../shared/shared.module.css";
+    width: 100%;
+    border-radius: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .card.selected {
-    background-color: var(--color-primary-dark);
+    background-color: var(--color-primary-medium);
 }
 
 .new-game-button {
@@ -50,7 +51,6 @@
     height: 1.5rem;
     border-radius: 0.25rem;
     padding: 2px;
-
 }
 
 .new-game-icon {
