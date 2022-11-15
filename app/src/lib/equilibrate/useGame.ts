@@ -177,9 +177,6 @@ function useGameEvents(gameAddress: PublicKey | undefined): UseEventsContext<Gam
     useEffect(() => {
         const run = async () => {
             if (equilibrateIsReady && (gameAddress !== undefined)) {
-                if (!await equilibrate.gameExists(gameAddress)) {
-                    throw UseGameError.eventNoSuchGame(gameAddress);
-                }
                 equilibrate.watchGame(gameAddress, setEvent, true);
 
                 return () => {
