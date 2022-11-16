@@ -95,8 +95,8 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                             </List.Item>
                             <List.Item>
                                 Hydrogen (decimal-tokens) continuously escapes from every star and the wormhole
-                                and is equally distributed across the other stars. Hydrogen does not
-                                enter the wormhole from stars, only new ships.
+                                and is equally distributed across the other stars with fewer orbiting ships.
+                                Hydrogen does not enter the wormhole from stars, only new ships.
                             </List.Item>
                             <List.Item>
                                 The rate at which hydrogen escapes a star is directly proportional to the number
