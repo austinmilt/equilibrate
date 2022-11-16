@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
 # https://vitejs.dev/guide/static-deploy.html
+# https://docs.github.com/en/authentication/troubleshooting-ssh/error-permission-denied-publickey?platform=linux
 
 # abort on errors
 set -e
