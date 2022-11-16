@@ -6,6 +6,7 @@
 set -e
 
 # build
+rm -rf app/dist
 yarn build
 
 # navigate into the build output directory
@@ -15,11 +16,11 @@ cd app/dist
 echo > .nojekyll
 
 git init
-git checkout -B main
+git checkout -B master
 git add -A
 git commit -m 'deploy'
 
 # if you are deploying to https://<USERNAME>.github.io/<REPO>
-git push -f git@github.com:austinmilt/equilibrate.git main:gh-pages
+git push -f git@github.com:austinmilt/equilibrate.git master:gh-pages
 
 cd ../
