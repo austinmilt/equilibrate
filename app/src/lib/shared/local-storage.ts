@@ -33,16 +33,17 @@ export function useLocalStorage() {
     }, []);
 
 
-    const updateValueIfNeeded = useCallback((event: StorageEvent) => {
-        // key will be null when local storage was cleared
-        if (event.key == null) {
+    const updateValueIfNeeded = useCallback((event: StorageEvent, type: StorageEventType) => {
+        if (type === StorageEventType.CLEAR) {
             setValues({});
 
-        } else if (event.newValue !== event.oldValue) {
-            setOrDeleteKeyValue(event.key, event.newValue, values);
-            setValues(values);
+        } else if (type === StorageEventType.REMOVE) {
+            if (event.key != null) {
+                setOrDeleteKeyValue(event.key, event.newValue, values);
+                setValues(values);
+            }
         }
-    }, []);
+    }, [values]);
 
 
     const mutations = useMutateLocalStorageWithEvent(updateValueIfNeeded);
@@ -175,12 +176,11 @@ export function useLocalStorageParam<T>(key: string, options?: Options<T>): UseL
     }, [key, window]);
 
 
-    const updateValueIfNeeded = useCallback((event: StorageEvent) => {
-        // key will be null when local storage was cleared
-        if (event.key == null) {
+    const updateValueIfNeeded = useCallback((event: StorageEvent, type: StorageEventType) => {
+        if (type === StorageEventType.CLEAR) {
             setValue(null);
 
-        } else if ((event.key === key) && (event.newValue !== event.oldValue)) {
+        } else if (event.key === key) {
             processStorageValue(event.key, event.newValue);
         }
     }, [processStorageValue, setValue, key]);
@@ -248,10 +248,8 @@ export function parseWrappedLocalStorageValue<T>(
 }
 
 
-interface UseMutateLocalStorageWithEventContext {
-    set: (key: string, value: string) => void;
-    remove: (key: string) => void;
-    clear: () => void;
+enum StorageEventType {
+    SET, REMOVE, CLEAR
 }
 
 
@@ -279,8 +277,16 @@ class StorageEvents {
 }
 
 
-function useMutateLocalStorageWithEvent(callback: (context: StorageEvent) => void) {
+interface UseMutateLocalStorageWithEventContext {
+    set: (key: string, value: string) => void;
+    remove: (key: string) => void;
+    clear: () => void;
+}
+
+
+function useMutateLocalStorageWithEvent(listener: (event: StorageEvent, type: StorageEventType) => void) {
     const ready: boolean = useMemo(() => typeof window !== "undefined", [window]);
+
 
     const set: UseMutateLocalStorageWithEventContext["set"] = useCallback((key, value) => {
         if (ready) {
@@ -289,12 +295,14 @@ function useMutateLocalStorageWithEvent(callback: (context: StorageEvent) => voi
         }
     }, [ready]);
 
+
     const remove: UseMutateLocalStorageWithEventContext["remove"] = useCallback((key) => {
         if (ready) {
             dispatchEvent(StorageEvents.remove(key));
             localStorage.removeItem(key);
         }
     }, [ready]);
+
 
     const clear: UseMutateLocalStorageWithEventContext["clear"] = useCallback(() => {
         if (ready) {
@@ -304,13 +312,27 @@ function useMutateLocalStorageWithEvent(callback: (context: StorageEvent) => voi
     }, [ready]);
 
 
+    const listenerWrapper: (event: StorageEvent) => void = useCallback((event) => {
+        // key will be null when local storage was cleared
+        if (event.key == null) {
+            listener(event, StorageEventType.CLEAR);
+
+        } else if (event.newValue === null) {
+            listener(event, StorageEventType.REMOVE);
+
+        } else if (event.newValue !== event.oldValue) {
+            listener(event, StorageEventType.SET);
+        }
+    }, [listener]);
+
+
     useEffect(() => {
-        addEventListener("storage", callback);
+        addEventListener("storage", listenerWrapper);
 
         return () => {
-            removeEventListener("storage", callback);
+            removeEventListener("storage", listenerWrapper);
         };
-    }, [callback]);
+    }, [listenerWrapper]);
 
 
     return {

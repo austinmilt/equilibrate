@@ -224,41 +224,13 @@ interface BucketSnapshot {
 }
 
 
-// //TODO consider moving to the SDK and calling with a timestamp for `now`
-// // Adapted from Game::update_bucket_balances in the program
-// //
-// // Note to self: two buckets with zero players will, in general, not end up with the same balance at
-// // steady state. Since buckets with zero players have no outflow, there's no mechanism for them to
-// // equilibrate with other buckets with the same number of players. I believe this applies to any
-// // two buckets with the same number of players.
-// function computeBucketSnapshots(game: GameEnriched): BucketSnapshot[] {
-//     // while the BN's here could be large enough to cause an overflow error, it's highly unlikely
-//     // a game would reach that state, so we'll use toNumber()
-//     const now: number = new Date().getTime();
-//     const secondsSinceLastUpdate: number = (now / 1000) - game.state.lastUpdateEpochSeconds.toNumber();
-//     const spillRateConfigured: number = game.config.spillRateDecimalTokensPerSecondPerPlayer.toNumber();
-//     const buckets: BucketEnriched[] = game.state.buckets;
-//     const nBucketsIncludingHolding: number = buckets.length;
-//     const nBucketsPlayable: number = nBucketsIncludingHolding - 1;
-//     const outflow: number[] = buckets.map(b => computeExpectedSpillover(b, spillRateConfigured, secondsSinceLastUpdate));
-//     const tokensToRedistribute: number = outflow.reduce((total, o) => total + o, 0);
-//     const inflow: number[] = outflow.map((o, i) => (tokensToRedistribute - o) / (i === 0 ? nBucketsPlayable : nBucketsPlayable - 1));
-//     const result: BucketSnapshot[] = buckets.map((b, i) => ({
-//         players: b.players,
-//         decimalTokens: b.decimalTokens.toNumber() + inflow[i] - outflow[i],
-//         changeRate: (inflow[i] - outflow[i]) / secondsSinceLastUpdate
-//     }));
-//     return result;
-// }
-
-
-//TODO consider moving to the SDK and calling with a timestamp for `now`
 // Adapted from Game::update_bucket_balances in the program
 //
 // Note to self: two buckets with zero players will, in general, not end up with the same balance at
 // steady state. Since buckets with zero players have no outflow, there's no mechanism for them to
 // equilibrate with other buckets with the same number of players. I believe this applies to any
 // two buckets with the same number of players.
+// function computeBucketSnapshots(game: GameEnriched): BucketSnapshot[] {
 function computeBucketSnapshots(game: GameEnriched): BucketSnapshot[] {
     // while the BN's here could be large enough to cause an overflow error, it's highly unlikely
     // a game would reach that state, so we'll use toNumber()
@@ -267,70 +239,30 @@ function computeBucketSnapshots(game: GameEnriched): BucketSnapshot[] {
     const spillRateConfigured: number = game.config.spillRateDecimalTokensPerSecondPerPlayer.toNumber();
     const buckets: BucketEnriched[] = game.state.buckets;
     const nBucketsIncludingHolding: number = buckets.length;
-    const nBucketsPlayable: number = nBucketsIncludingHolding - 1;
     const inflow: number[] = Array(nBucketsIncludingHolding).fill(0);
-    const result: BucketSnapshot[] = [];
+    const outflow: number[] = Array(nBucketsIncludingHolding).fill(0);
     for (let i = 0; i < nBucketsIncludingHolding; i++) {
         const bucketI: BucketEnriched = buckets[i];
-        const iIsHolding: boolean = i === 0;
         const spilloverIExpected: number = computeExpectedSpillover(
             bucketI,
             spillRateConfigured,
             secondsSinceLastUpdate
         );
-        const peersI: number = iIsHolding ? nBucketsPlayable : (nBucketsPlayable - 1);
-        //TODO this floor is causing a bucket with small balance to not get rid of its last tokens, and
-        //TODO that's a problem for the holding bucket especially. We should choose which bucket the remaining
-        //TODO tokens need to enter (maybe the one with the lowest balance that has positive inflow rate)
-        //TODO and update that in the program (and here)
-        //TODO
-        //TODO BIG PROBLEM: If you start with zero tokens but non-zero players (e.g. first player), then the
-        //TODO program (and this code) will have tokens flowing into the bucket, but nothing flowing out because
-        //TODO computeExpectedSpillover is based on the original balance of the bucket (0).
-        //TODO I think to do this properly, I need to do two rounds of calculations.
-        //TODO A. Expected net flow
-        //TODO      1. _all_ the outflow as if it had tokens to give
-        //TODO      2. _all_ the inflow from other buckets as if they had the tokens to give
-        //TODO      3. expected balance change = [2] - [1]
-        //TODO
-        //TODO B. Actual flow and balance
-        //TODO      1. ????
-        //TODO
-        //TODO THERE IS AN ANALYTICAL FORMULA FOR THIS. WRITE OUT equation for balance(time t, bucket i)
-        //TODO      And the first derivative for change over time
-        const spilloverToJ: number = Math.floor(spilloverIExpected / peersI);
-        const spilloverI: number = spilloverToJ * peersI;
-        for (let j = i + 1; j < nBucketsIncludingHolding; j++) {
-            const bucketJ: BucketEnriched = buckets[j];
-            // j will never be 0, so it's always a playable bucket
-            const peersJ: number = nBucketsPlayable - 1;
-            const spilloverJ: number = computeExpectedSpillover(bucketJ, spillRateConfigured, secondsSinceLastUpdate);
-            const spilloverToI: number = iIsHolding ? 0 : Math.floor(spilloverJ / peersJ);
-            inflow[i] += spilloverToI;
-            inflow[j] += spilloverToJ;
-        }
-        const balanceChange: number = inflow[i] - spilloverI;
-        const balanceI: number = bucketI.decimalTokens.toNumber() + balanceChange;
-        //TODO revert
-        // if (i > 0 && bucketI.players > 0) {
-        //     console.log({
-        //         inflow: inflow[i],
-        //         outflow: spilloverI,
-        //         lastTokens: bucketI.decimalTokens.toNumber(),
-        //         expected: bucketI.decimalTokens.toNumber() - bucketI.players * spillRateConfigured * secondsSinceLastUpdate,
-        //         decimalTokens: balanceI,
-        //         players: bucketI.players,
-        //         spillRate: balanceChange / secondsSinceLastUpdate
-        //     });
-        // }
-        result.push({
-            decimalTokens: balanceI,
-            players: bucketI.players,
-            changeRate: balanceChange / secondsSinceLastUpdate
-        });
+        // only spill to buckets with fewer players than this one
+        const targetIndices: number[] = buckets.flatMap((b, j) =>
+            (j !== 0) && (j !== i) && (b.players < bucketI.players) ? [j] : []
+        );
+        const targetCount: number = targetIndices.length;
+        const spilloverToJ: number = targetCount === 0 ? 0 : Math.floor(spilloverIExpected / targetCount);
+        const spilloverI: number = spilloverToJ * targetCount;
+        outflow[i] = spilloverI;
+        targetIndices.forEach(j => inflow[j] += spilloverToJ);
     }
-
-    return result;
+    return buckets.map((b, i) => ({
+        decimalTokens: b.decimalTokens.toNumber() + inflow[i] - outflow[i],
+        players: b.players,
+        changeRate: (inflow[i] - outflow[i]) / secondsSinceLastUpdate
+    }));
 }
 
 

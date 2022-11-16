@@ -32,7 +32,7 @@ interface UseMintListContext {
     /**
      * Will be `true` during initialization/update of the list.
      */
-    loading: boolean;
+    initialized: boolean;
 }
 
 
@@ -46,7 +46,7 @@ export function useMintList(): UseMintListContext {
 
     return {
         mints: localStorageContext.value,
-        loading: localStorageContext.initialized
+        initialized: localStorageContext.initialized
     };
 }
 

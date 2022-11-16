@@ -5,7 +5,7 @@ import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/p
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
 import { StarStatus } from "./StarStatus";
 import { ShipLog, useCleanShipLogs, useShipLogs } from "./ShipLog";
-import { Notifications, notifyError, notifyPotentialBug } from "../../../lib/shared/notifications";
+import { Notifications, notifyError, notifyPotentialBug, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
 import { PublicKey } from "@solana/web3.js";
@@ -94,14 +94,23 @@ export function Hud(): JSX.Element {
             starIndex,
             {
                 player: overridePlayer,
-                onSuccess: ({transactionSignature: signature}) => {
-                    if (signature !== undefined) {
+                onSuccess: (result) => {
+                    const signature: string | undefined = result.transactionSignature;
+                    if (result.error !== undefined) {
+                        notifyError("Unable to enter the system: " + result.error.message);
+                        console.error(result.error);
+
+                    } else if (signature !== undefined) {
                         shipLogContext.record({
                             text: "Entered the system.",
                             url: makeTransactionUrl(signature)
                         });
+                        activeGalaxyContext.playerStar.set(starIndex);
+
+                    } else if (result.simulationResult) {
+                        notifySuccess("Enter simulated. See console for details.");
+                        console.log("Enter simulation result", result.simulationResult);
                     }
-                    activeGalaxyContext.playerStar.set(starIndex);
                 },
                 onError: e => notifyError("Unable to enter the system.", e)
             }
@@ -118,13 +127,22 @@ export function Hud(): JSX.Element {
             starIndex,
             {
                 player: overridePlayer,
-                onSuccess: ({transactionSignature: signature}) => {
-                    if (signature !== undefined) {
+                onSuccess: (result) => {
+                    const signature: string | undefined = result.transactionSignature;
+                    if (result.error !== undefined) {
+                        notifyError("Unable to move the ship: " + result.error.message);
+                        console.error(result.error);
+
+                    } else if (signature !== undefined) {
                         shipLogContext.record({ text: "Moved ship.", url: makeTransactionUrl(signature) });
+                        activeGalaxyContext.playerStar.set(starIndex);
+
+                    } else if (result.simulationResult) {
+                        notifySuccess("Move simulated. See console for details.");
+                        console.log("Move simulation result", result.simulationResult);
                     }
-                    activeGalaxyContext.playerStar.set(starIndex);
                 },
-                onError: e => notifyError("Unable to move the ship.", e)
+                onError: e => notifyError("Unable to move the ship.", e),
             }
         );
     }, [
@@ -146,20 +164,28 @@ export function Hud(): JSX.Element {
                         }
                     } else {
                         const signature: string | undefined = result.transactionSignature;
-                        if (signature !== undefined) {
+                        if (result.error !== undefined) {
+                            notifyError("Unable to escape the system: " + result.error.message);
+                            console.error(result.error);
+
+                        } else if (signature !== undefined) {
                             shipLogContext.record({
                                 text: "Escaped the system.",
                                 url: makeTransactionUrl(signature)
                             });
+                            shipLogContext.onEscapeSystem();
+
+                        } else if (result.simulationResult) {
+                            notifySuccess("Escape simulated. See console for details.");
+                            console.log("Escape simulation result", result.simulationResult);
                         }
-                        shipLogContext.onEscapeSystem();
                     }
                 },
-                onError: e => notifyError("Unable to leave the system.", e)
+                onError: e => notifyError("Unable to escape the system.", e)
             }
         );
     }, [
-        gameContext.moveBucket,
+        gameContext.leaveGame,
         shipLogContext.record,
         shipLogContext.onEscapeSystem,
         activeGalaxyContext.playerStar.set,
