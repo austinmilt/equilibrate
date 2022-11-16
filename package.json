@@ -2,6 +2,7 @@
   "scripts": {
     "dev": "yarn --cwd app vite --port 3000",
     "build": "yarn --cwd app vite build",
+    "deploy": "./app/deploy.sh",
     "preview": "yarn --cwd app vite preview",
     "lint": "yarn --cwd app eslint"
   },
