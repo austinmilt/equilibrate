@@ -5,9 +5,9 @@ import {
     SolflareWalletAdapter,
     TorusWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, ReactNode, useContext, useMemo, useState } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
-import { clusterApiUrl } from "@solana/web3.js";
+import { RPC_KEY_DEFAULT, RPC_URL_DEV, RPC_URL_LOCAL, RPC_URL_MAIN } from "../shared/constants";
 
 // https://github.com/solana-labs/wallet-adapter/blob/master/APP.md
 export function SolanaProvider(props: {children: React.ReactNode}): JSX.Element {
@@ -50,27 +50,24 @@ export function useEndpoint(): EndpointContextState {
 }
 
 export function EndpointProvider(props: { children: ReactNode }): JSX.Element {
-    const [key, setKey] = useState<Endpoint>("local");
-    const [url, setUrl] = useState<string>("http://localhost:8899");
-    const [isProd, setIsProd] = useState<boolean>(false);
+    const [key, setKey] = useState<Endpoint>(RPC_KEY_DEFAULT);
 
-    useEffect(() => {
+    const [url, isProd] = useMemo(() => {
         let newUrl: string;
         let newIsProd: boolean;
         if (key === "local") {
-            newUrl = "http://localhost:8899";
+            newUrl = RPC_URL_LOCAL;
             newIsProd = false;
 
         } else if (key === "dev") {
-            newUrl = clusterApiUrl("devnet");
+            newUrl = RPC_URL_DEV;
             newIsProd = false;
 
         } else {
-            newUrl = clusterApiUrl("mainnet-beta");
+            newUrl = RPC_URL_MAIN;
             newIsProd = true;
         }
-        setUrl(newUrl);
-        setIsProd(newIsProd);
+        return [newUrl, newIsProd];
     }, [key]);
 
     return (

@@ -1,5 +1,7 @@
 // https://vitejs.dev/guide/env-and-mode.html
 
+import { clusterApiUrl } from "@solana/web3.js";
+import { Endpoint } from "../solana/provider";
 import { Duration } from "./duration";
 
 export const GAMES_LIST_UPDATE_INTERVAL: Duration = parseEnv(
@@ -23,6 +25,35 @@ export const SHIP_MAX_LOGS: number = parseEnv(
     import.meta.env.VITE_SHIP_MAX_LOGS,
     20,
     Number.parseInt
+);
+
+
+export const RPC_URL_LOCAL: string = parseEnv(
+    "RPC_URL_LOCAL",
+    import.meta.env.VITE_RPC_URL_LOCAL,
+    "http://localhost:8899"
+);
+
+
+export const RPC_URL_DEV: string = parseEnv(
+    "RPC_URL_DEV",
+    import.meta.env.VITE_RPC_URL_DEV,
+    clusterApiUrl("devnet")
+);
+
+
+export const RPC_URL_MAIN: string = parseEnv(
+    "RPC_URL_MAIN",
+    import.meta.env.VITE_RPC_URL_MAIN,
+    clusterApiUrl("mainnet-beta")
+);
+
+
+export const RPC_KEY_DEFAULT: Endpoint = parseEnv(
+    "RPC_KEY_DEFAULT",
+    import.meta.env.VITE_RPC_KEY_DEFAULT,
+    "dev",
+    v => v as Endpoint
 );
 
 
