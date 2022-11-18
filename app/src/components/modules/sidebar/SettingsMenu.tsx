@@ -1,8 +1,9 @@
 import { Center, Group, Loader, SegmentedControl } from "@mantine/core";
-import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useAnchorWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { useState, useCallback, useRef } from "react";
+import { clusterApiUrl, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { useState, useCallback, useRef, useMemo } from "react";
+import { RPC_URL_LOCAL } from "../../../lib/shared/constants";
 import { notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
 import { useOnClickOutside } from "../../../lib/shared/useOnClickOutside";
 import { useOnEscape } from "../../../lib/shared/useOnEscape";
@@ -97,9 +98,17 @@ function ClusterControl(): JSX.Element {
 
 function AirdropButton(): JSX.Element {
     const wallet = useAnchorWallet();
-    const { connection } = useConnection();
     const { key: endpoint, isProd: endpointIsProd } = useEndpoint();
     const [loading, setLoading] = useState<boolean>(false);
+
+    // have to use the public RPC for airdrops :/
+    const airdropEndpoint: string = useMemo(() => {
+        if (endpoint === "local") return RPC_URL_LOCAL;
+        else if (endpoint === "dev") return clusterApiUrl("devnet");
+        else return "";
+    }, [endpoint]);
+
+    const connection: Connection = useMemo(() => new Connection(airdropEndpoint), [airdropEndpoint]);
 
     const onAirdrop: () => Promise<void> = useCallback(async () => {
         setLoading(true);
