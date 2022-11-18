@@ -2,8 +2,6 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import * as spl from "@solana/spl-token";
 import { GAME_SEED, PLAYER_SEED, POOL_SEED, POOL_MANAGER_SEED } from "./constants";
-import { Game } from "./types";
-import { Equilibrate } from "../../../../target/types/equilibrate";
 
 export async function getGameAddress(
     gameId: number,

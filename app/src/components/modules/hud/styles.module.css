@@ -1,11 +1,19 @@
 .hud {
     display: flex;
     flex-direction: row;
-    gap: 1rem;
+    gap: 3rem;
     height: 100%;
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: flex-end;
+}
+
+
+.star-status-and-winnings {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
 }
 
 
@@ -34,12 +42,12 @@
 
 
 .star-status {
-    flex-direction: column;
+    flex-direction: row;
     display: flex;
     justify-content: space-between;
     align-content: space-between;
     height: 100%;
-    width: 10rem;
+    gap: 1rem;
 }
 
 

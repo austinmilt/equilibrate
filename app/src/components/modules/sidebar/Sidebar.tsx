@@ -1,7 +1,5 @@
 import {
-    Card,
     Group,
-    Image,
     Text,
     ScrollArea,
     Center
@@ -21,6 +19,7 @@ import { SettingsMenu } from "./SettingsMenu";
 import styles from "./styles.module.css";
 import { useMintList } from "../../../lib/shared/mint-list";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { formatTokens } from "../../../lib/shared/number";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -204,27 +203,14 @@ function GameCard(props: GameCardProps): JSX.Element {
     const userIsPlaying: boolean | undefined = props.entry.userIsPlaying;
     const gameConfig: GameConfigEnriched = props.entry.account.config;
     const buckets: Bucket[] = props.entry.account.state.buckets;
-    const numberFormatter: Intl.NumberFormat = useMemo(() =>
-        new Intl.NumberFormat(undefined, {
-            notation: "compact",
-            maximumSignificantDigits: 3
-        })
-    , []);
 
-    const entryFeeWithoutDecimals: string = useMemo(() => {
-        let resultNumber: number = gameConfig.entryFeeDecimalTokens.toNumber();
-        if (gameConfig.mintDecimals !== null) {
-            resultNumber /= Math.pow(10, gameConfig.mintDecimals);
-        }
-        return resultNumber < 1e-3 ? "~0" : numberFormatter.format(resultNumber);
-    }, [gameConfig.entryFeeDecimalTokens, gameConfig.mintDecimals]);
+    const entryFeeWithoutDecimals: string = useMemo(() =>
+        formatTokens(gameConfig.entryFeeDecimalTokens.toNumber(), gameConfig.mintDecimals),
+    [gameConfig.entryFeeDecimalTokens, gameConfig.mintDecimals]);
 
     const totalTokensWithoutDecimals: string = useMemo(() => {
-        let resultNumber: number = buckets.reduce((sum, bucket) => sum + bucket.decimalTokens.toNumber(), 0);
-        if (gameConfig.mintDecimals !== null) {
-            resultNumber /= Math.pow(10, gameConfig.mintDecimals);
-        }
-        return resultNumber < 1e-3 ? "~0" : numberFormatter.format(resultNumber);
+        const resultNumber: number = buckets.reduce((sum, bucket) => sum + bucket.decimalTokens.toNumber(), 0);
+        return formatTokens(resultNumber, gameConfig.mintDecimals);
     }, [props.entry, buckets]);
 
     const mintName: string = useMemo(() => {

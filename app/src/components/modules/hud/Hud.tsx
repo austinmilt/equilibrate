@@ -1,7 +1,7 @@
 import { Tooltip, Text } from "@mantine/core";
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
-import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/provider";
+import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
 import { StarStatus } from "./StarStatus";
 import { ShipLog, useCleanShipLogs, useShipLogs } from "./ShipLog";
@@ -13,6 +13,7 @@ import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { PlayerState } from "../../../lib/equilibrate/types";
 import styles from "./styles.module.css";
 import { useMousePosition } from "../../../lib/shared/useMousePosition";
+import { formatTokens } from "../../../lib/shared/number";
 
 enum GameAction {
     ENTER,
@@ -296,20 +297,37 @@ export function Hud(): JSX.Element {
     [cancelOnLoss]);
 
 
+    const playerApproximateWinnings: string | undefined = useMemo(() => {
+        let result: string | undefined;
+        const playerStar: StarData | undefined = activeGalaxyContext.playerStar.data;
+        if ((playerStar !== undefined) && (playerStar.satellites > 0)) {
+            result = formatTokens(playerStar.fuel / playerStar.satellites, gameContext.game?.game?.config.mintDecimals);
+        }
+        return result;
+    }, [activeGalaxyContext.playerStar.data]);
+
+
     return <div className={styles["hud"]}>
         {activeGame && (
             <>
                 <ShipLog gameAddress={activeGame}/>
-                <StarStatus
-                    data={activeGalaxyContext.focalStar.data}
-                    galaxyState={activeGalaxyContext.galaxy?.state}
-                    isSourceStar={activeGalaxyContext.focalStar.isSource}
-                />
                 <Tooltip label={abortSwitchTooltip} multiline width={300}>
                     <button className={styles["abort-switch"]} onClick={() => setCancelOnLoss(!cancelOnLoss)}>
                         { cancelOnLoss ? "💎" : "📃" }
                     </button>
                 </Tooltip>
+                <div className={styles["star-status-and-winnings"]}>
+                    <StarStatus
+                        data={activeGalaxyContext.focalStar.data}
+                        galaxyState={activeGalaxyContext.galaxy?.state}
+                        isSourceStar={activeGalaxyContext.focalStar.isSource}
+                    />
+                    <Tooltip label="Your approximate winnings if you leave now.">
+                        <Text size="lg">
+                            { playerApproximateWinnings && "🪙 " + playerApproximateWinnings }
+                        </Text>
+                    </Tooltip>
+                </div>
                 { activeGalaxyContext.focalStar.isHovered && (
                     <div
                         className={styles["star-hover-help"]}

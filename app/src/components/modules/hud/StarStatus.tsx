@@ -1,4 +1,4 @@
-import { RingProgress, Center, Text, Image, Tooltip, SimpleGrid } from "@mantine/core";
+import { RingProgress, Center, Text, Image } from "@mantine/core";
 import { useMemo } from "react";
 import { StarData } from "../../shared/galaxy/provider";
 import { InlineStyles } from "../../shared/inline-styles";
@@ -19,8 +19,8 @@ interface StarStatusProps {
 export function StarStatus(props: StarStatusProps): JSX.Element {
     return (
         <div className={styles["star-status"]}>
-            <FuelGuage {...props}/>
             <SatelliteGuage {...props}/>
+            <FuelGuage {...props}/>
         </div>
     );
 }
