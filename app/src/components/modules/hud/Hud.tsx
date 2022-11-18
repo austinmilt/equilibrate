@@ -292,7 +292,10 @@ export function Hud(): JSX.Element {
 
     const abortSwitchTooltip: string = useMemo(() =>
         cancelOnLoss ?
-            "The game will reject your attempt to leave if you would lose tokens." :
+            (
+                "The game will reject your attempt to leave if you would leave with less than the game's entry fee. " +
+                    "This does not include the program's flat fee to play."
+            ) :
             "The game will approve your attempt to leave regardless of your winnings.",
     [cancelOnLoss]);
 
@@ -322,7 +325,10 @@ export function Hud(): JSX.Element {
                         galaxyState={activeGalaxyContext.galaxy?.state}
                         isSourceStar={activeGalaxyContext.focalStar.isSource}
                     />
-                    <Tooltip label="Your approximate winnings if you leave now.">
+                    <Tooltip label={(
+                        "Your approximate winnings if you leave now " +
+                        "(not including the program's fee to play)."
+                    )}>
                         <Text size="lg">
                             { playerApproximateWinnings && "🪙 " + playerApproximateWinnings }
                         </Text>
