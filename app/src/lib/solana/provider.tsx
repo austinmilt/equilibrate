@@ -5,9 +5,10 @@ import {
     SolflareWalletAdapter,
     TorusWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import React, { createContext, ReactNode, useContext, useMemo, useState } from "react";
+import React, { createContext, ReactNode, useContext, useMemo } from "react";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import { RPC_KEY_DEFAULT, RPC_URL_DEV, RPC_URL_LOCAL, RPC_URL_MAIN } from "../shared/constants";
+import { useLocalStorageParam } from "../shared/local-storage";
 
 // https://github.com/solana-labs/wallet-adapter/blob/master/APP.md
 export function SolanaProvider(props: {children: React.ReactNode}): JSX.Element {
@@ -50,7 +51,8 @@ export function useEndpoint(): EndpointContextState {
 }
 
 export function EndpointProvider(props: { children: ReactNode }): JSX.Element {
-    const [key, setKey] = useState<Endpoint>(RPC_KEY_DEFAULT);
+    const { value: lsKey, set: setKey } = useLocalStorageParam<Endpoint>("endpoint-key");
+    const key: Endpoint = useMemo(() => lsKey ?? RPC_KEY_DEFAULT, [lsKey]);
 
     const [url, isProd] = useMemo(() => {
         let newUrl: string;
