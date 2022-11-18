@@ -125,3 +125,12 @@
     transition-duration: 500ms;
     transition: all;
 }
+
+.wallet-balance {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    font-size: 0.8rem;
+}

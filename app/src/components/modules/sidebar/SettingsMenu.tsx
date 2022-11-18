@@ -1,10 +1,10 @@
-import { Center, Group, Loader, SegmentedControl } from "@mantine/core";
-import { useAnchorWallet } from "@solana/wallet-adapter-react";
+import { Center, Group, Loader, SegmentedControl, Text } from "@mantine/core";
+import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { clusterApiUrl, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { RPC_URL_LOCAL } from "../../../lib/shared/constants";
-import { notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
+import { notifyError, notifyPotentialBug, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
 import { useOnClickOutside } from "../../../lib/shared/useOnClickOutside";
 import { useOnEscape } from "../../../lib/shared/useOnEscape";
 import { useEndpoint, Endpoint } from "../../../lib/solana/provider";
@@ -18,19 +18,82 @@ export function SettingsMenu(): JSX.Element {
     const menuButtonRef = useRef<HTMLButtonElement>(null);
     useOnEscape(() => setOpenMenu(false));
     useOnClickOutside([menuContentRef, menuButtonRef], () => setOpenMenu(false));
+    const walletBalanceContext = useWalletBalance();
 
     return <>
         <div className={styles["settings-menu-container"]}>
             <SettingsButton onClick={() => setOpenMenu(!openMenu)} innerRef={menuButtonRef}/>
             { openMenu && (
                 <menu className={styles["settings-menu-content"]} ref={menuContentRef}>
-                    <WalletMultiButton className={styles["wallet-connect-button"]}/>
+                    <div>
+                        <WalletMultiButton className={styles["wallet-connect-button"]}/>
+                        <div className={styles["wallet-balance"]}>
+                            <Text>{ walletBalanceContext.balance?.toFixed(3) } SOL</Text>
+                            <ContainerButton onClick={walletBalanceContext.refresh}>
+                                <RefreshIcon/>
+                            </ContainerButton>
+                        </div>
+                    </div>
                     <ClusterControl/>
                     { !endpointIsProd && <AirdropButton/> }
                 </menu>
             )}
         </div>
     </>;
+}
+
+
+interface UseWalletBalanceContext {
+    loading: boolean;
+    balance: number | undefined;
+    refresh: () => void;
+}
+
+
+function useWalletBalance(): UseWalletBalanceContext {
+    const [balance, setBalance] = useState<number | undefined>();
+    const [loading, setLoading] = useState<boolean>(false);
+    const { connection } = useConnection();
+    const wallet = useAnchorWallet();
+
+    const updateBalance: () => void = useCallback(() => {
+        if (wallet !== undefined) {
+            setLoading(true);
+            connection.getBalance(wallet.publicKey)
+                .then(b => setBalance(b / LAMPORTS_PER_SOL))
+                .catch(e => notifyError("Unable to fetch wallet balance.", e))
+                .finally(() => setLoading(false));
+        }
+    }, [connection, setBalance, wallet]);
+
+    useEffect(updateBalance, [updateBalance]);
+
+    return {
+        loading: loading,
+        balance: balance,
+        refresh: updateBalance
+    };
+}
+
+
+function RefreshIcon(): JSX.Element {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+            stroke="currentColor"
+            className={styles["settings-menu-button"]}
+        >
+            <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                // eslint-disable-next-line max-len
+                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+            />
+        </svg>
+    );
 }
 
 
