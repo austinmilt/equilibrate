@@ -191,6 +191,8 @@ function AirdropButton(): JSX.Element {
                     "Airdrop suceeded!",
                     `New balance on ${wallet.publicKey.toBase58()} is ${newSol.toFixed(3)} SOL.`
                 );
+            } catch (e) {
+                notifyError("Airdrop failed.", e as Error);
 
             } finally {
                 setLoading(false);
