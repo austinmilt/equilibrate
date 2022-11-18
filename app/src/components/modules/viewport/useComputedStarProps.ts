@@ -171,8 +171,6 @@ function computeStarCoordinates(
     const placementHeight: number = viewportHeight - 2*innerPadding;
     const cellWidth: number = placementWidth / nCols;
     const cellHeight: number = placementHeight / nRows;
-    // TODO recompute the star centroid such that its radius
-    // TODO does not leave its cell (and overlap with another star)
     // give each star a bit of jitter to make it look more natural
     return {
         x: cellWidth*(colIndex + Math.random()) + innerPadding,

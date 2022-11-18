@@ -180,8 +180,6 @@ function useGameEvents(gameAddress: PublicKey | undefined): UseEventsContext<Gam
                 equilibrate.watchGame(gameAddress, setEvent, true);
 
                 return () => {
-                    // TODO this is an async method so it may return after the component is unmounted :(
-                    // TODO likely the cause of "WebSocket is already in CLOSING or CLOSED state."
                     equilibrate.stopWatchingGame(gameAddress);
                 };
             }
@@ -221,8 +219,6 @@ function usePlayerEvents(
                 );
 
                 return () => {
-                    // TODO this is an async method so it may return after the component is unmounted :(
-                    // TODO likely the cause of "WebSocket is already in CLOSING or CLOSED state."
                     equilibrate.stopWatchingPlayerState(playerAddress, gameAddress);
                 };
             }

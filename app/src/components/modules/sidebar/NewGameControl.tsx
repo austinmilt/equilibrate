@@ -76,7 +76,6 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [loading, setLoading] = useState<boolean>(false);
 
-    //TODO replace with form validation
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
     const [spillRate, setSpillRate] = useState<number | undefined>(0.0001);

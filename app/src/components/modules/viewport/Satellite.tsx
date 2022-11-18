@@ -13,10 +13,6 @@ export function Satellite(props: {
     const [conduitRef, setConduitRef] = useState<Konva.Line | null>(null);
     useEffect(() => {
         if (conduitRef !== null) {
-            //TODO want to draw the conduit behind the star, but cant do that unless it's
-            // in the same level as the star, so I'll have to rearrange how this stuff is
-            // drawn (draw all the conduits before the stars and satellites)
-
             // pass pointer events through to the star if it's overlapping
             conduitRef.listening(false);
         }
@@ -44,7 +40,6 @@ export function Satellite(props: {
     const x: number = useMemo(() => props.starX + xOffset, [xOffset, props.starX]);
     const y: number = useMemo(() => props.starY + yOffset, [yOffset, props.starY]);
 
-    //TODO export style consts elsewhere
     const color: string = useMemo(() => props.isPlayer ? "#D9594C" : "gray", [props.isPlayer]);
 
     return <>
