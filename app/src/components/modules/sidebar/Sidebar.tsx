@@ -204,21 +204,27 @@ function GameCard(props: GameCardProps): JSX.Element {
     const userIsPlaying: boolean | undefined = props.entry.userIsPlaying;
     const gameConfig: GameConfigEnriched = props.entry.account.config;
     const buckets: Bucket[] = props.entry.account.state.buckets;
+    const numberFormatter: Intl.NumberFormat = useMemo(() =>
+        new Intl.NumberFormat(undefined, {
+            notation: "compact",
+            maximumSignificantDigits: 3
+        })
+    , []);
 
-    const entryFeeWithoutDecimals: number = useMemo(() => {
-        let result: number = gameConfig.entryFeeDecimalTokens.toNumber();
+    const entryFeeWithoutDecimals: string = useMemo(() => {
+        let resultNumber: number = gameConfig.entryFeeDecimalTokens.toNumber();
         if (gameConfig.mintDecimals !== null) {
-            result /= Math.pow(10, gameConfig.mintDecimals);
+            resultNumber /= Math.pow(10, gameConfig.mintDecimals);
         }
-        return result;
+        return resultNumber < 1e-3 ? "~0" : numberFormatter.format(resultNumber);
     }, [gameConfig.entryFeeDecimalTokens, gameConfig.mintDecimals]);
 
-    const totalTokensWithoutDecimals: number = useMemo(() => {
-        let result: number = buckets.reduce((sum, bucket) => sum + bucket.decimalTokens.toNumber(), 0);
+    const totalTokensWithoutDecimals: string = useMemo(() => {
+        let resultNumber: number = buckets.reduce((sum, bucket) => sum + bucket.decimalTokens.toNumber(), 0);
         if (gameConfig.mintDecimals !== null) {
-            result /= Math.pow(10, gameConfig.mintDecimals);
+            resultNumber /= Math.pow(10, gameConfig.mintDecimals);
         }
-        return result;
+        return resultNumber < 1e-3 ? "~0" : numberFormatter.format(resultNumber);
     }, [props.entry, buckets]);
 
     const mintName: string = useMemo(() => {
