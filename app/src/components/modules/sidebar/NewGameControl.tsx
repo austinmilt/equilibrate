@@ -80,6 +80,8 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const shipLogContext = useShipLogs(activeGame);
     const makeTransactionUrl = useMakeTransactionUrl();
+    const [newGameAddress, setNewGameAddress] = useState<PublicKey | undefined>();
+    const [newGameTransactionSignature, setNewGameTransactionSignature] = useState<string | undefined>();
 
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
@@ -109,21 +111,14 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         .setMaxPlayers(players)
                         // this sets the game address before the game is made, allowing
                         // us to observe the game creation event
-                        .withCreateNewGame(props.onGameAddressResolved)
+                        .withCreateNewGame((address) => {
+                            setNewGameAddress(address);
+                            props.onGameAddressResolved(address);
+                        })
                         .signAndSend();
 
-                    let url: string | undefined;
-                    if (result.transactionSignature != null) {
-                        url = makeTransactionUrl(result.transactionSignature);
-                    }
-
-                    shipLogContext.record({
-                        text: "Started a new game.",
-                        url: url
-                    });
-
+                    setNewGameTransactionSignature(result.transactionSignature);
                     props.onSuccess();
-                    props.onCloseIntent();
 
                 } catch (e) {
                     Notifications.createError(e);
@@ -144,6 +139,27 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
         props.onGameAddressResolved,
         props.onSuccess
     ]);
+
+
+    useEffect(() => {
+        if ((newGameAddress !== undefined) && (newGameAddress.toBase58() === activeGame?.toBase58())) {
+
+            let url: string | undefined;
+            if (newGameTransactionSignature != null) {
+                url = makeTransactionUrl(newGameTransactionSignature);
+            }
+
+            shipLogContext.record({
+                text: "Started a new game.",
+                url: url
+            });
+
+            setNewGameAddress(undefined);
+            setNewGameTransactionSignature(undefined);
+            props.onCloseIntent();
+        }
+    }, [newGameAddress, activeGame]);
+
 
     return (
         <Modal
