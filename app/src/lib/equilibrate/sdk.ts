@@ -410,8 +410,14 @@ export class EquilibrateSDK {
 
         if (fetchNow) {
             Assert.notNullish(this.program, "program");
-            getGame(gameAddress, this.program)
-                .then(game => this.processAndEmitGameEvent(gameAddress, game, subscription.emitter));
+            const program = this.program;
+            this.gameExists(gameAddress)
+                .then(exists => {
+                    if (exists) {
+                        getGame(gameAddress, program)
+                            .then(game => this.processAndEmitGameEvent(gameAddress, game, subscription.emitter));
+                    }
+                });
         }
     }
 
