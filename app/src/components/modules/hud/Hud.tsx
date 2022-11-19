@@ -33,9 +33,9 @@ export function Hud(): JSX.Element {
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
-    const makeTransactionUrl = useMakeTransactionUrl();
     const shipLogContext = useShipLogs(activeGame);
     const connectWalletIfNeeded = useInsertConnectWallet();
+    const makeTransactionUrl = useMakeTransactionUrl();
     const { equilibrate, player } = useEquilibrate();
     const [mouseX, mouseY] = useMousePosition();
     useCleanShipLogs();
