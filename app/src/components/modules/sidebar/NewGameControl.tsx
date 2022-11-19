@@ -5,9 +5,12 @@ import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { MintData, useMintList } from "../../../lib/shared/mint-list";
 import { Notifications } from "../../../lib/shared/notifications";
+import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
+import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
 import { InlineStyles } from "../../shared/inline-styles";
 import { Button } from "../../shared/model/button";
+import { useShipLogs } from "../hud/ShipLog";
 import styles from "./styles.module.css";
 
 
@@ -70,11 +73,13 @@ interface NewGameModalProps {
 }
 
 
-
 // https://mantine.dev/core/modal/
 export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const { equilibrate, equilibrateIsReady } = useEquilibrate();
     const [loading, setLoading] = useState<boolean>(false);
+    const { address: activeGame }: ActiveGameContextState = useActiveGame();
+    const shipLogContext = useShipLogs(activeGame);
+    const makeTransactionUrl = useMakeTransactionUrl();
 
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
@@ -96,7 +101,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
 
             } else {
                 try {
-                    await equilibrate.request()
+                    const result = await equilibrate.request()
                         .setEntryFeeTokens(entryFee)
                         .setMint(mint)
                         .setSpillRate(spillRate)
@@ -106,6 +111,16 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         // us to observe the game creation event
                         .withCreateNewGame(props.onGameAddressResolved)
                         .signAndSend();
+
+                    let url: string | undefined;
+                    if (result.transactionSignature != null) {
+                        url = makeTransactionUrl(result.transactionSignature);
+                    }
+
+                    shipLogContext.record({
+                        text: "Started a new game.",
+                        url: url
+                    });
 
                     props.onSuccess();
                     props.onCloseIntent();
