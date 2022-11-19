@@ -242,9 +242,6 @@ function GameCard(props: GameCardProps): JSX.Element {
                 {
                     userIsPlaying && <Text size="xs" title="You're in this game">🔆</Text>
                 }
-                {
-                    !userIsPlaying && <Text size="xs" title="Unsure if you're in this game">❔</Text>
-                }
             </Group>
             <Text transform="uppercase" size="xs" color="dimmed" title="Game ID">
                 { props.entry.account.id.toNumber() }
