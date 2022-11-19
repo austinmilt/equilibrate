@@ -32,3 +32,5 @@ app/dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+kp.json

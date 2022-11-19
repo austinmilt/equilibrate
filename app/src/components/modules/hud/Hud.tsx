@@ -8,12 +8,13 @@ import { ShipLog, useCleanShipLogs, useShipLogs } from "./ShipLog";
 import { Notifications, notifyError, notifyPotentialBug, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { PlayerState } from "../../../lib/equilibrate/types";
-import styles from "./styles.module.css";
 import { useMousePosition } from "../../../lib/shared/useMousePosition";
 import { formatTokens } from "../../../lib/shared/number";
+import { useConnection } from "@solana/wallet-adapter-react";
+import styles from "./styles.module.css";
 
 enum GameAction {
     ENTER,
@@ -38,6 +39,7 @@ export function Hud(): JSX.Element {
     const { equilibrate, player } = useEquilibrate();
     const [mouseX, mouseY] = useMousePosition();
     useCleanShipLogs();
+    const { connection } = useConnection();
 
 
     const computeFocalStarClickAction: () => Promise<GameAction> = useCallback(async () => {
@@ -90,7 +92,7 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const enterSystem: (starIndex: number) => void = useCallback(starIndex => {
+    const enterSystem: (starIndex: number) => Promise<void> = useCallback(async starIndex => {
         gameContext.enterGame(
             starIndex,
             {
@@ -123,7 +125,7 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const moveShip: (starIndex: number) => void = useCallback(starIndex => {
+    const moveShip: (starIndex: number) => Promise<void> = useCallback(async starIndex => {
         gameContext.moveBucket(
             starIndex,
             {
@@ -153,12 +155,12 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const leaveSystem: () => void = useCallback(() => {
+    const leaveSystem: () => Promise<void> = useCallback(async () => {
         gameContext.leaveGame(
             cancelOnLoss,
             {
                 player: overridePlayer,
-                onSuccess: (result) => {
+                onSuccess: async (result) => {
                     if (cancelOnLoss) {
                         if (result.anchorErrorCode === "AbortLeaveOnLoss") {
                             shipLogContext.record({ text: "Escape aborted." });
@@ -170,8 +172,13 @@ export function Hud(): JSX.Element {
                             console.error(result.error);
 
                         } else if (signature !== undefined) {
+                            const winnings: number | undefined = await tryToEstimateWinnings(signature, connection);
+                            const log: string = winnings === undefined ?
+                                "Escaped the system." :
+                                `Escaped the system with ${formatTokens(winnings)} tokens.`;
+
                             shipLogContext.record({
-                                text: "Escaped the system.",
+                                text: log,
                                 url: makeTransactionUrl(signature)
                             });
                             shipLogContext.onEscapeSystem();
@@ -198,13 +205,13 @@ export function Hud(): JSX.Element {
         try {
             const action: GameAction = await computeFocalStarClickAction();
             if (action === GameAction.ENTER) {
-                enterSystem(starIndex);
+                await enterSystem(starIndex);
 
             } else if (action === GameAction.MOVE) {
-                moveShip(starIndex);
+                await moveShip(starIndex);
 
             } else if (action === GameAction.LEAVE) {
-                leaveSystem();
+                await leaveSystem();
 
             } else if (action === GameAction.TRY_ENTER_CENTRAL) {
                 Notifications.enterWormholeOrbit();
@@ -350,4 +357,41 @@ export function Hud(): JSX.Element {
             </>
         )}
     </div>;
+}
+
+
+async function tryToEstimateWinnings(
+    transactionSignature: string,
+    connection: Connection
+): Promise<number | undefined> {
+
+    let winnings: number | undefined;
+    const transactionResponse = await connection.getTransaction(transactionSignature, {
+        commitment: "confirmed",
+        maxSupportedTransactionVersion: 10
+    });
+    if ((transactionResponse?.meta?.preTokenBalances != null)
+        && (transactionResponse?.meta?.postTokenBalances != null)
+    ) {
+        // for some reason the number will be set to null when it's zero, even though
+        // the text versions show it as zero
+        const poolBalanceBefore: number = transactionResponse.meta
+            .preTokenBalances[0]
+            .uiTokenAmount
+            .uiAmount ?? 0;
+
+        const poolBalanceAfter: number = transactionResponse.meta
+            .postTokenBalances[0]
+            .uiTokenAmount
+            .uiAmount ?? 0;
+
+        if ((poolBalanceBefore !== null) && (poolBalanceAfter !== null)) {
+            // I know this looks backwards, but the account being queried is the token pool
+            // of the program (or at least I think it is), so we're looking for the loss
+            // of tokens to find out what's going to the player
+            winnings = poolBalanceBefore - poolBalanceAfter;
+        }
+    }
+
+    return winnings;
 }
