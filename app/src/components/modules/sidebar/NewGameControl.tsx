@@ -78,7 +78,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
 
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
-    const [spillRate, setSpillRate] = useState<number | undefined>(0.0001);
+    const [spillRate, setSpillRate] = useState<number | undefined>(0.005);
     const [buckets, setBuckets] = useState<number | undefined>(3);
     const [players, setPlayers] = useState<number | undefined>(5);
 
