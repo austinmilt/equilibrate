@@ -67,7 +67,7 @@ function setOrDeleteKeyValue(key: string, value: string | null, values: {[key: s
 }
 
 
-interface UseLocalStorageParamContext<T> {
+export interface UseLocalStorageParamContext<T> {
     /**
      * Value in local storage, if it exists (and hasnt expired), `null` otherwise. Automatically updated
      * after calling `set` or `remove`, and upon automatic expiration.

@@ -1,6 +1,6 @@
-import { Accordion, Button, Group, List, Modal, SimpleGrid, Text } from "@mantine/core";
-import { useEffect, useMemo } from "react";
-import { useLocalStorageParam } from "../../../lib/shared/local-storage";
+import { Button, Group, List, Modal, SimpleGrid, Text } from "@mantine/core";
+import { useMemo } from "react";
+import { useLocalStorageParam, UseLocalStorageParamContext } from "../../../lib/shared/local-storage";
 import { Carousel } from "../../shared/model/carousel";
 import GettingStartedImage from "./assets/getting-started.png";
 import MoveOrbitImage from "./assets/move-orbit.png";
@@ -11,30 +11,29 @@ import Dynamics3Image from "./assets/dynamics-3.png";
 import Dynamics4Image from "./assets/dynamics-4.png";
 import Dynamics5Image from "./assets/dynamics-5.png";
 
+type WelcomeModalShowValue = "never" | "read" | "unread";
+
+
+export function useShowWelcome(): UseLocalStorageParamContext<WelcomeModalShowValue> {
+    return useLocalStorageParam<WelcomeModalShowValue>("show-welcome");
+}
+
 
 export function WelcomeModal(): JSX.Element {
-    const showWelcomeContext = useLocalStorageParam<"never" | "read" | "unread">("show-welcome");
-
-    // on initial load of the app, check if the local storage state
-    // was one which should cause the modal to be displayed when they re-open
-    useEffect(() => {
-        if (showWelcomeContext.initialized && (showWelcomeContext.value === "read")) {
-            showWelcomeContext.set("unread");
-        }
-    }, [showWelcomeContext.initialized]);
+    const {initialized, value, set} = useShowWelcome();
 
     const show: boolean = useMemo(() =>
-        showWelcomeContext.initialized && (
-            showWelcomeContext.value === null ||
-            showWelcomeContext.value === "unread"
+        initialized && (
+            value === null ||
+            value === "unread"
         ),
-    [showWelcomeContext.initialized, showWelcomeContext.value]);
+    [initialized, value]);
 
     return (
         <WelcomeModalControlled
             open={show}
-            onCloseIntent={() => showWelcomeContext.set("read")}
-            onCloseForeverIntent={() => showWelcomeContext.set("never")}
+            onCloseIntent={() => set("read")}
+            onCloseForeverIntent={() => set("never")}
 
         />
     );
@@ -60,7 +59,7 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
     >
         <SimpleGrid cols={1}>
             <Text>
-                Escape Solfied through the wormhole with precious hydrogen.
+                Escape the Solfied through the wormhole with precious hydrogen.
                 Be strategic, because your bounty is only as big as your
                 claim on the star you orbit.
             </Text>
@@ -122,28 +121,28 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics1Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
-                        In Solfied, tokens are represented by hydrogen (highlight the hud and focal star).
+                        <img src={Dynamics2Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
+                        In Solfied, tokens are represented by hydrogen.
                         For instance, 1 SOL = 1 billion lamports = 1 billion hydrogen.
                         The size of a star reflects the amount of hydrogen in the star.
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics1Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
+                        <img src={Dynamics3Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
                         Players are represented by ships.
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics2Image} alt="dynamics-2" width="100%" style={{margin: "1rem"}}/>
+                        <img src={Dynamics4Image} alt="dynamics-2" width="100%" style={{margin: "1rem"}}/>
                         Hydrogen continuously escapes from the wormhole
                         and is equally distributed across the stars.
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics3Image} alt="dynamics-3" width="100%" style={{margin: "1rem"}}/>
+                        <img src={Dynamics5Image} alt="dynamics-3" width="100%" style={{margin: "1rem"}}/>
                         Hydrogen also escapes from each star and is equally distributed
                         to other stars with fewer orbiting ships.
                         <Text size="sm" color="dimmed">
