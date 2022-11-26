@@ -1,4 +1,5 @@
 import { useState } from "react";
+import styles from "./styles.module.css";
 
 export function Carousel(props: {children: JSX.Element[]}): JSX.Element {
     const [iCurrent, setICurrent] = useState<number>(0);
@@ -9,15 +10,11 @@ export function Carousel(props: {children: JSX.Element[]}): JSX.Element {
             display: "flex",
             flexDirection: "row",
             flexWrap: "nowrap",
-            alignItems: "center"
+            alignItems: "center",
+            gap: "1rem"
         }}>
             <button
-                style={{
-                    height: "100%",
-                    visibility: `${iCurrent > 0 ? "visible" : "hidden"}`,
-                    background: "none",
-                    border: "none",
-                }}
+                className={`${styles["carousel-button"]} ${iCurrent === 0 && styles["hidden"]}`}
                 onClick={() => setICurrent(Math.max(0, iCurrent - 1))}
             >
                 <svg
@@ -36,13 +33,7 @@ export function Carousel(props: {children: JSX.Element[]}): JSX.Element {
             {props.children[iCurrent]}
 
             <button
-                style={{
-                    visibility: `${iCurrent < props.children.length - 1 ? "visible" : "hidden"}`,
-                    height: "100%",
-                    display: "flex",
-                    background: "none",
-                    border: "none"
-                }}
+                className={`${styles["carousel-button"]} ${iCurrent === props.children.length - 1 && styles["hidden"]}`}
                 onClick={() => setICurrent(Math.min(props.children.length - 1, iCurrent + 1))}
             >
                 <svg

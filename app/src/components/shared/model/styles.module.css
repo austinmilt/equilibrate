@@ -21,3 +21,19 @@
 .container-button:disabled:hover {
     background-color: initial;
 }
+
+.carousel-button {
+    height: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+}
+
+.carousel-button:hover {
+    background-color: var(--color-primary-darker);
+    cursor: pointer;
+}
+
+.carousel-button.hidden {
+    visibility: hidden;
+}
