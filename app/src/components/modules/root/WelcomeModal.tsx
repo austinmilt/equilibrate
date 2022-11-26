@@ -105,7 +105,8 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                             </List.Item>
                         </List>
                         <Text size="sm" color="dimmed">
-                            Continue clicking through slides to learn more about game mechanics.
+                            That is all you need to know to get started. Continue clicking
+                            through slides to learn more about game mechanics.
                         </Text>
                     </div>
                 </Carousel.Item>
