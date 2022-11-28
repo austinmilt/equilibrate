@@ -92,7 +92,7 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                         <List>
                             <List.Item>
                                 Your winnings depend on the amount of hydrogen in
-                                and players orbiting your star. If you exited a
+                                and players around your star. If you exited a
                                 SOL-based game while orbiting a star with 10 ships
                                 and 10 SOL (10 billion hydrogen),
                                 you would receive 1 SOL.
