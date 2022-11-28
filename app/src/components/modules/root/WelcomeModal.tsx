@@ -91,17 +91,18 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                         <img src={EscapeImage} alt="escape" width="100%" style={{margin: "1rem"}}/>
                         <List>
                             <List.Item>
-                                Click the wormhole to escape the system and claim your bounty.
-                            </List.Item>
-                            <List.Item>
-                                Your bounty is proportional
-                                to your claim on the tokens in the star you were orbiting. If you exited a
-                                SOL-based game while orbiting a star with 10 ships and 10 SOL (10 billion hydrogen),
+                                Your winnings depend on the amount of hydrogen in
+                                and players orbiting your star. If you exited a
+                                SOL-based game while orbiting a star with 10 ships
+                                and 10 SOL (10 billion hydrogen),
                                 you would receive 1 SOL.
                             </List.Item>
                             <List.Item>
                                 The last player to leave receives all the remaining
                                 hydrogen in the system and the game ends.
+                            </List.Item>
+                            <List.Item>
+                                Click the wormhole to escape the system and claim your winnings.
                             </List.Item>
                         </List>
                         <Text size="sm" color="dimmed">
