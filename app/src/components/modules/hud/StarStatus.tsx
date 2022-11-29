@@ -1,5 +1,6 @@
 import { RingProgress, Center, Text, Image } from "@mantine/core";
 import { useMemo } from "react";
+import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
 import { StarData } from "../../shared/galaxy/provider";
 import { InlineStyles } from "../../shared/inline-styles";
 import HydrogenIcon from "./hydrogen-icon.svg";
@@ -40,7 +41,7 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
     const fuelFormatted: string | undefined = useMemo(() => {
         if (props.data?.fuel === undefined) return undefined;
-        return Math.round(props.data.fuel).toLocaleString();
+        return formatTokensShort(props.data.fuel);
     }, [props.data?.fuel]);
 
 
