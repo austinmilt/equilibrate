@@ -1,15 +1,8 @@
-import { Button, Group, List, Modal, SimpleGrid, Text } from "@mantine/core";
+import { Button, Group, Modal, SimpleGrid, Text } from "@mantine/core";
 import { useMemo } from "react";
 import { useLocalStorageParam, UseLocalStorageParamContext } from "../../../lib/shared/local-storage";
 import { Carousel } from "../../shared/model/carousel";
-import GettingStartedImage from "./assets/getting-started.png";
-import MoveOrbitImage from "./assets/move-orbit.png";
-import EscapeImage from "./assets/escape.png";
-import Dynamics1Image from "./assets/dynamics-1.png";
-import Dynamics2Image from "./assets/dynamics-2.png";
-import Dynamics3Image from "./assets/dynamics-3.png";
-import Dynamics4Image from "./assets/dynamics-4.png";
-import Dynamics5Image from "./assets/dynamics-5.png";
+import GalaxyImage from "./assets/galaxy.png";
 
 type WelcomeModalShowValue = "never" | "read" | "unread";
 
@@ -53,104 +46,73 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
         opened={props.open}
         onClose={props.onCloseIntent}
         size="lg"
-        title="Welcome to Solfield!"
         centered={true}
         closeOnClickOutside={true}
     >
         <SimpleGrid cols={1}>
-            <Text>
-                Escape the Solfied through the wormhole with precious hydrogen.
-                Be strategic, because your bounty is only as big as your
-                claim on the star you orbit.
-            </Text>
             <Carousel>
                 <Carousel.Item>
+                    Welcome to Solfield, a game in which
+                    winning depends on your ability to strategically
+                    outmaneuver other players and time your escape.
+                    <br/><br/>
+                    Each Solfield game is a unique galaxy of stars and
+                    a wormhole. Tokens, represented by hydrogen, constantly
+                    flow out of the wormhole and stars and into other stars.
+                    <br/><br/>
+                    Your mission is to harvest hydrogen. Maximize your hydrogen
+                    by exiting the game while orbiting a star with lots of
+                    hydrogen and few players.
+                    <br/><br/>
+                    And that&apos;s it! To get started, click a game from
+                    the list and a star to orbit, or start a new game.
+                    You can also click through the slides to learn more
+                    about game mechanics.
+                </Carousel.Item>
+                <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={GettingStartedImage} alt="getting-started" width="100%" style={{margin: "1rem"}}/>
-                        Connect your wallet and then enter or create a game.
-                        <List>
-                            <List.Item>
-                                New Game: Click the New Game button and follow instructions.
-                                You will be entered into the game automatically.
-                            </List.Item>
-                            <List.Item>
-                                Enter a Game: Select a game from the list, then click
-                                the star you want to orbit, and confirm the transaction.
-                            </List.Item>
-                        </List>
+                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
+                        The size of a star indicates the amount of hydrogen in the star.
+                        <br/><br/>
+                        Orbit a star by clicking it.
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={MoveOrbitImage} alt="move-orbit" width="100%" style={{margin: "1rem"}}/>
-                        Once in the game, click a star to move your ship there.
+                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
+                        When you enter or create a game, you pay the the game
+                        entry fee, which is initially added to the wormhole. There
+                        is an additional fee of ~0.07 SOL to create or enter a game.
+                        <br/><br/>
+                        Tokens are represented by hydrogen. For instance, 1 SOL =
+                        1 billion lamports = 1 billion hydrogen.
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={EscapeImage} alt="escape" width="100%" style={{margin: "1rem"}}/>
-                        <List>
-                            <List.Item>
-                                Your winnings depend on the amount of hydrogen in
-                                and players around your star. If you exited a
-                                SOL-based game while orbiting a star with 10 ships
-                                and 10 SOL (10 billion hydrogen),
-                                you would receive 1 SOL.
-                            </List.Item>
-                            <List.Item>
-                                The last player to leave receives all the remaining
-                                hydrogen in the system and the game ends.
-                            </List.Item>
-                            <List.Item>
-                                Click the wormhole to escape the system and claim your winnings.
-                            </List.Item>
-                        </List>
-                        <Text size="sm" color="dimmed">
-                            That is all you need to know to get started. Continue clicking
-                            through slides to learn more about game mechanics.
-                        </Text>
+                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
+                        Hydrogen continuously flows out of the wormhole and is
+                        equally distributed across the stars.
+                        <br/><br/>
+                        Hydrogen also continuously flows out of stars into
+                        other stars with fewer orbiting ships.
+                        <br/><br/>
+                        The rate at which hydrogen flows out of stars is directly
+                        proportional to the number of orbiting ships. More ships
+                        equals faster flow.
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics1Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
-                        The game entry fee* is initially added to the wormhole.
-                        <Text size="sm" color="dimmed">
-                            *There are additional fees for creating your game
-                            account (~0.001 SOL) and payment to the Solfield owner (0.07 SOL).
-                        </Text>
-                    </div>
-                </Carousel.Item>
-                <Carousel.Item>
-                    <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics2Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
-                        In Solfied, tokens are represented by hydrogen.
-                        For instance, 1 SOL = 1 billion lamports = 1 billion hydrogen.
-                        The size of a star reflects the amount of hydrogen in the star.
-                    </div>
-                </Carousel.Item>
-                <Carousel.Item>
-                    <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics3Image} alt="dynamics-1" width="100%" style={{margin: "1rem"}}/>
-                        Players are represented by ships.
-                    </div>
-                </Carousel.Item>
-                <Carousel.Item>
-                    <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics4Image} alt="dynamics-2" width="100%" style={{margin: "1rem"}}/>
-                        Hydrogen continuously escapes from the wormhole
-                        and is equally distributed across the stars.
-                    </div>
-                </Carousel.Item>
-                <Carousel.Item>
-                    <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={Dynamics5Image} alt="dynamics-3" width="100%" style={{margin: "1rem"}}/>
-                        Hydrogen also escapes from each star and is equally distributed
-                        to other stars with fewer orbiting ships.
-                        <Text size="sm" color="dimmed">
-                            The rate at which hydrogen escapes a star is directly proportional to the number
-                            of ships orbiting it. More ships = faster loss.
-                        </Text>
+                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
+                        When you leave a game, you receive tokens equal to
+                        your proportional claim on the hydrogen in the star
+                        you were orbiting. For instance, if you leave a SOL-based
+                        game while orbiting a star with 10 billion hydrogen and
+                        10 players, you would receive 1 SOL.
+                        <br/><br/>
+                        The last player to leave receives all the unclaimed
+                        tokens in the game. This ends the game.
                     </div>
                 </Carousel.Item>
             </Carousel>
