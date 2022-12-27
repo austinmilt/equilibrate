@@ -34,3 +34,6 @@ app/dist-ssr
 *.sw?
 
 kp.json
+
+**/.yarn
+**/.yarnrc.yml
