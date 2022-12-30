@@ -4,7 +4,7 @@ import { EquilibrateProgramProvider } from "../../../lib/equilibrate/provider";
 import { EndpointProvider, SolanaProvider } from "../../../lib/solana/provider";
 import { ActiveGameProvider } from "../../shared/game/provider";
 import { Sidebar } from "../sidebar/Sidebar";
-import { Viewport } from "../viewport/Viewport";
+import { Viewport } from "../viewport/Viewport2";
 import { WelcomeModal } from "./WelcomeModal";
 import styles from "./styles.module.css";
 import "./root.css";

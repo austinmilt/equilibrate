@@ -1,4 +1,4 @@
-import { Button, Group, Modal, SimpleGrid, Text } from "@mantine/core";
+import { Button, Group, Modal, SimpleGrid } from "@mantine/core";
 import { useMemo } from "react";
 import { useLocalStorageParam, UseLocalStorageParamContext } from "../../../lib/shared/local-storage";
 import { Carousel } from "../../shared/model/carousel";
