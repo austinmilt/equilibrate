@@ -11,7 +11,7 @@ import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
 import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
-import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
+import { GAMES_LIST_UPDATE_INTERVAL, USE_BORING_THEME } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { NewGameControl } from "./NewGameControl";
 import { Notifications, notifyWarning } from "../../../lib/shared/notifications";
@@ -221,6 +221,8 @@ function GameCard(props: GameCardProps): JSX.Element {
         return result;
     }, [props.entry.mintName, gameConfig.mint]);
 
+    const playerIcon: string = useMemo(() => USE_BORING_THEME ? "👥" : "🚀", []);
+
     return (
         <button
             className={`${styles["card"]} ${props.selected && styles["selected"]}`}
@@ -238,7 +240,7 @@ function GameCard(props: GameCardProps): JSX.Element {
                 <Text
                     size="xs"
                     title={`${buckets[0].players} of ${gameConfig.maxPlayers} currently playing`}
-                >{`🚀 ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
+                >{`${playerIcon} ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
                 {
                     userIsPlaying && <Text size="xs" title="You're in this game">🔆</Text>
                 }

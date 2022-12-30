@@ -3,8 +3,12 @@ import { useMemo } from "react";
 import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
 import { StarData } from "../../shared/galaxy/provider";
 import { InlineStyles } from "../../shared/inline-styles";
-import HydrogenIcon from "./hydrogen-icon.svg";
 import styles from "./styles.module.css";
+import { useGame } from "../../../lib/equilibrate/useGame";
+import { useActiveGame } from "../../shared/game/provider";
+import { GameConfigEnriched } from "../../../lib/equilibrate/types";
+import { USE_BORING_THEME } from "../../../lib/shared/constants";
+import HydrogenIcon from "./hydrogen-icon.svg";
 
 
 interface StarStatusProps {
@@ -28,6 +32,13 @@ export function StarStatus(props: StarStatusProps): JSX.Element {
 
 
 function FuelGuage(props: StarStatusProps): JSX.Element {
+    const { address: gameAddress } = useActiveGame();
+    const gameContext = useGame(gameAddress);
+
+    const gameConfig: GameConfigEnriched | undefined = useMemo(() => (
+        gameContext.game?.game?.config
+    ), [gameContext.game?.game?.config]);
+
     const ringPercent: number = useMemo(() => {
         if ((props.galaxyState === undefined) || (props.data === undefined)) {
             return 0;
@@ -41,7 +52,12 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
     const fuelFormatted: string | undefined = useMemo(() => {
         if (props.data?.fuel === undefined) return undefined;
-        return formatTokensShort(props.data.fuel);
+        if (USE_BORING_THEME) {
+            return formatTokens(props.data.fuel, gameConfig?.mintDecimals);
+
+        } else {
+            return formatTokensShort(props.data.fuel);
+        }
     }, [props.data?.fuel]);
 
 
@@ -67,7 +83,11 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
                 sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorHydrogen }]}
                 label={
                     <Center>
-                        <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
+                        {USE_BORING_THEME && "🪙"}
+                        {
+                            !USE_BORING_THEME &&
+                                <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
+                        }
                     </Center>
                 }
             />
@@ -100,7 +120,7 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
                 roundCaps
                 thickness={3}
                 sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorPlayer }]}
-                label={<Center>🚀</Center>}
+                label={<Center>👥</Center>}
             />
             <Text size="md">{showLabel && `${props.isSourceStar ? 0 : props.data?.satellites}`}</Text>
         </div>

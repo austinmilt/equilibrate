@@ -23,7 +23,7 @@ export function formatTokensShort(amount: number, decimals?: number | null | und
 }
 
 
-function convertDecimals(amount: number, decimals?: number | null | undefined): number {
+export function convertDecimals(amount: number, decimals?: number | null | undefined): number {
     if (decimals != null) {
         amount /= Math.pow(10, decimals);
     }

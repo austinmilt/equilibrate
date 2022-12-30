@@ -57,6 +57,14 @@ export const RPC_KEY_DEFAULT: Endpoint = parseEnv(
 );
 
 
+export const USE_BORING_THEME: boolean = parseEnv<boolean>(
+    "USE_BORING_THEME",
+    import.meta.env.VITE_USE_BORING_THEME,
+    true,
+    v => v.toLowerCase() === "true"
+);
+
+
 function parseEnv<T>(
     name: string,
     value: string | undefined,

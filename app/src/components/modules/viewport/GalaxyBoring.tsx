@@ -12,11 +12,15 @@ import {
     ChartEvent,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
-import { formatTokensShort } from "../../../lib/shared/number";
+import { convertDecimals } from "../../../lib/shared/number";
+import { useGame } from "../../../lib/equilibrate/useGame";
+import { useActiveGame } from "../../shared/game/provider";
+import { GameConfigEnriched } from "../../../lib/equilibrate/types";
 
 //TODO update language
 //TODO update tutorial
 //TODO fit chart to window
+//TODO add buttons to HUD to enter stars/exit
 
 
 ChartJS.register(
@@ -36,24 +40,29 @@ export interface GalaxyProps {
 }
 
 
-export function Galaxy(): JSX.Element {
+export function GalaxyBoring(): JSX.Element {
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
     const chartRef = useRef<ChartJS>(null);
+    const { address: gameAddress } = useActiveGame();
+    const gameContext = useGame(gameAddress);
+
+    const gameConfig: GameConfigEnriched | undefined = useMemo(() => (
+        gameContext.game?.game?.config
+    ), [gameContext.game?.game?.config]);
 
     const labels: string[] = useMemo(() => (
-        activeGalaxyContext.stars?.map((_, i) => i === 0 ? "Wormhole" : `Star ${i}`) ?? []
+        activeGalaxyContext.stars?.map((_, i) => i === 0 ? "Holding Area" : `Area ${i}`) ?? []
     ), [activeGalaxyContext.stars]);
 
     const datasets = [
         {
             label: "Your share",
             data: activeGalaxyContext.stars?.map((s, i) => {
+                let withDecimals: number = 0;
                 if (activeGalaxyContext.playerStar.index === i) {
-                    return s.fuel * (1 / s.satellites);
-
-                } else {
-                    return 0;
+                    withDecimals = s.fuel * (1 / s.satellites);
                 }
+                return convertDecimals(withDecimals, gameConfig?.mintDecimals);
             }),
             backgroundColor: "#D9594C",
             hoverBackgroundColor: "#D9594C",
@@ -63,11 +72,13 @@ export function Galaxy(): JSX.Element {
         {
             label: "Remaining share",
             data: activeGalaxyContext.stars?.map((s, i) => {
+                let withDecimals: number = 0;
                 if ((i == 0) || (s.satellites === 0) || (activeGalaxyContext.playerStar.index !== i)) {
-                    return s.fuel;
+                    withDecimals = s.fuel;
                 } else if (activeGalaxyContext.playerStar.index === i) {
-                    return s.fuel * ((s.satellites - 1) / s.satellites);
+                    withDecimals = s.fuel * ((s.satellites - 1) / s.satellites);
                 }
+                return convertDecimals(withDecimals, gameConfig?.mintDecimals);
             }),
             backgroundColor: "#757575",
             hoverBackgroundColor: "#757575",
@@ -122,12 +133,11 @@ export function Galaxy(): JSX.Element {
     const onChartMouseMove = useCallback((event: ChartEvent) => {
         const starIndex: number | null = getFocalStar(event);
 
-        const mousedOver: boolean = activeGalaxyContext.focalStar.index === starIndex;
-        activeGalaxyContext.focalStar.onHoverChange(mousedOver);
+        activeGalaxyContext.focalStar.onHoverChange(starIndex != null);
         if (starIndex != null) {
             activeGalaxyContext.focalStar.set(starIndex);
         }
-    }, [activeGalaxyContext.focalStar.set, activeGalaxyContext.focalStar.onHoverChange]);
+    }, [activeGalaxyContext.focalStar.set, activeGalaxyContext.focalStar.onHoverChange, getFocalStar]);
 
 
     const options = useMemo(() => ({
@@ -137,7 +147,7 @@ export function Galaxy(): JSX.Element {
             x: {
                 stacked: true,
                 ticks: {
-                    callback: (amount: string | number) => formatTokensShort(Number.parseInt(`${amount}`))
+                    callback: (amount: string | number) => amount
                 }
             },
             y: {

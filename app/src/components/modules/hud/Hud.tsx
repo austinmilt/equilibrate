@@ -15,6 +15,7 @@ import { useMousePosition } from "../../../lib/shared/useMousePosition";
 import { formatTokens } from "../../../lib/shared/number";
 import { useConnection } from "@solana/wallet-adapter-react";
 import styles from "./styles.module.css";
+import { USE_BORING_THEME } from "../../../lib/shared/constants";
 
 enum GameAction {
     ENTER,
@@ -280,21 +281,21 @@ export function Hud(): JSX.Element {
         if (activeGalaxyContext.focalStar.isHovered) {
             let helpText: string | undefined;
             if (focalStarClickAction === GameAction.ENTER) {
-                helpText = "orbit";
+                helpText = USE_BORING_THEME ? `enter Area ${activeGalaxyContext.focalStar.index}` : "orbit";
 
             } else if (focalStarClickAction === GameAction.MOVE) {
-                helpText = "move";
+                helpText = `move to Area ${activeGalaxyContext.focalStar.index}`;
 
             } else if (focalStarClickAction === GameAction.LEAVE) {
-                helpText = "escape";
+                helpText = USE_BORING_THEME ? "leave" : "escape";
 
             } else if (activeGalaxyContext.playerStar.index === activeGalaxyContext.focalStar.index) {
-                helpText = "your orbit";
+                helpText = USE_BORING_THEME ? "you are here" : "your orbit";
             }
             return helpText === undefined ? undefined : <Text size="md">{helpText}</Text>;
         }
         return undefined;
-    }, [focalStarClickAction]);
+    }, [focalStarClickAction, activeGalaxyContext.focalStar.index]);
 
 
     const abortSwitchTooltip: string = useMemo(() =>
