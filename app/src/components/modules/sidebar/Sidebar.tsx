@@ -20,9 +20,6 @@ import styles from "./styles.module.css";
 import { useMintList } from "../../../lib/shared/mint-list";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { formatTokens } from "../../../lib/shared/number";
-import { MoneyIcon } from "../../shared/icons/MoneyIcon";
-import { Themed, themed } from "../../shared/theme";
-import { PlayersIcon } from "../../shared/icons/PlayersIcon";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -224,38 +221,19 @@ function GameCard(props: GameCardProps): JSX.Element {
         return result;
     }, [props.entry.mintName, gameConfig.mint]);
 
-    const playerIcon: string = useMemo(() => themed("👥", "🚀"), []);
-
     return (
         <button
             className={`${styles["card"]} ${props.selected && styles["selected"]}`}
             onClick={() => props.setGame(props.entry.publicKey)}
         >
+            <Text size="sm">Pot: {totalTokensWithoutDecimals} {mintName}</Text>
+            <Text size="sm">Fee: {entryFeeWithoutDecimals} {mintName}</Text>
             <Group noWrap>
-                <MoneyIcon className={styles["money-icon"]}/>
-                <Text title={`Prize pool is ${totalTokensWithoutDecimals} tokens`}>
-                    {`${totalTokensWithoutDecimals}`}
-                </Text>
-                <Text title={`Entry fee is ${entryFeeWithoutDecimals} tokens`} color="dimmed" size="xs">
-                    {`(${entryFeeWithoutDecimals} ${mintName})`}
-                </Text>
-            </Group>
-            <Group noWrap spacing="xs">
-                <Themed.Boring><PlayersIcon className={styles["players-icon"]}/></Themed.Boring>
-                <Themed.Star>🚀</Themed.Star>
-                <Text
-                    size="xs"
-                    title={`${buckets[0].players} of ${gameConfig.maxPlayers} currently playing`}
-                >
-                    {`${buckets[0].players} / ${gameConfig.maxPlayers}`}
-                </Text>
+                <Text size="sm">Players: {`${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
                 {
                     userIsPlaying && <Text size="xs" title="You're in this game">🔆</Text>
                 }
             </Group>
-            <Text transform="uppercase" size="xs" color="dimmed" title="Game ID">
-                { props.entry.account.id.toNumber() }
-            </Text>
         </button>
     );
 }
