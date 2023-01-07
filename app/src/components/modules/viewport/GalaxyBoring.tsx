@@ -42,14 +42,23 @@ export function GalaxyBoring(props: Props): JSX.Element {
     }, [canvasRef.current, props.viewportDimensions]);
 
 
-    const drawBar: (bar: Rect) => void = useCallback((bar) => {
+    const drawBar: (bar: Rect, isPlayer: boolean) => void = useCallback((bar, isPlayer) => {
         const canvas: HTMLCanvasElement | null = canvasRef.current;
         const context: CanvasRenderingContext2D | null = canvas?.getContext("2d") ?? null;
         if ((canvas == null) || (context == null)) return;
 
-        if (bar.width > 0) {
-            context.fillStyle = InlineStyles.GLOBAL.colorMoney;
+        if (bar.height > 0) {
+            // draw the bar
+            context.fillStyle = isPlayer ? InlineStyles.GLOBAL.colorMoney : InlineStyles.GLOBAL.colorCooling;
             context.fillRect(bar.left, bar.top, bar.width, bar.height);
+
+            // draw dividing line between it and other bars
+            context.strokeStyle = InlineStyles.GLOBAL.colorPrimaryDarkest;
+            context.lineWidth = 2;
+            context.beginPath();
+            context.moveTo(bar.left, bar.bottom);
+            context.lineTo(bar.right, bar.bottom);
+            context.stroke();
         }
     }, [canvasRef.current]);
 
@@ -68,7 +77,15 @@ export function GalaxyBoring(props: Props): JSX.Element {
         //  most of the canvas on every render anyway, so  just clear the
         //  whole thing on every render
         clearCanvas();
-        barPropsContext.bars.map(bar => drawBar(bar.canvas));
+        let drewPlayerBar: boolean = false;
+        for (const bar of barPropsContext.bars) {
+            if ((bar.starIndex === activeGalaxyContext.playerStar.index) && !drewPlayerBar) {
+                drawBar(bar.canvas, true);
+                drewPlayerBar = true;
+            } else {
+                drawBar(bar.canvas, false);
+            }
+        }
     }, [barPropsContext.bars]);
 
 
@@ -94,6 +111,7 @@ interface BarProps {
     canvas: Rect;
     screen: Rect;
     star: StarData;
+    starIndex: number;
 }
 
 
@@ -105,8 +123,6 @@ interface UseComputedBarPropsContext {
 }
 
 
-//TODO make a bar/rect for each player so you can see the divisions
-//TODO in the bar and then color the player bar differently above
 function useComputedBarProps(
     canvas: HTMLCanvasElement | null,
     activeGalaxyContext: ActiveGalaxyContextState
@@ -118,9 +134,11 @@ function useComputedBarProps(
 
     const nBars: number = useMemo(() => activeGalaxyContext.stars?.length ?? 0, [activeGalaxyContext.stars]);
 
-    const computeBarProps: (star: StarData, index: number) => BarProps = useCallback((star, index) => {
-        if (canvas == null) return emptyBar(star);
+    const computeBarProps: (star: StarData, index: number) => BarProps[] = useCallback((star, index) => {
+        if (canvas == null) return [emptyBar(star)];
         const barHeight: number = Math.round(canvas.height * (star.fuel / systemTokens));
+        const nSections: number = index === 0 ? 1 : Math.max(1, star.satellites);
+        const sectionHeight: number = Math.round(barHeight / nSections);
         const barTop: number = canvas.height - barHeight;
 
         const barBaseWidth: number = canvas.width / nBars;
@@ -128,25 +146,31 @@ function useComputedBarProps(
         // move the bar right some so it is centered in its section
         const barLeft: number = index * barBaseWidth + 0.5*(barBaseWidth - barWidth);
 
-        const rectCanvas: Rect = {
-            left: barLeft,
-            top: barTop,
-            width: barWidth,
-            height: barHeight,
-            right: barLeft + barWidth,
-            bottom: barTop + barHeight
-        };
-        return {
-            canvas: rectCanvas,
-            screen: transformCanvasRectToScreen(rectCanvas, canvas),
-            star: star
-        };
+        const sections: BarProps[] = Array(nSections).fill(null).map((_, i) => {
+            const sectionTop: number = barTop + sectionHeight*i;
+            const rectCanvas: Rect = {
+                left: barLeft,
+                top: sectionTop,
+                width: barWidth,
+                height: sectionHeight,
+                right: barLeft + barWidth,
+                bottom: sectionTop + sectionHeight
+            };
+            return {
+                canvas: rectCanvas,
+                screen: transformCanvasRectToScreen(rectCanvas, canvas),
+                star: star,
+                starIndex: index
+            };
+        });
+
+        return sections;
     }, [canvas, systemTokens, nBars]);
 
 
     const bars: BarProps[] = useMemo(() => {
         if ((canvas == null) || (activeGalaxyContext.stars == null)) return [];
-        return activeGalaxyContext.stars.map(computeBarProps);
+        return activeGalaxyContext.stars.map(computeBarProps).flat();
     }, [activeGalaxyContext.stars]);
 
 
@@ -171,7 +195,8 @@ function emptyBar(star: StarData): BarProps {
     return {
         canvas: rectEmpty,
         screen: rectEmpty,
-        star: star
+        star: star,
+        starIndex: -1
     };
 }
 
