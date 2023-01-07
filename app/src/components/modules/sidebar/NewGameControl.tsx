@@ -214,7 +214,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         label={themed("Number of buckets", "Number of Stars")}
                         onChange={setBuckets}
                         min={1}
-                        max={64}
+                        max={5}
                         step={1}
                         precision={0}
                     />
