@@ -1,5 +1,5 @@
 import { ActiveGalaxyProvider } from "../../shared/galaxy/provider";
-import { GalaxyBoring2 } from "./GalaxyBoring2";
+import { GalaxyBoring } from "./GalaxyBoring";
 import styles from "./styles.module.css";
 import { useRef, useMemo, RefObject, useState, useCallback, useEffect } from "react";
 import { InlineStyles } from "../../shared/inline-styles";
@@ -14,7 +14,7 @@ export function ViewportBoring(): JSX.Element {
     return (
         <section ref={viewportRef} className={styles["viewport"]}>
             <ActiveGalaxyProvider>
-                <GalaxyBoring2
+                <GalaxyBoring
                     viewportDimensions={{
                         widthPixels: stageWidth,
                         heightPixels: stageHeight
