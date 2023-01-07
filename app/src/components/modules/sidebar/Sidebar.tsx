@@ -11,7 +11,7 @@ import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
 import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
-import { GAMES_LIST_UPDATE_INTERVAL, USE_BORING_THEME } from "../../../lib/shared/constants";
+import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { NewGameControl } from "./NewGameControl";
 import { Notifications, notifyWarning } from "../../../lib/shared/notifications";
@@ -20,6 +20,9 @@ import styles from "./styles.module.css";
 import { useMintList } from "../../../lib/shared/mint-list";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { formatTokens } from "../../../lib/shared/number";
+import { MoneyIcon } from "../../shared/icons/MoneyIcon";
+import { Themed, themed } from "../../shared/theme";
+import { PlayersIcon } from "../../shared/icons/PlayersIcon";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -31,7 +34,7 @@ export function Sidebar(): JSX.Element {
 
     return (
         <nav className={styles["sidebar"]}>
-            <Text className={styles["title"]}>Solfield</Text>
+            <Text className={styles["title"]}>B*cket</Text>
             <div className={styles["header"]}>
                 <Group spacing={3}>
                     <Text>Games</Text>
@@ -221,7 +224,7 @@ function GameCard(props: GameCardProps): JSX.Element {
         return result;
     }, [props.entry.mintName, gameConfig.mint]);
 
-    const playerIcon: string = useMemo(() => USE_BORING_THEME ? "👥" : "🚀", []);
+    const playerIcon: string = useMemo(() => themed("👥", "🚀"), []);
 
     return (
         <button
@@ -229,18 +232,23 @@ function GameCard(props: GameCardProps): JSX.Element {
             onClick={() => props.setGame(props.entry.publicKey)}
         >
             <Group noWrap>
+                <MoneyIcon className={styles["money-icon"]}/>
                 <Text title={`Prize pool is ${totalTokensWithoutDecimals} tokens`}>
-                    {`🪙 ${totalTokensWithoutDecimals}`}
+                    {`${totalTokensWithoutDecimals}`}
                 </Text>
                 <Text title={`Entry fee is ${entryFeeWithoutDecimals} tokens`} color="dimmed" size="xs">
                     {`(${entryFeeWithoutDecimals} ${mintName})`}
                 </Text>
             </Group>
             <Group noWrap spacing="xs">
+                <Themed.Boring><PlayersIcon className={styles["players-icon"]}/></Themed.Boring>
+                <Themed.Star>🚀</Themed.Star>
                 <Text
                     size="xs"
                     title={`${buckets[0].players} of ${gameConfig.maxPlayers} currently playing`}
-                >{`${playerIcon} ${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
+                >
+                    {`${buckets[0].players} / ${gameConfig.maxPlayers}`}
+                </Text>
                 {
                     userIsPlaying && <Text size="xs" title="You're in this game">🔆</Text>
                 }

@@ -17,12 +17,6 @@ import { useGame } from "../../../lib/equilibrate/useGame";
 import { useActiveGame } from "../../shared/game/provider";
 import { GameConfigEnriched } from "../../../lib/equilibrate/types";
 
-//TODO update language
-//TODO update tutorial
-//TODO fit chart to window
-//TODO add buttons to HUD to enter stars/exit
-
-
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -51,7 +45,7 @@ export function GalaxyBoring(): JSX.Element {
     ), [gameContext.game?.game?.config]);
 
     const labels: string[] = useMemo(() => (
-        activeGalaxyContext.stars?.map((_, i) => i === 0 ? "Holding Area" : `Area ${i}`) ?? []
+        activeGalaxyContext.stars?.map((_, i) => i === 0 ? "Faucet" : `Bucket ${i}`) ?? []
     ), [activeGalaxyContext.stars]);
 
     const datasets = [
@@ -64,8 +58,8 @@ export function GalaxyBoring(): JSX.Element {
                 }
                 return convertDecimals(withDecimals, gameConfig?.mintDecimals);
             }),
-            backgroundColor: "#D9594C",
-            hoverBackgroundColor: "#D9594C",
+            backgroundColor: "#7dc97d",
+            hoverBackgroundColor: "#7dc97d",
             hoverBorderColor: "#e6e6e6",
             hoverBorderWidth: 2
         },

@@ -46,6 +46,18 @@
     background-color: var(--color-primary-medium);
 }
 
+.card .money-icon {
+    width: 1rem;
+    height: auto;
+    margin-right: -0.75rem;
+}
+
+.card .players-icon {
+    width: 1rem;
+    height: auto;
+    margin-right: -0.5rem;
+}
+
 .new-game-button {
     composes: button-like from "../../shared/shared.module.css";
     width: 1.5rem;

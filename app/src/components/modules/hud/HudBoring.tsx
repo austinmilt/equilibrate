@@ -1,9 +1,8 @@
 import { Tooltip, Text } from "@mantine/core";
-import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
 import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
-import { StarStatus } from "./StarStatus";
 import { ShipLog, useCleanShipLogs, useShipLogs } from "./ShipLog";
 import { Notifications, notifyError, notifyPotentialBug, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
@@ -11,27 +10,19 @@ import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWall
 import { Connection, PublicKey } from "@solana/web3.js";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { PlayerState } from "../../../lib/equilibrate/types";
-import { useMousePosition } from "../../../lib/shared/useMousePosition";
-import { formatTokens } from "../../../lib/shared/number";
+import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
 import { useConnection } from "@solana/wallet-adapter-react";
-import styles from "./styles.module.css";
 import { MoneyIcon } from "../../shared/icons/MoneyIcon";
 import { themed } from "../../shared/theme";
-
-enum GameAction {
-    ENTER,
-    MOVE,
-    LEAVE,
-    TRY_ENTER_CENTRAL,
-    NO_OP
-}
+import { PlayersIcon } from "../../shared/icons/PlayersIcon";
+import { Button } from "../../shared/model/button";
+import styles from "./styles.module.css";
+import { BucketIcon } from "../../shared/icons/BucketIcon";
 
 
-export function Hud(): JSX.Element {
+export function HudBoring(): JSX.Element {
     const [cancelOnLoss, setCancelOnLoss] = useState<boolean>(false);
-    const [clickedStar, setClickedStar] = useState<number | undefined>();
     const [overridePlayer, setOverridePlayer] = useState<PublicKey | undefined>();
-    const [focalStarClickAction, setFocalStarClickAction] = useState<GameAction>(GameAction.NO_OP);
     const activeGalaxyContext: ActiveGalaxyContextState = useActiveGalaxy();
     const { address: activeGame }: ActiveGameContextState = useActiveGame();
     const gameContext: GameContext = useGame(activeGame);
@@ -39,66 +30,47 @@ export function Hud(): JSX.Element {
     const connectWalletIfNeeded = useInsertConnectWallet();
     const makeTransactionUrl = useMakeTransactionUrl();
     const { equilibrate, player } = useEquilibrate();
-    const [mouseX, mouseY] = useMousePosition();
-    useCleanShipLogs();
     const { connection } = useConnection();
+    const [playerInGame, setPlayerInGame] = useState<boolean | null>(null);
+    useCleanShipLogs();
 
+    // update when we initially load the player/game state for the active game
+    useEffect(() => {
+        setOverridePlayer(player);
+    }, [player]);
 
-    const computeFocalStarClickAction: () => Promise<GameAction> = useCallback(async () => {
-        let playerState: PlayerState | null = gameContext.player?.player ?? null;
-        if (activeGame !== undefined) {
-            if (overridePlayer !== undefined) {
-                playerState = await equilibrate.getPlayerState(activeGame, overridePlayer);
-            }
-
-            // only try to get the player state for the configured player if
-            // we dont already have the player state from the game context, since
-            // they should be equivalent
-            if ((playerState === null) &&
-                (gameContext.player !== undefined) &&
-                (player !== undefined)
-            ) {
-                playerState = await equilibrate.getPlayerState(activeGame, player);
-            }
-        }
-
-        const focalStarIndex: number | undefined = activeGalaxyContext.focalStar.index;
-        let result: GameAction = GameAction.NO_OP;
-        if (focalStarIndex !== undefined) {
-            // player is in the game
-            if (playerState !== null) {
-                if (focalStarIndex === 0) {
-                    result = GameAction.LEAVE;
-
-                } else if (playerState.bucket !== focalStarIndex) {
-                    result = GameAction.MOVE;
+    useEffect(() => {
+        const updatePlayerInGame = async () => {
+            let result: boolean | null = null;
+            if (activeGame !== undefined) {
+                let playerState: PlayerState | null = gameContext.player?.player ?? null;
+                if (overridePlayer !== undefined) {
+                    playerState = await equilibrate.getPlayerState(activeGame, overridePlayer);
+                    result = playerState != null;
                 }
-            } else {
-                if (focalStarIndex === 0) {
-                    result = GameAction.TRY_ENTER_CENTRAL;
 
-                } else {
-                    result = GameAction.ENTER;
+                // only try to get the player state for the configured player if
+                // we dont already have the player state from the game context, since
+                // they should be equivalent
+                if ((playerState === null) &&
+                    (gameContext.player !== undefined) &&
+                    (player !== undefined)
+                ) {
+                    playerState = await equilibrate.getPlayerState(activeGame, player);
+                    result = playerState != null;
                 }
             }
-        }
-        return result;
-
-    }, [
-        activeGalaxyContext.focalStar.index,
-        gameContext.player,
-        player,
-        activeGame,
-        equilibrate.getPlayerState,
-        shipLogContext.record
-    ]);
+            setPlayerInGame(result);
+        };
+        updatePlayerInGame();
+    }, [gameContext.player, overridePlayer, equilibrate.getPlayerState, setPlayerInGame]);
 
 
-    const enterSystem: (starIndex: number) => Promise<void> = useCallback(async starIndex => {
+    const enterSystem: (i: number, p: PublicKey) => Promise<void> = useCallback(async (starIndex, player) => {
         gameContext.enterGame(
             starIndex,
             {
-                player: overridePlayer,
+                player: player,
                 onSuccess: (result) => {
                     const signature: string | undefined = result.transactionSignature;
                     if (result.error !== undefined) {
@@ -127,11 +99,11 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const moveShip: (starIndex: number) => Promise<void> = useCallback(async starIndex => {
+    const moveShip: (i: number, p: PublicKey) => Promise<void> = useCallback(async (starIndex, player) => {
         gameContext.moveBucket(
             starIndex,
             {
-                player: overridePlayer,
+                player: player,
                 onSuccess: (result) => {
                     const signature: string | undefined = result.transactionSignature;
                     if (result.error !== undefined) {
@@ -160,11 +132,11 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const leaveSystem: () => Promise<void> = useCallback(async () => {
+    const leaveSystem: (player: PublicKey) => Promise<void> = useCallback(async (player) => {
         gameContext.leaveGame(
             cancelOnLoss,
             {
-                player: overridePlayer,
+                player: player,
                 onSuccess: async (result) => {
                     if (cancelOnLoss) {
                         if (result.anchorErrorCode === "AbortLeaveOnLoss") {
@@ -209,60 +181,6 @@ export function Hud(): JSX.Element {
     ]);
 
 
-    const onStarClick: (starIndex: number) => Promise<void> = useCallback(async (starIndex) => {
-        try {
-            const action: GameAction = await computeFocalStarClickAction();
-            if (action === GameAction.ENTER) {
-                await enterSystem(starIndex);
-
-            } else if (action === GameAction.MOVE) {
-                await moveShip(starIndex);
-
-            } else if (action === GameAction.LEAVE) {
-                await leaveSystem();
-
-            } else if (action === GameAction.TRY_ENTER_CENTRAL) {
-                Notifications.enterWormholeOrbit();
-            }
-        } catch (e) {
-            console.error(e);
-            notifyPotentialBug(`HUD error: ${(e as unknown as Error).message}`);
-        }
-    }, [enterSystem, moveShip, leaveSystem, computeFocalStarClickAction]);
-
-
-    // trigger a game action after user has connected wallet and clicked a star
-    useEffect(() => {
-        if (clickedStar !== undefined) {
-            onStarClick(clickedStar);
-            setClickedStar(undefined);
-        }
-    }, [clickedStar]);
-
-
-    // register a click event for whichever focal star is clicked on so we can
-    // trigger a game action
-    useEffect(() => {
-        return activeGalaxyContext.focalStar.addOnClick(starIndex => {
-            connectWalletIfNeeded((player, neededToConnect) => {
-                if (neededToConnect) {
-                    setOverridePlayer(player);
-
-                } else {
-                    setOverridePlayer(undefined);
-                }
-
-                // Ideally we'd directly call onStarClick, but this passes
-                // an outdated memoized version of the function which results
-                // in a failed call. This way we can still use the latest
-                // version of the function in a useEffect
-                setClickedStar(starIndex);
-            });
-        }
-        );
-    }, [connectWalletIfNeeded, onStarClick]);
-
-
     // handle errors
     useEffect(() => {
         if (gameContext.error) {
@@ -278,31 +196,84 @@ export function Hud(): JSX.Element {
     }, [gameContext.error]);
 
 
-    // what would happen if the user clicked the focal star?
-    useEffect(() => {
-        computeFocalStarClickAction().then(setFocalStarClickAction);
-    }, [computeFocalStarClickAction, setFocalStarClickAction]);
-
-
-    const clickActionHelp: ReactNode | undefined = useMemo(() => {
-        if (activeGalaxyContext.focalStar.isHovered) {
-            let helpText: string | undefined;
-            if (focalStarClickAction === GameAction.ENTER) {
-                helpText = themed(`enter Bucket ${activeGalaxyContext.focalStar.index}`, "orbit");
-
-            } else if (focalStarClickAction === GameAction.MOVE) {
-                helpText = themed(`move to Bucket ${activeGalaxyContext.focalStar.index}`, "move");
-
-            } else if (focalStarClickAction === GameAction.LEAVE) {
-                helpText = themed("leave", "escape");
-
-            } else if (activeGalaxyContext.playerStar.index === activeGalaxyContext.focalStar.index) {
-                helpText = themed("you are here", "your orbit");
+    const getBucketButtonProps: (index: number) => BucketButtonProps = useCallback((index) => {
+        let result: BucketButtonProps;
+        if (playerInGame === null) {
+            if (index === 0) {
+                result = {
+                    label: "Connect Wallet",
+                    disabled: false,
+                    onClick: () => connectWalletIfNeeded(setOverridePlayer)
+                };
+            } else {
+                result = {
+                    label: <BucketIcon text={`${index}`} classNames={{bucket: styles["bucket-button-icon"]}}/>,
+                    disabled: true,
+                    onClick: () => connectWalletIfNeeded((player) => {
+                        enterSystem(index, player).catch(handleError);
+                    })
+                };
             }
-            return helpText === undefined ? undefined : <Text size="md">{helpText}</Text>;
+        } else if (playerInGame) {
+            if (index === 0) {
+                result = {
+                    label: "Cash Out",
+                    disabled: false,
+                    onClick: () => connectWalletIfNeeded((player) => {
+                        leaveSystem(player).catch(handleError);
+                    })
+                };
+            } else if (activeGalaxyContext.playerStar.index === index) {
+                result = {
+                    label: "You are Here",
+                    disabled: true,
+                    onClick: () => Notifications.enterCurrentStar()
+                };
+            } else {
+                result = {
+                    label: <>
+                        Move to <BucketIcon text={`${index}`} classNames={{bucket: styles["bucket-button-icon"]}}/>
+                    </>,
+                    disabled: false,
+                    onClick: () => connectWalletIfNeeded((player) => {
+                        moveShip(index, player).catch(handleError);
+                    })
+                };
+            }
+        } else {
+            if (index === 0) {
+                result = {
+                    label: "Faucet",
+                    disabled: true,
+                    onClick: () => Notifications.enterWormholeOrbit()
+                };
+            } else {
+                result = {
+                    label: <>
+                        Enter <BucketIcon text={`${index}`} classNames={{bucket: styles["bucket-button-icon"]}}/>
+                    </>,
+                    disabled: false,
+                    onClick: () => connectWalletIfNeeded((player) => {
+                        enterSystem(index, player).catch(handleError);
+                    })
+                };
+            }
         }
-        return undefined;
-    }, [focalStarClickAction, activeGalaxyContext.focalStar.index]);
+
+        return result;
+
+        function handleError(e: Error) {
+            console.error(e);
+            notifyPotentialBug(`HUD error: ${(e as unknown as Error).message}`);
+        }
+    }, [
+        activeGalaxyContext.playerStar.index,
+        playerInGame,
+        enterSystem,
+        moveShip,
+        leaveSystem,
+        connectWalletIfNeeded,
+    ]);
 
 
     const abortSwitchTooltip: string = useMemo(() =>
@@ -325,45 +296,70 @@ export function Hud(): JSX.Element {
     }, [activeGalaxyContext.playerStar.data]);
 
 
-    return <div className={styles["hud"]}>
-        {activeGame && (
-            <>
-                <ShipLog gameAddress={activeGame}/>
-                <Tooltip label={abortSwitchTooltip} multiline width={300}>
-                    <button className={styles["abort-switch"]} onClick={() => setCancelOnLoss(!cancelOnLoss)}>
-                        { cancelOnLoss ? "💎" : "📃" }
-                    </button>
-                </Tooltip>
-                <div className={styles["star-status-and-winnings"]}>
-                    <StarStatus
-                        data={activeGalaxyContext.focalStar.data}
-                        galaxyState={activeGalaxyContext.galaxy?.state}
-                        isSourceStar={activeGalaxyContext.focalStar.isSource}
-                    />
-                    <Tooltip label={(
-                        "Your approximate winnings if you leave now."
-                    )}>
-                        <div>
-                            { playerApproximateWinnings && <MoneyIcon className={styles["winnings-icon"]}/> }
-                        </div>
-                    </Tooltip>
-                </div>
-                { activeGalaxyContext.focalStar.isHovered && (
-                    <div
-                        className={styles["star-hover-help"]}
-                        style={{
-                            position: "fixed",
-                            top: `${mouseY}px`,
-                            left: `${mouseX}px`
-                        }}
-                    >
-                        {clickActionHelp}
-                    </div>
-                )}
+    //TODO extract styles
+    return <>
+        <table style={{width: "100%"}}>
+            <tbody>
+                <tr style={{display: "flex", flexDirection: "row", justifyContent: "space-around"}}>
+                    {activeGalaxyContext.stars?.map((star, i) => (
+                        <td key={i} style={{display: "flex", flexDirection: "column"}}>
+                            <BucketButton {...getBucketButtonProps(i)}/>
+                            <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between", padding: "0.2rem", gap: "1rem"}}>
+                                <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: "0.2rem"}}>
+                                    <div style={{width: "1rem"}}><MoneyIcon/></div> {formatTokensShort(star.fuel, 9)}
+                                </div>
+                                {i > 0 &&
+                                    <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: "0.2rem"}}>
+                                        <div style={{width: "1rem"}}><PlayersIcon/></div> {star.satellites}
+                                    </div>
+                                }
+                            </div>
+                        </td>
+                    ))}
+                </tr>
+            </tbody>
+        </table>
 
-            </>
-        )}
-    </div>;
+        <div className={styles["hud"]}>
+            {activeGame && (
+                <>
+                    <ShipLog gameAddress={activeGame}/>
+                    <Tooltip label={abortSwitchTooltip} multiline width={300}>
+                        <button className={styles["abort-switch"]} onClick={() => setCancelOnLoss(!cancelOnLoss)}>
+                            { cancelOnLoss ? "💎" : "📃" }
+                        </button>
+                    </Tooltip>
+                    { playerApproximateWinnings && (
+                        <div style={{display: "flex", flexDirection: "column", alignItems: "start"}}>
+                            <Tooltip label={(
+                                "Your approximate winnings if you cash out now."
+                            )}>
+                                <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
+                                    <MoneyIcon className={styles["winnings-icon"]}/>
+                                    <Text size="xl">{playerApproximateWinnings}</Text>
+                                </div>
+                            </Tooltip>
+                            <Text size="sm" color="dimmed">Your approximate winnings if you cash out now.</Text>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    </>;
+}
+
+
+interface BucketButtonProps {
+    label: React.ReactNode;
+    disabled: boolean;
+    onClick: () => void;
+}
+
+
+function BucketButton(props: BucketButtonProps): JSX.Element {
+    return <Button disabled={props.disabled} onClick={props.onClick}>
+        {props.label}
+    </Button>;
 }
 
 

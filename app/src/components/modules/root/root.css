@@ -11,4 +11,5 @@
   --color-player: #D9594C;
   --color-text-base: var(--color-primary-lightest);
   --color-text-disabled: var(--color-primary-light);
+  --color-money: #7dc97d;
 }

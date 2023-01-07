@@ -60,6 +60,18 @@
 }
 
 
+.status-label {
+    width: 65%;
+    height: auto;
+}
+
+
+.winnings-icon {
+    width: 2rem;
+    height: auto;
+}
+
+
 .star-hover-help {
     position: fixed;
     color: var(--color-text-base);
@@ -71,4 +83,10 @@
 
     transform: translate(-50%, 100%);
     z-index: 1000;
+}
+
+.bucket-button-icon {
+    width: 1.5rem;
+    height: auto;
+    fill: var(--color-primary-medium);
 }

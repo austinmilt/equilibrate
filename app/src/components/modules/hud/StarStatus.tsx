@@ -7,9 +7,10 @@ import styles from "./styles.module.css";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { useActiveGame } from "../../shared/game/provider";
 import { GameConfigEnriched } from "../../../lib/equilibrate/types";
-import { USE_BORING_THEME } from "../../../lib/shared/constants";
 import HydrogenIcon from "./hydrogen-icon.svg";
-
+import { MoneyIcon } from "../../shared/icons/MoneyIcon";
+import { Themed, themed } from "../../shared/theme";
+import { PlayersIcon } from "../../shared/icons/PlayersIcon";
 
 interface StarStatusProps {
     data: StarData | undefined;
@@ -52,12 +53,10 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
     const fuelFormatted: string | undefined = useMemo(() => {
         if (props.data?.fuel === undefined) return undefined;
-        if (USE_BORING_THEME) {
-            return formatTokens(props.data.fuel, gameConfig?.mintDecimals);
-
-        } else {
-            return formatTokensShort(props.data.fuel);
-        }
+        return themed(
+            formatTokens(props.data.fuel, gameConfig?.mintDecimals),
+            formatTokensShort(props.data.fuel)
+        );
     }, [props.data?.fuel]);
 
 
@@ -83,11 +82,12 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
                 sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorHydrogen }]}
                 label={
                     <Center>
-                        {USE_BORING_THEME && "🪙"}
-                        {
-                            !USE_BORING_THEME &&
-                                <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
-                        }
+                        <Themed.Boring>
+                            <MoneyIcon className={styles["status-label"]}/>
+                        </Themed.Boring>
+                        <Themed.Star>
+                            <Image src={ HydrogenIcon } alt="H" width={InlineStyles.STAR_STATUS_GAUGE.labelSize}/>
+                        </Themed.Star>
                     </Center>
                 }
             />
@@ -120,7 +120,7 @@ function SatelliteGuage(props: StarStatusProps): JSX.Element {
                 roundCaps
                 thickness={3}
                 sections={[{ value: ringPercent, color: InlineStyles.GLOBAL.colorPlayer }]}
-                label={<Center>👥</Center>}
+                label={<Center><PlayersIcon className={styles["status-label"]}/></Center>}
             />
             <Text size="md">{showLabel && `${props.isSourceStar ? 0 : props.data?.satellites}`}</Text>
         </div>

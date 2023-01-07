@@ -9,8 +9,8 @@ import { WelcomeModal } from "./WelcomeModal";
 import styles from "./styles.module.css";
 import "./root.css";
 import { StartupProvider } from "../../shared/startup/provider";
-import { USE_BORING_THEME } from "../../../lib/shared/constants";
 import { Viewport } from "../viewport/Viewport";
+import { Themed } from "../../shared/theme";
 
 export default function App(): JSX.Element {
     return (
@@ -30,9 +30,8 @@ export default function App(): JSX.Element {
                                 <StartupProvider>
                                     <main className={styles["main"]}>
                                         <Sidebar/>
-                                        {
-                                            USE_BORING_THEME ? <ViewportBoring/> : <Viewport/>
-                                        }
+                                        <Themed.Boring><ViewportBoring/></Themed.Boring>
+                                        <Themed.Star><Viewport/></Themed.Star>
                                         <WelcomeModal/>
                                     </main>
                                 </StartupProvider>

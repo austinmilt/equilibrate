@@ -5,11 +5,12 @@ export class InlineStyles {
         colorPlayer: "#D9594C",
         colorTextBase: "#e6e6e6",
         colorCooling: "#2F488A",
-        colorPrimaryDarkest: "#1E1E1E"
+        colorPrimaryDarkest: "#1E1E1E",
+        colorMoney: "#7dc97d"
     };
 
     public static STAGE = {
-        heightPropViewport: 0.81
+        heightPropViewport: 0.63
     };
 
     public static STAR_STATUS_GAUGE = {
@@ -19,5 +20,9 @@ export class InlineStyles {
 
     public static MINT_SELECT = {
         dropdownMaxHeightPixels: 200
+    };
+
+    public static STAR_BAR = {
+        widthPropBase: 0.95
     };
 }
