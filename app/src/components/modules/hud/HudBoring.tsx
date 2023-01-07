@@ -243,7 +243,7 @@ export function HudBoring(): JSX.Element {
         } else {
             if (index === 0) {
                 result = {
-                    label: "Faucet",
+                    label: "Not in Game",
                     disabled: true,
                     onClick: () => Notifications.enterWormholeOrbit()
                 };
@@ -303,7 +303,6 @@ export function HudBoring(): JSX.Element {
                 <tr style={{display: "flex", flexDirection: "row", justifyContent: "space-around"}}>
                     {activeGalaxyContext.stars?.map((star, i) => (
                         <td key={i} style={{display: "flex", flexDirection: "column"}}>
-                            <BucketButton {...getBucketButtonProps(i)}/>
                             <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between", padding: "0.2rem", gap: "1rem"}}>
                                 <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: "0.2rem"}}>
                                     <div style={{width: "1rem"}}><MoneyIcon/></div> {formatTokensShort(star.fuel, 9)}
@@ -314,6 +313,8 @@ export function HudBoring(): JSX.Element {
                                     </div>
                                 }
                             </div>
+                            {i === 0 && <Text>Faucet</Text>}
+                            {i > 0 && <BucketButton {...getBucketButtonProps(i)}/>}
                         </td>
                     ))}
                 </tr>
@@ -335,6 +336,7 @@ export function HudBoring(): JSX.Element {
                                 "Your approximate winnings if you cash out now."
                             )}>
                                 <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
+                                    <BucketButton {...getBucketButtonProps(0)}/>
                                     <MoneyIcon className={styles["winnings-icon"]}/>
                                     <Text size="xl">{playerApproximateWinnings}</Text>
                                 </div>
