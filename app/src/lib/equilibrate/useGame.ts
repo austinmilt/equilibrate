@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "./provider";
 import { GameEvent, PlayerStateEvent, RequestResult } from "./sdk";
 import { GameEnriched } from "./types";
+import { Duration } from "../shared/duration";
 
 interface OnSuccessFunction {
     (result: RequestResult): void;
@@ -168,27 +169,32 @@ interface UseEventsContext<T> {
 
 
 function useGameEvents(gameAddress: PublicKey | undefined): UseEventsContext<GameEvent> {
-    const { equilibrate, equilibrateIsReady } = useEquilibrate();
+    const { equilibrate, equilibrateIsReady, player } = useEquilibrate();
     const [event, setEvent] = useState<GameEvent | null>(null);
     const [loading, setLoading] = useState<GameContext["loading"]>(false);
     const [error, setError] = useState<GameContext["error"]>();
 
     // (un)subscribe to the current game
     useEffect(() => {
-        const run = async () => {
+        async function run() {
             if (equilibrateIsReady && (gameAddress !== undefined)) {
                 equilibrate.watchGame(gameAddress, setEvent, true);
-
-                return () => {
-                    equilibrate.stopWatchingGame(gameAddress);
-                };
             }
-        };
+        }
 
         setError(undefined);
         setLoading(true);
-        run().catch(setError).finally(() => setLoading(false));
-    }, [gameAddress, equilibrateIsReady]);
+        run()
+            .catch(setError)
+            .finally(() => setLoading(false));
+
+        return () => {
+            if (equilibrateIsReady && (gameAddress !== undefined)) {
+                equilibrate.stopWatchingGame(gameAddress);
+            }
+        };
+
+    }, [gameAddress, equilibrateIsReady, player]);
 
     return {
         event: event,
