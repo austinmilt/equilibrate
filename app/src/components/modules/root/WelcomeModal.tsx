@@ -1,8 +1,9 @@
-import { Button, Group, Modal, SimpleGrid } from "@mantine/core";
+import { Button, Group, Modal, SimpleGrid, Text } from "@mantine/core";
 import { useMemo } from "react";
 import { useLocalStorageParam, UseLocalStorageParamContext } from "../../../lib/shared/local-storage";
 import { Carousel } from "../../shared/model/carousel";
-import GalaxyImage from "./assets/galaxy.png";
+import BoringGameDescriptionImage from "./assets/boring-tutorial-game-description.png";
+import BoringGameListImage from "./assets/boring-tutorial-game-list.png";
 
 type WelcomeModalShowValue = "never" | "read" | "unread";
 
@@ -52,67 +53,47 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
         <SimpleGrid cols={1}>
             <Carousel>
                 <Carousel.Item>
-                    Welcome to Solfield, a game in which
-                    winning depends on your ability to strategically
-                    outmaneuver other players and time your escape.
-                    <br/><br/>
-                    Each Solfield game is a unique galaxy of stars and
-                    a wormhole. Tokens, represented by hydrogen, constantly
-                    flow out of the wormhole and stars and into other stars.
-                    <br/><br/>
-                    Your mission is to harvest hydrogen. Maximize your hydrogen
-                    by exiting the game while orbiting a star with lots of
-                    hydrogen and few players.
-                    <br/><br/>
-                    And that&apos;s it! To get started, click a game from
-                    the list and a star to orbit, or start a new game.
-                    You can also click through the slides to learn more
-                    about game mechanics.
-                </Carousel.Item>
-                <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
-                        The size of a star indicates the amount of hydrogen in the star.
+                        Welcome to B*cket! Collect as much as you can by
+                        strategically choosing which bucket to occupy and
+                        when you leave.
                         <br/><br/>
-                        Orbit a star by clicking it.
+                        <Text color="dimmed">Click through the slides to keep learning.</Text>
+
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
-                        When you enter or create a game, you pay the the game
-                        entry fee, which is initially added to the wormhole. There
-                        is an additional fee of ~0.07 SOL to create or enter a game.
+                        <img src={BoringGameDescriptionImage} alt="tutorial" width="100%" style={{margin: "1rem"}}/>
+                        Games are composed of buckets and players. Each bucket
+                        contains tokens - represented by the height of the bar - and
+                        players - represented by the number of divisions in the bar.
                         <br/><br/>
-                        Tokens are represented by hydrogen. For instance, 1 SOL =
-                        1 billion lamports = 1 billion hydrogen.
+                        Each bucket has a hole from which tokens leak out and
+                        into other buckets. The more players in the bucket,
+                        the bigger the hole, and the faster the leak.
+                        <br/><br/>
+                        Players&apos; initial deposits flow from the faucet
+                        to the buckets.
+                        <br/><br/>
+                        <Text color="dimmed">Click through the slides to keep learning.</Text>
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
-                        Hydrogen continuously flows out of the wormhole and is
-                        equally distributed across the stars.
+                        <img src={BoringGameDescriptionImage} alt="tutorial" width="100%" style={{margin: "1rem"}}/>
+                        Collect your tokens by leaving the game when the bucket
+                        you occupy has a lot of tokens and few players.
                         <br/><br/>
-                        Hydrogen also continuously flows out of stars into
-                        other stars with fewer orbiting ships.
+                        And that&apos;s it! To get started, click a game from
+                        the list and a bucket to enter, or start a new game.
                         <br/><br/>
-                        The rate at which hydrogen flows out of stars is directly
-                        proportional to the number of orbiting ships. More ships
-                        equals faster flow.
+                        <Text color="dimmed">Click through the slides to keep learning.</Text>
                     </div>
                 </Carousel.Item>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        <img src={GalaxyImage} alt="galaxy" width="100%" style={{margin: "1rem"}}/>
-                        When you leave a game, you receive tokens equal to
-                        your proportional claim on the hydrogen in the star
-                        you were orbiting. For instance, if you leave a SOL-based
-                        game while orbiting a star with 10 billion hydrogen and
-                        10 players, you would receive 1 SOL.
-                        <br/><br/>
-                        The last player to leave receives all the unclaimed
-                        tokens in the game. This ends the game.
+                        <img src={BoringGameListImage} alt="tutorial" width="100%" style={{margin: "1rem"}}/>
                     </div>
                 </Carousel.Item>
             </Carousel>
