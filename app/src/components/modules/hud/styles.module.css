@@ -101,3 +101,8 @@
     background-color: #a2ffa2 !important;
     color: var(--color-primary-medium) !important;
 }
+
+.faucet-button:disabled {
+    background-color: transparent !important;
+    color: var(--color-primary-medium) !important;
+}

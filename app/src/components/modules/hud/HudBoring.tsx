@@ -163,6 +163,8 @@ export function HudBoring(): JSX.Element {
                             });
                             shipLogContext.onEscapeSystem();
 
+                            notifySuccess(log);
+
                         } else if (result.simulationResult) {
                             notifySuccess("Escape simulated. See console for details.");
                             console.log("Escape simulation result", result.simulationResult);
@@ -333,9 +335,7 @@ export function HudBoring(): JSX.Element {
                     { playerApproximateWinnings && (
                         <div style={{display: "flex", flexDirection: "column", alignItems: "start"}}>
                             <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
-                                <div className={styles["shiner"]}>
-                                    <BucketButton {...getBucketButtonProps(0)} className={styles["faucet-button"]}/>
-                                </div>
+                                <BucketButton {...getBucketButtonProps(0)} className={styles["faucet-button"]}/>
                                 <MoneyIcon className={styles["winnings-icon"]}/>
                                 <Text size="xl">{playerApproximateWinnings}</Text>
                             </div>

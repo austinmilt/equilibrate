@@ -191,6 +191,8 @@ export function Hud(): JSX.Element {
                             });
                             shipLogContext.onEscapeSystem();
 
+                            notifySuccess(log);
+
                         } else if (result.simulationResult) {
                             notifySuccess("Escape simulated. See console for details.");
                             console.log("Escape simulation result", result.simulationResult);
