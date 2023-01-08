@@ -39,6 +39,22 @@ export function SettingsMenu(): JSX.Element {
                     { !endpointIsProd && <AirdropButton/> }
 
                     <HowToPlayButton onClick={() => setOpenMenu(false)}/>
+
+                    <a
+                        href="https://github.com/austinmilt/equilibrate"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        View source code
+                    </a>
+
+                    <a
+                        href="https://discord.gg/Ab4ecFXZGU"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        Join Discord
+                    </a>
                 </menu>
             )}
         </div>
