@@ -332,15 +332,13 @@ export function HudBoring(): JSX.Element {
                     </Tooltip>
                     { playerApproximateWinnings && (
                         <div style={{display: "flex", flexDirection: "column", alignItems: "start"}}>
-                            <Tooltip label={(
-                                "Your approximate winnings if you cash out now."
-                            )}>
-                                <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
-                                    <BucketButton {...getBucketButtonProps(0)}/>
-                                    <MoneyIcon className={styles["winnings-icon"]}/>
-                                    <Text size="xl">{playerApproximateWinnings}</Text>
+                            <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
+                                <div className={styles["shiner"]}>
+                                    <BucketButton {...getBucketButtonProps(0)} className={styles["faucet-button"]}/>
                                 </div>
-                            </Tooltip>
+                                <MoneyIcon className={styles["winnings-icon"]}/>
+                                <Text size="xl">{playerApproximateWinnings}</Text>
+                            </div>
                             <Text size="sm" color="dimmed">Your approximate winnings if you cash out now.</Text>
                         </div>
                     )}
@@ -355,11 +353,16 @@ interface BucketButtonProps {
     label: React.ReactNode;
     disabled: boolean;
     onClick: () => void;
+    className?: string;
 }
 
 
 function BucketButton(props: BucketButtonProps): JSX.Element {
-    return <Button disabled={props.disabled} onClick={props.onClick}>
+    return <Button
+        disabled={props.disabled}
+        onClick={props.onClick}
+        className={props.className}
+    >
         {props.label}
     </Button>;
 }

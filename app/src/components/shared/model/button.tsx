@@ -8,6 +8,7 @@ interface Props {
     disabled?: boolean;
     children?: React.ReactNode;
     innerRef?: React.RefObject<HTMLButtonElement>;
+    className?: string;
 }
 
 // https://mantine.dev/styles/styles-api/
@@ -16,7 +17,7 @@ export function Button(props: Props): JSX.Element {
         <MantineButton
             onClick={props.onClick}
             disabled={props.disabled}
-            classNames={{root: sharedStyles["button-like"]}}
+            classNames={{root: `${sharedStyles["button-like"]} ${props.className ?? ""}`}}
         >
             {props.children}
         </MantineButton>

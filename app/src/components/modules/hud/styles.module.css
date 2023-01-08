@@ -90,3 +90,14 @@
     height: auto;
     fill: var(--color-primary-medium);
 }
+
+.faucet-button {
+    background-color: var(--color-money) !important;
+    color: var(--color-primary-darker) !important;
+    font-weight: 900;
+}
+
+.faucet-button:hover {
+    background-color: #a2ffa2 !important;
+    color: var(--color-primary-medium) !important;
+}
