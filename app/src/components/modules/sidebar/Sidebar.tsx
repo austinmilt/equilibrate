@@ -139,9 +139,22 @@ function useGamesList(): UseGamesListContext {
             } else if (b.publicKey.toBase58() === activeAddressString) {
                 return 1;
 
+            // then list all games the user is in
+            } else if (a.userIsPlaying && !b.userIsPlaying) {
+                return -1;
+
+            } else if (!a.userIsPlaying && b.userIsPlaying) {
+                return 1;
+
             } else {
-                // sort descending by volume
-                return computeGamePoolTotal(b.account) - computeGamePoolTotal(a.account);
+                // sort descending by game fee vs total money in pool
+                const aEntryFee: number = a.account.config.entryFeeDecimalTokens.toNumber();
+                const aRatio: number = aEntryFee / computeGamePoolTotal(b.account);
+
+                const bEntryFee: number = b.account.config.entryFeeDecimalTokens.toNumber();
+                const bRatio: number = bEntryFee / computeGamePoolTotal(b.account);
+
+                return bRatio - aRatio;
             }
         }),
     [gamesList, activeGameContext.address]);
