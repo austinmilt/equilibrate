@@ -1,4 +1,4 @@
-import { Tooltip, Text } from "@mantine/core";
+import { Tooltip, Text, Center } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
 import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
@@ -304,7 +304,7 @@ export function HudBoring(): JSX.Element {
             <tbody>
                 <tr style={{display: "flex", flexDirection: "row", justifyContent: "space-around"}}>
                     {activeGalaxyContext.stars?.map((star, i) => (
-                        <td key={i} style={{display: "flex", flexDirection: "column"}}>
+                        <td key={i} style={{display: "flex", flexDirection: "column", width: "100%", padding: "0.5rem"}}>
                             <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between", padding: "0.2rem", gap: "1rem"}}>
                                 <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: "0.2rem"}}>
                                     <div style={{width: "1rem"}}><MoneyIcon/></div> {formatTokensShort(star.fuel, 9)}
@@ -315,8 +315,8 @@ export function HudBoring(): JSX.Element {
                                     </div>
                                 }
                             </div>
-                            {i === 0 && <Text>Faucet</Text>}
-                            {i > 0 && <BucketButton {...getBucketButtonProps(i)}/>}
+                            {(i === 0) && <Center><Text>Faucet</Text></Center>}
+                            {(i > 0) && <BucketButton {...getBucketButtonProps(i)}/>}
                         </td>
                     ))}
                 </tr>
