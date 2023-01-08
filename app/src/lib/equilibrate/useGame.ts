@@ -223,17 +223,19 @@ function usePlayerEvents(
                     setEvent,
                     true
                 );
-
-                return () => {
-                    equilibrate.stopWatchingPlayerState(playerAddress, gameAddress);
-                };
             }
         };
 
         setError(undefined);
         setLoading(true);
         run().catch(setError).finally(() => setLoading(false));
-    }, [gameAddress, equilibrateIsReady]);
+
+        return () => {
+            if (equilibrateIsReady && (gameAddress !== undefined) && (playerAddress !== undefined)) {
+                equilibrate.stopWatchingPlayerState(playerAddress, gameAddress);
+            }
+        };
+    }, [gameAddress, equilibrateIsReady, playerAddress]);
 
 
     return {

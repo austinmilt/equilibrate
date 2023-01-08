@@ -332,16 +332,18 @@ export function HudBoring(): JSX.Element {
                             { cancelOnLoss ? "💎" : "📃" }
                         </button>
                     </Tooltip>
-                    { playerApproximateWinnings && (
-                        <div style={{display: "flex", flexDirection: "column", alignItems: "start"}}>
-                            <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
-                                <BucketButton {...getBucketButtonProps(0)} className={styles["faucet-button"]}/>
-                                <MoneyIcon className={styles["winnings-icon"]}/>
-                                <Text size="xl">{playerApproximateWinnings}</Text>
-                            </div>
-                            <Text size="sm" color="dimmed">Your approximate winnings if you cash out now.</Text>
+                    <div style={{display: "flex", flexDirection: "column", alignItems: "start"}}>
+                        <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
+                            <BucketButton {...getBucketButtonProps(0)} className={styles["faucet-button"]}/>
+                            <MoneyIcon className={styles["winnings-icon"]}/>
+                            <Text size="xl">{playerApproximateWinnings}</Text>
                         </div>
-                    )}
+                        <Text size="sm" color="dimmed">
+                            {(playerApproximateWinnings != null) ?
+                                "Your approximate winnings if you cash out now." :
+                                <br/>}
+                        </Text>
+                    </div>
                 </>
             )}
         </div>

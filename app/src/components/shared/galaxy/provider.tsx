@@ -185,7 +185,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
     [stars, focalStarIndex]);
 
 
-    const value: ActiveGalaxyContextState = useMemo(() => ({
+    const value: ActiveGalaxyContextState = {
         galaxy: ((galaxyConstants === undefined) || (galaxyState === undefined)) ? undefined : {
             constants: galaxyConstants,
             state: galaxyState
@@ -206,8 +206,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
             addOnClick: addFocalStarOnClick,
             onClick: focalStarOnClick
         }
-    }), [stars, focalStar, galaxyConstants, galaxyState, activeGame, playerStar, focalStarHovered]);
-
+    };
 
     return (
         <ActiveGalaxyContext.Provider value={value}>

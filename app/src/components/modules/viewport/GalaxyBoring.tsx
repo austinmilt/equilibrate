@@ -86,7 +86,7 @@ export function GalaxyBoring(props: Props): JSX.Element {
                 drawBar(bar.canvas, false);
             }
         }
-    }, [barPropsContext.bars]);
+    }, [barPropsContext.bars, activeGalaxyContext.playerStar.index]);
 
 
     return (
