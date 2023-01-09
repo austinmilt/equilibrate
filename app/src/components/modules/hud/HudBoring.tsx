@@ -1,4 +1,4 @@
-import { Tooltip, Text, Center } from "@mantine/core";
+import { Tooltip, Text, Center, Loader } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
 import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
@@ -9,7 +9,6 @@ import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
-import { PlayerState } from "../../../lib/equilibrate/types";
 import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { MoneyIcon } from "../../shared/icons/MoneyIcon";
@@ -43,27 +42,48 @@ export function HudBoring(): JSX.Element {
         const updatePlayerInGame = async () => {
             let result: boolean | null = null;
             if (activeGame !== undefined) {
-                let playerState: PlayerState | null = gameContext.player?.player ?? null;
-                if (overridePlayer !== undefined) {
-                    playerState = await equilibrate.getPlayerState(activeGame, overridePlayer);
-                    result = playerState != null;
-                }
+                if (gameContext.player?.leave != null) {
+                    result = false;
 
-                // only try to get the player state for the configured player if
-                // we dont already have the player state from the game context, since
-                // they should be equivalent
-                if ((playerState === null) &&
-                    (gameContext.player !== undefined) &&
-                    (player !== undefined)
+                } else if ((gameContext.player?.enter != null) ||
+                    (gameContext.player?.move != null) ||
+                    (gameContext.player?.new)
                 ) {
-                    playerState = await equilibrate.getPlayerState(activeGame, player);
-                    result = playerState != null;
+                    result = true;
+
+                } else {
+                    if (overridePlayer !== undefined) {
+                        result = await equilibrate.playerInGame(activeGame, overridePlayer);
+                    }
+
+                    if (!result) {
+                        result = await equilibrate.playerInGame(activeGame, player);
+                    }
                 }
             }
             setPlayerInGame(result);
         };
         updatePlayerInGame();
-    }, [gameContext.player, overridePlayer, equilibrate.getPlayerState, setPlayerInGame]);
+    }, [
+        gameContext.player?.leave,
+        gameContext.player?.enter,
+        gameContext.player?.move,
+        gameContext.player?.new,
+        activeGame,
+        player,
+        overridePlayer,
+        setPlayerInGame
+    ]);
+
+
+    useEffect(() => {
+        if (gameContext.player?.leave != null) {
+            setPlayerInGame(false);
+
+        } else if (gameContext.player?.enter != null) {
+            setPlayerInGame(true);
+        }
+    }, [gameContext.player?.leave, gameContext.player?.enter, setPlayerInGame]);
 
 
     const enterSystem: (i: number, p: PublicKey) => Promise<void> = useCallback(async (starIndex, player) => {
@@ -200,7 +220,13 @@ export function HudBoring(): JSX.Element {
 
     const getBucketButtonProps: (index: number) => BucketButtonProps = useCallback((index) => {
         let result: BucketButtonProps;
-        if (playerInGame === null) {
+        if (gameContext.loading) {
+            result = {
+                label: <Loader variant="dots" color="lime"/>,
+                disabled: true,
+                onClick: () => undefined
+            };
+        } else if (playerInGame === null) {
             if (index === 0) {
                 result = {
                     label: "Connect Wallet",
@@ -270,6 +296,7 @@ export function HudBoring(): JSX.Element {
         }
     }, [
         activeGalaxyContext.playerStar.index,
+        gameContext.loading,
         playerInGame,
         enterSystem,
         moveShip,

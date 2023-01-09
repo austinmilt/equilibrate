@@ -107,8 +107,11 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
     useEffect(() => {
         if (playerEvent?.player != null) {
             setPlayerStarIndex(playerEvent?.player.bucket);
+
+        } else if (playerEvent?.leave != null) {
+            setPlayerStarIndex(undefined);
         }
-    }, [activeGame, playerEvent?.player]);
+    }, [activeGame, playerEvent?.enter, playerEvent?.leave, playerEvent?.move, playerEvent?.new]);
 
 
     const updateStarsWithGame = useCallback((game: GameEnriched) => {
