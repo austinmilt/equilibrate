@@ -44,6 +44,8 @@ import {
 } from "./utils";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { AnchorError } from "@project-serum/anchor";
+import { SimpleCache } from "./cache";
+import { Duration } from "../shared/duration";
 
 export interface SubmitTransactionFunction {
   (transaction: Transaction, connection: Connection): Promise<string>;
@@ -249,6 +251,16 @@ export class EquilibrateSDK {
     private readonly playerStateSubscriptions: Map<string, Subscription<PlayerStateEvent>> =
         new Map<string, Subscription<PlayerStateEvent>>();
 
+    private readonly mintDecimalsCache: SimpleCache<string, number> = SimpleCache.withoutTtl();
+    private readonly gameExistsCache: SimpleCache<string, boolean> = SimpleCache.withTtl(Duration.ofSeconds(5));
+    private readonly playerInGameCache: SimpleCache<string, boolean> = SimpleCache.withTtl(
+        Duration.ofMilliseconds(500)
+    );
+    private readonly playerStateCache: SimpleCache<string, PlayerState | null> = SimpleCache.withTtl(
+        Duration.ofMilliseconds(500),
+        true
+    );
+
     private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
     }
@@ -286,7 +298,7 @@ export class EquilibrateSDK {
      */
     public request(player?: PublicKey): EquilibrateRequest {
         Assert.notNullish(this.program, "program");
-        return EquilibrateRequest.new(this.program, player);
+        return EquilibrateRequest.new(this, this.program, player);
     }
 
 
@@ -298,13 +310,12 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
 
         // get the mint decimals for all mints in all games
-        const connection: Connection = program.provider.connection;
         const gamesListRaw = await program.account.game.all();
         const mints: Set<PublicKey> = new Set<PublicKey>();
         const mintDecimals: Map<string, number> = new Map<string, number>();
         gamesListRaw.forEach(r => mints.add(r.account.config.mint));
         await Promise.allSettled([...mints].map(mint =>
-            getMintDecimals(mint, connection)
+            this.getOrFetchMintDecimals(mint)
                 .then(decimals => mintDecimals.set(mint.toBase58(), decimals))
                 .catch(e => {
                     console.error(`Unable to retrieve mint decimals for ${mint}`, e);
@@ -357,7 +368,11 @@ export class EquilibrateSDK {
      */
     public async gameExists(address: PublicKey): Promise<boolean> {
         Assert.notNullish(this.program, "program");
-        return await accountExists(address, this.program.provider.connection);
+        const connection: Connection = this.program.provider.connection;
+        return await this.gameExistsCache.getOrFetch(
+            address.toBase58(),
+            () => accountExists(address, connection)
+        );
     }
 
 
@@ -373,7 +388,11 @@ export class EquilibrateSDK {
             this.program.provider.publicKey,
             this.program.programId
         );
-        return await accountExists(playerStateAddress, this.program.provider.connection);
+        const connection: Connection = this.program.provider.connection;
+        return await this.playerInGameCache.getOrFetch(
+            playerStateAddress.toBase58(),
+            () => accountExists(playerStateAddress, connection)
+        );
     }
 
 
@@ -393,7 +412,12 @@ export class EquilibrateSDK {
             targetPlayer,
             this.program.programId
         );
-        return await this.program.account.playerState.fetchNullable(playerStateAddress);
+
+        const program: anchor.Program<Equilibrate> = this.program;
+        return await this.playerStateCache.getOrFetch(
+            playerStateAddress.toBase58(),
+            () => program.account.playerState.fetchNullable(playerStateAddress)
+        );
     }
 
 
@@ -561,12 +585,30 @@ export class EquilibrateSDK {
             if (gameNow === null) {
                 throw new Error("Game never existed.");
             }
-            result = await getMintDecimals(gameNow.config.mint, this.program.provider.connection);
+            result = await this.getOrFetchMintDecimals(gameNow.config.mint);
 
         } else {
             result = gameBefore.config.mintDecimals;
         }
         return result;
+    }
+
+
+    /**
+     * Gets the number of decimals for the given mint, pulling from
+     * in-memory cache or fetching from on-chain if not in the cache.
+     *
+     * @param mint mint for which to retrieve decimals
+     * @returns number of decimals for the mint
+     */
+    public async getOrFetchMintDecimals(mint: PublicKey): Promise<number> {
+        Assert.notNullish(this.program, "program");
+        const mintAddressString: string = mint.toBase58();
+        const connection: Connection = this.program.provider.connection;
+        return await this.mintDecimalsCache.getOrFetch(
+            mintAddressString,
+            () => getMintDecimals(mint, connection)
+        );
     }
 
 
@@ -806,6 +848,7 @@ interface RequestStep {
  */
 export class EquilibrateRequest {
     private readonly program: anchor.Program<Equilibrate>;
+    private readonly sdk: EquilibrateSDK;
     private readonly connection: Connection;
     private readonly playerAddress: PublicKey;
     private readonly steps: RequestStep[] = [];
@@ -817,21 +860,27 @@ export class EquilibrateRequest {
         nBuckets?: number;
         maxPlayers?: number;
     } = {};
+    private mintDecimals?: number;
     private bucketIndex: number | undefined;
     private gameId: number | undefined;
     private cancelOnLoss: boolean | undefined;
     private neededToCreatePlayerTokenAccount: boolean = false;
 
-    private constructor(program: anchor.Program<Equilibrate>, playerAddress: PublicKey) {
+    private constructor(sdk: EquilibrateSDK, program: anchor.Program<Equilibrate>, playerAddress: PublicKey) {
+        this.sdk = sdk;
         this.program = program;
         this.connection = program.provider.connection;
         this.playerAddress = playerAddress;
     }
 
-    public static new(program: anchor.Program<Equilibrate>, overridePlayer?: PublicKey): EquilibrateRequest {
+    public static new(
+        sdk: EquilibrateSDK,
+        program: anchor.Program<Equilibrate>,
+        overridePlayer?: PublicKey
+    ): EquilibrateRequest {
         const playerAddress: PublicKey | undefined = overridePlayer ?? program.provider.publicKey;
         Assert.notNullish(playerAddress, "player");
-        return new EquilibrateRequest(program, playerAddress);
+        return new EquilibrateRequest(sdk, program, playerAddress);
     }
 
 
@@ -1103,7 +1152,7 @@ export class EquilibrateRequest {
 
     private async computeMintToDecimalMultiplier(): Promise<number> {
         Assert.notNullish(this.config.mint, "mint");
-        const mintDecimals: number = await getMintDecimals(this.config.mint, this.connection);
+        const mintDecimals: number = await this.sdk.getOrFetchMintDecimals(this.config.mint);
         return Math.pow(10, mintDecimals);
     }
 

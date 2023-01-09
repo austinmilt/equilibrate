@@ -8,7 +8,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 export const GAMES_LIST_UPDATE_INTERVAL: Duration = parseEnv(
     "GAMES_LIST_UPDATE_INTERVAL",
     import.meta.env.VITE_GAMES_LIST_UPDATE_INTERVAL,
-    Duration.ofSeconds(10),
+    Duration.ofMinutes(1),
     (v) => Duration.ofSeconds(Number.parseInt(v))
 );
 
