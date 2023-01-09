@@ -260,6 +260,7 @@ export class EquilibrateSDK {
         Duration.ofMilliseconds(500),
         true
     );
+    private readonly gameCache: SimpleCache<string, Game> = SimpleCache.withTtl(Duration.ofMilliseconds(200));
 
     private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
@@ -433,16 +434,24 @@ export class EquilibrateSDK {
         subscription.emitter.subscribe(callback);
 
         if (fetchNow) {
-            Assert.notNullish(this.program, "program");
-            const program = this.program;
             this.gameExists(gameAddress)
                 .then(exists => {
                     if (exists) {
-                        getGame(gameAddress, program)
+                        this.getGame(gameAddress)
                             .then(game => this.processAndEmitGameEvent(gameAddress, game, subscription.emitter));
                     }
                 });
         }
+    }
+
+
+    public async getGame(address: PublicKey): Promise<Game> {
+        Assert.notNullish(this.program, "program");
+        const program: anchor.Program<Equilibrate> = this.program;
+        return await this.gameCache.getOrFetch(
+            address.toBase58(),
+            async () => (await program.account.game.fetch(address)) as Game
+        );
     }
 
 
@@ -680,9 +689,10 @@ export class EquilibrateSDK {
                 subscription.emitter.subscribe(callback);
 
                 if (fetchNow) {
-                    const playerState: PlayerState | null = await program.account
-                        .playerState
-                        .fetchNullable(playerStateAddresss);
+                    const playerState: PlayerState | null = await this.getPlayerState(
+                        gameAddress,
+                        playerAddress
+                    );
 
                     await this.processAndEmitPlayerStateEvent(
                         playerAddress,
@@ -1377,7 +1387,7 @@ export class EquilibrateRequest {
                 this.playerAddress,
                 this.program.programId
             );
-            const game: Game = await getGame(gameAddress, this.program);
+            const game: Game = await this.sdk.getGame(gameAddress);
             const leaveInstruction: TransactionInstruction = await this.program
                 .methods
                 .leaveGame(cancelOnLoss)
@@ -1559,11 +1569,6 @@ export class EquilibrateRequest {
         }
         return result;
     }
-}
-
-
-async function getGame(address: PublicKey, program: anchor.Program<Equilibrate>): Promise<Game> {
-    return (await program.account.game.fetch(address)) as Game;
 }
 
 
