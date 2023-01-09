@@ -254,13 +254,13 @@ export class EquilibrateSDK {
     private readonly mintDecimalsCache: SimpleCache<string, number> = SimpleCache.withoutTtl();
     private readonly gameExistsCache: SimpleCache<string, boolean> = SimpleCache.withTtl(Duration.ofSeconds(5));
     private readonly playerInGameCache: SimpleCache<string, boolean> = SimpleCache.withTtl(
-        Duration.ofMilliseconds(500)
+        Duration.ofMilliseconds(1)
     );
     private readonly playerStateCache: SimpleCache<string, PlayerState | null> = SimpleCache.withTtl(
-        Duration.ofMilliseconds(500),
+        Duration.ofMilliseconds(1),
         true
     );
-    private readonly gameCache: SimpleCache<string, Game> = SimpleCache.withTtl(Duration.ofMilliseconds(200));
+    private readonly gameCache: SimpleCache<string, Game> = SimpleCache.withTtl(Duration.ofMilliseconds(50));
 
     private constructor(program: anchor.Program<Equilibrate> | undefined) {
         this.program = program;
@@ -379,14 +379,15 @@ export class EquilibrateSDK {
 
     /**
      * @param gameAddress game address to check if active player is playing
+     * @param player overrides the SDK's current player to locate with the given one
      * @returns true if active player is playing this game
      */
-    public async playerInGame(gameAddress: PublicKey): Promise<boolean> {
+    public async playerInGame(gameAddress: PublicKey, player?: PublicKey): Promise<boolean> {
         Assert.notNullish(this.program, "program");
         Assert.notNullish(this.program.provider.publicKey, "player");
         const playerStateAddress: PublicKey = await getPlayerStateAddress(
             gameAddress,
-            this.program.provider.publicKey,
+            player ?? this.program.provider.publicKey,
             this.program.programId
         );
         const connection: Connection = this.program.provider.connection;
@@ -629,20 +630,22 @@ export class EquilibrateSDK {
 
 
     private getBucketLeftIndex(bucketPlayerCountChanges: number[]): number {
-        const index: number = bucketPlayerCountChanges.findIndex(c => c < 0);
+        // dont include the holding bucket, which always contains "all" players
+        const index: number = bucketPlayerCountChanges.slice(1).findIndex(c => c < 0);
         if (index === -1) {
             throw new Error("Unable to determine bucket left");
         }
-        return index;
+        return index + 1;
     }
 
 
     private getBucketEnteredIndex(bucketPlayerCountChanges: number[]): number {
-        const index: number = bucketPlayerCountChanges.findIndex(c => c > 0);
+        // dont include the holding bucket, which always contains "all" players
+        const index: number = bucketPlayerCountChanges.slice(1).findIndex(c => c > 0);
         if (index === -1) {
             throw new Error("Unable to determine bucket entered");
         }
-        return index;
+        return index + 1;
     }
 
 
@@ -877,7 +880,6 @@ export class EquilibrateRequest {
         nBuckets?: number;
         maxPlayers?: number;
     } = {};
-    private mintDecimals?: number;
     private bucketIndex: number | undefined;
     private gameId: number | undefined;
     private cancelOnLoss: boolean | undefined;
