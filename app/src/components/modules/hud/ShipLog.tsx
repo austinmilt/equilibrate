@@ -1,6 +1,6 @@
 import { ScrollArea, Text, Anchor } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { SHIP_MAX_LOGS } from "../../../lib/shared/constants";
 import { Duration } from "../../../lib/shared/duration";
 import {
@@ -14,10 +14,24 @@ const LOGS_KEY_PREFIX: string = "ship-logs:";
 const LOGS_KEY_DUMMY_SUFFIX: string = "dummy";
 
 export function ShipLog(props: { gameAddress: PublicKey | undefined }): JSX.Element {
+    const scrollRef = useRef<HTMLDivElement>(null);
     const logsContext = useShipLogs(props.gameAddress);
 
+    const scrollToBottom: () => void = useCallback(() => {
+        if (scrollRef.current != null) {
+            console.log("scrolling");
+            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+        }
+    }, [scrollRef.current]);
+
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [logsContext.logs]);
+
+
     return <div className={styles["ship-log"]}>
-        <ScrollArea>
+        <ScrollArea type="auto" viewportRef={scrollRef}>
             {
                 logsContext.logs.map((log, i) =>
                     <LogEntryComponent log={log} key={i}/>

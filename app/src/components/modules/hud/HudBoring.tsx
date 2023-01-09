@@ -99,7 +99,7 @@ export function HudBoring(): JSX.Element {
 
                     } else if (signature !== undefined) {
                         shipLogContext.record({
-                            text: themed("Entered the game.", "Entered the system."),
+                            text: themed(`Entered bucket ${starIndex}`, "Entered the system."),
                             url: makeTransactionUrl(signature)
                         });
                         activeGalaxyContext.playerStar.set(starIndex);
@@ -132,7 +132,7 @@ export function HudBoring(): JSX.Element {
 
                     } else if (signature !== undefined) {
                         shipLogContext.record({
-                            text: themed("Moved buckets", "Moved ship."),
+                            text: themed(`Moved to bucket ${starIndex}`, "Moved ship."),
                             url: makeTransactionUrl(signature)
                         });
                         activeGalaxyContext.playerStar.set(starIndex);
