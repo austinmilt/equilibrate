@@ -7,6 +7,9 @@ interface CacheValue<V> {
     expiration?: Date;
 }
 
+/**
+ * Simple in-memory cache with lazy TTL (no automatic deletion of entries).
+ */
 export class SimpleCache<K, V> {
     private readonly ttl?: Duration;
     private readonly allowNullish: boolean;

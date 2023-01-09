@@ -445,6 +445,13 @@ export class EquilibrateSDK {
     }
 
 
+    /**
+     * Gets the game object from on-chain. This assumes the
+     * game exists (use `gameExists` to check if it exists first).
+     *
+     * @param address address of the game to retrieve
+     * @returns game object
+     */
     public async getGame(address: PublicKey): Promise<Game> {
         Assert.notNullish(this.program, "program");
         const program: anchor.Program<Equilibrate> = this.program;
