@@ -28,8 +28,6 @@
     max-width: 10rem;
     width: 100%;
     background-color: transparent;
-    border: 1px solid var(--color-primary-lightest);
-    border-radius: 0.5rem;
 }
 
 .card {
@@ -44,6 +42,18 @@
 
 .card.selected {
     background-color: var(--color-primary-medium);
+}
+
+.card .money-icon {
+    width: 1rem;
+    height: auto;
+    margin-right: -0.75rem;
+}
+
+.card .players-icon {
+    width: 1rem;
+    height: auto;
+    margin-right: -0.5rem;
 }
 
 .new-game-button {
@@ -94,18 +104,6 @@
     left: -50%;
 }
 
-.github-icon {
-    stroke-width: 0.05rem;
-    fill: none;
-    stroke: var(--color-primary-lightest);
-    width: 1.1rem;
-    border-radius: 0.25rem;
-}
-
-.github-icon:hover {
-    background-color: var(--color-primary-medium);
-}
-
 .wallet-connect-button {
     composes: button-like from "../../shared/shared.module.css";
 }
@@ -133,4 +131,18 @@
     align-items: center;
     width: 100%;
     font-size: 0.8rem;
+}
+
+.advanced-settings-button {
+    background-color: transparent;
+    display: block;
+    border: none;
+    color: var(--color-primary-light);
+    text-align: left;
+    padding: 0;
+}
+
+.advanced-settings-button:hover {
+    cursor: pointer;
+    color: var(--color-primary-lightest);
 }

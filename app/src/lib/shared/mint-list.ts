@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Duration } from "./duration";
 import { useLocalStorageParam } from "./local-storage";
+import { NATIVE_MINT } from "@solana/spl-token";
+import { SOLANA_MINT_NAME } from "./constants";
 
 const LOCAL_STORAGE_KEY: string = "mint-list";
 
@@ -107,11 +109,17 @@ interface CoinGeckoCoinListEntry {
 }
 
 
+const WRAPPED_SOL_ADDRESS: string = NATIVE_MINT.toBase58();
+
 function flatMapCoinGeckoEntry(entry: CoinGeckoCoinListEntry): MintData | [] {
     for (const [platform, address] of Object.entries(entry.platforms)) {
         if (platform === "solana") {
+            let entryName: string = entry.name;
+            if (address === WRAPPED_SOL_ADDRESS) {
+                entryName = SOLANA_MINT_NAME;
+            }
             return {
-                name: entry.name,
+                name: entryName,
                 address: address,
                 id: entry.id
             };

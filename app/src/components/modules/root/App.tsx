@@ -4,11 +4,13 @@ import { EquilibrateProgramProvider } from "../../../lib/equilibrate/provider";
 import { EndpointProvider, SolanaProvider } from "../../../lib/solana/provider";
 import { ActiveGameProvider } from "../../shared/game/provider";
 import { Sidebar } from "../sidebar/Sidebar";
-import { Viewport } from "../viewport/Viewport";
+import { ViewportBoring } from "../viewport/ViewportBoring";
 import { WelcomeModal } from "./WelcomeModal";
 import styles from "./styles.module.css";
 import "./root.css";
 import { StartupProvider } from "../../shared/startup/provider";
+import { Viewport } from "../viewport/Viewport";
+import { Themed } from "../../shared/theme";
 
 export default function App(): JSX.Element {
     return (
@@ -28,7 +30,8 @@ export default function App(): JSX.Element {
                                 <StartupProvider>
                                     <main className={styles["main"]}>
                                         <Sidebar/>
-                                        <Viewport/>
+                                        <Themed.Boring><ViewportBoring/></Themed.Boring>
+                                        <Themed.Star><Viewport/></Themed.Star>
                                         <WelcomeModal/>
                                     </main>
                                 </StartupProvider>

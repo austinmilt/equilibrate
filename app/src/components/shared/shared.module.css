@@ -18,6 +18,9 @@
     background-color: initial;
 }
 
+.button-like:disabled {
+    color: var(--color-text-disabled);
+}
 
 .menu-like {
     display: flex;

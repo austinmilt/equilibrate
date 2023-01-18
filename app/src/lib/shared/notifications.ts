@@ -44,6 +44,7 @@ enum NotificationCode {
     CREATE_SDK_NOT_READY,
     CREATE_ERROR,
     ENTER_WORMHOLE_ORBIT,
+    ENTER_CURRENT_STAR,
     ENTER_NULL_GAME,
     ENTER_SDK_NOT_READY,
     MOVE_WORMHOLE_ORBIT,
@@ -57,6 +58,11 @@ enum NotificationCode {
 export class Notifications {
     public static enterWormholeOrbit(): void {
         this.bug("Unable to enter game.", NotificationCode.ENTER_WORMHOLE_ORBIT);
+    }
+
+
+    public static enterCurrentStar(): void {
+        this.bug("Unable to move.", NotificationCode.ENTER_CURRENT_STAR);
     }
 
 

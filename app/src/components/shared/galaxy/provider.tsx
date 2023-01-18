@@ -107,8 +107,11 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
     useEffect(() => {
         if (playerEvent?.player != null) {
             setPlayerStarIndex(playerEvent?.player.bucket);
+
+        } else if (playerEvent?.leave != null) {
+            setPlayerStarIndex(undefined);
         }
-    }, [activeGame, playerEvent?.player]);
+    }, [activeGame, playerEvent?.enter, playerEvent?.leave, playerEvent?.move, playerEvent?.new]);
 
 
     const updateStarsWithGame = useCallback((game: GameEnriched) => {
@@ -185,7 +188,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
     [stars, focalStarIndex]);
 
 
-    const value: ActiveGalaxyContextState = useMemo(() => ({
+    const value: ActiveGalaxyContextState = {
         galaxy: ((galaxyConstants === undefined) || (galaxyState === undefined)) ? undefined : {
             constants: galaxyConstants,
             state: galaxyState
@@ -206,8 +209,7 @@ export function ActiveGalaxyProvider(props: { children: ReactNode }): JSX.Elemen
             addOnClick: addFocalStarOnClick,
             onClick: focalStarOnClick
         }
-    }), [stars, focalStar, galaxyConstants, galaxyState, activeGame, playerStar, focalStarHovered]);
-
+    };
 
     return (
         <ActiveGalaxyContext.Provider value={value}>

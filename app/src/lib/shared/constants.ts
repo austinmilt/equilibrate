@@ -3,11 +3,12 @@
 import { clusterApiUrl } from "@solana/web3.js";
 import { Endpoint } from "../solana/provider";
 import { Duration } from "./duration";
+import { NATIVE_MINT } from "@solana/spl-token";
 
 export const GAMES_LIST_UPDATE_INTERVAL: Duration = parseEnv(
     "GAMES_LIST_UPDATE_INTERVAL",
     import.meta.env.VITE_GAMES_LIST_UPDATE_INTERVAL,
-    Duration.ofSeconds(10),
+    Duration.ofMinutes(1),
     (v) => Duration.ofSeconds(Number.parseInt(v))
 );
 
@@ -55,6 +56,24 @@ export const RPC_KEY_DEFAULT: Endpoint = parseEnv(
     "dev",
     v => v as Endpoint
 );
+
+
+export const USE_BORING_THEME: boolean = parseEnv<boolean>(
+    "USE_BORING_THEME",
+    import.meta.env.VITE_USE_BORING_THEME,
+    true,
+    v => v.toLowerCase() === "true"
+);
+
+
+export const NEW_GAME_DEFAULT_MINT: string = parseEnv<string>(
+    "NEW_GAME_DEFAULT_MINT",
+    import.meta.env.VITE_NEW_GAME_DEFAULT_MINT,
+    NATIVE_MINT.toBase58(),
+);
+
+
+export const SOLANA_MINT_NAME: string = "SOL";
 
 
 function parseEnv<T>(

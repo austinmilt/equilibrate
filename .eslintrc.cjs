@@ -30,5 +30,12 @@ module.exports = {
         "indent": ["error", 4],
         "no-multi-spaces": ["error"],
         "max-len": ["warn", 120],
+        "@typescript-eslint/ban-ts-comment": [
+            "error", {
+                "ts-expect-error": "allow-with-description",
+                "ts-ignore": "allow-with-description",
+                "ts-nocheck": "allow-with-description"
+            }
+        ]
     },
 };

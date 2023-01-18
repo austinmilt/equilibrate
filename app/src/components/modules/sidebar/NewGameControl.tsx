@@ -1,4 +1,4 @@
-import { Modal, Loader, NumberInput, Text, Group, Autocomplete } from "@mantine/core";
+import { Modal, Loader, NumberInput, Text, Group, Autocomplete, Collapse } from "@mantine/core";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
@@ -12,6 +12,8 @@ import { InlineStyles } from "../../shared/inline-styles";
 import { Button } from "../../shared/model/button";
 import { useShipLogs } from "../hud/ShipLog";
 import styles from "./styles.module.css";
+import { SOLANA_MINT_NAME } from "../../../lib/shared/constants";
+import { themed } from "../../shared/theme";
 
 
 interface NewGameControlProps {
@@ -82,15 +84,22 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const makeTransactionUrl = useMakeTransactionUrl();
     const [newGameAddress, setNewGameAddress] = useState<PublicKey | undefined>();
     const [newGameTransactionSignature, setNewGameTransactionSignature] = useState<string | undefined>();
+    const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
 
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
-    const [spillRate, setSpillRate] = useState<number | undefined>(0.005);
+    const [spillRatePercent, setSpillRatePercent] = useState<number | undefined>(2);
     const [buckets, setBuckets] = useState<number | undefined>(3);
     const [players, setPlayers] = useState<number | undefined>(5);
 
     const onNewGame: () => void = useCallback(async () => {
         setLoading(true);
+
+        let spillRate: number | undefined;
+        if ((spillRatePercent !== undefined) && (entryFee !== undefined)) {
+            spillRate = (spillRatePercent / 100.0) * entryFee;
+        }
+
         try {
             validateArg(entryFee, "entryFee");
             validateArg(mint, "mint");
@@ -133,7 +142,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
         equilibrateIsReady,
         entryFee,
         mint,
-        spillRate,
+        spillRatePercent,
         buckets,
         players,
         props.onGameAddressResolved,
@@ -177,7 +186,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             <MintSelect onMintSelect={setMint}/>
             <NumberInput
                 value={entryFee}
-                label="Entry Fuel (tokens)"
+                label={themed("Entry fee (tokens)", "Entry Fuel (tokens)")}
                 onChange={setEntryFee}
                 min={1e-9}
                 precision={9}
@@ -185,30 +194,45 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             />
             <NumberInput
                 value={players}
-                label="Max Ships (players)"
+                label={themed("Max players", "Max Ships (players)")}
                 onChange={setPlayers}
                 min={1}
                 max={1000}
                 step={1}
                 precision={0}
             />
-            <NumberInput
-                value={buckets}
-                label="Number of Stars"
-                onChange={setBuckets}
-                min={1}
-                max={64}
-                step={1}
-                precision={0}
-            />
-            <NumberInput
-                value={spillRate}
-                label={<Text>Hydrogen Escape Rate<br/>(tokens per player per second)</Text>}
-                onChange={setSpillRate}
-                min={1e-9}
-                precision={9}
-                step={0.0001}
-            />
+            <button
+                onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
+                className={styles["advanced-settings-button"]}
+            >
+                <Text size="xs">Advanced Settings {showAdvancedSettings ? "▼" : "▲"} </Text>
+            </button>
+            <Collapse in={showAdvancedSettings}>
+                <div className={styles["new-game-modal-body"]}>
+                    <NumberInput
+                        value={buckets}
+                        label={themed("Number of buckets", "Number of Stars")}
+                        onChange={setBuckets}
+                        min={1}
+                        max={5}
+                        step={1}
+                        precision={0}
+                    />
+                    <NumberInput
+                        value={spillRatePercent}
+                        label={
+                            <Text>
+                                { themed("Token Spill Rate", "Hydrogen Escape Rate") }<br/>
+                                (% of entry fee)
+                            </Text>
+                        }
+                        onChange={setSpillRatePercent}
+                        min={0.01}
+                        precision={2}
+                        step={0.5}
+                    />
+                </div>
+            </Collapse>
             <Button onClick={onNewGame}>{ loading ? <Loader/> : "Create Game" }</Button>
         </Modal>
     );
@@ -261,6 +285,12 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
         (searchValue, item) => {
             const trimmedKey: string = searchValue.trim();
             const lowercaseKey: string = trimmedKey.toLowerCase();
+            // give special priority to SOL since it should be the main
+            // mint being used, and it's hard to find in the list.
+            if ((lowercaseKey === SOLANA_MINT_NAME.toLowerCase())) {
+                if (item.name !== SOLANA_MINT_NAME) return false;
+                else return true;
+            }
             return item.address.includes(trimmedKey) || item.name.toLowerCase().includes(lowercaseKey);
         },
         []

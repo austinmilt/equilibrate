@@ -15,6 +15,8 @@ import { useMousePosition } from "../../../lib/shared/useMousePosition";
 import { formatTokens } from "../../../lib/shared/number";
 import { useConnection } from "@solana/wallet-adapter-react";
 import styles from "./styles.module.css";
+import { MoneyIcon } from "../../shared/icons/MoneyIcon";
+import { themed } from "../../shared/theme";
 
 enum GameAction {
     ENTER,
@@ -100,12 +102,12 @@ export function Hud(): JSX.Element {
                 onSuccess: (result) => {
                     const signature: string | undefined = result.transactionSignature;
                     if (result.error !== undefined) {
-                        notifyError("Unable to enter the system: " + result.error.message);
+                        notifyError("Unable to enter the game: " + result.error.message);
                         console.error(result.error);
 
                     } else if (signature !== undefined) {
                         shipLogContext.record({
-                            text: "Entered the system.",
+                            text: themed("Entered the game.", "Entered the system."),
                             url: makeTransactionUrl(signature)
                         });
                         activeGalaxyContext.playerStar.set(starIndex);
@@ -115,7 +117,7 @@ export function Hud(): JSX.Element {
                         console.log("Enter simulation result", result.simulationResult);
                     }
                 },
-                onError: e => notifyError("Unable to enter the system.", e)
+                onError: e => notifyError("Unable to enter the game.", e)
             }
         );
     }, [
@@ -133,11 +135,14 @@ export function Hud(): JSX.Element {
                 onSuccess: (result) => {
                     const signature: string | undefined = result.transactionSignature;
                     if (result.error !== undefined) {
-                        notifyError("Unable to move the ship: " + result.error.message);
+                        notifyError("Unable to move: " + result.error.message);
                         console.error(result.error);
 
                     } else if (signature !== undefined) {
-                        shipLogContext.record({ text: "Moved ship.", url: makeTransactionUrl(signature) });
+                        shipLogContext.record({
+                            text: themed("Moved buckets", "Moved ship."),
+                            url: makeTransactionUrl(signature)
+                        });
                         activeGalaxyContext.playerStar.set(starIndex);
 
                     } else if (result.simulationResult) {
@@ -163,19 +168,22 @@ export function Hud(): JSX.Element {
                 onSuccess: async (result) => {
                     if (cancelOnLoss) {
                         if (result.anchorErrorCode === "AbortLeaveOnLoss") {
-                            shipLogContext.record({ text: "Escape aborted." });
+                            shipLogContext.record({ text: themed("Exit aborted", "Escape aborted.") });
                         }
                     } else {
                         const signature: string | undefined = result.transactionSignature;
                         if (result.error !== undefined) {
-                            notifyError("Unable to escape the system: " + result.error.message);
+                            notifyError("Unable to leave the game: " + result.error.message);
                             console.error(result.error);
 
                         } else if (signature !== undefined) {
                             const winnings: number | undefined = await tryToEstimateWinnings(signature, connection);
                             const log: string = winnings === undefined ?
-                                "Escaped the system." :
-                                `Escaped the system with ${formatTokens(winnings)} tokens.`;
+                                themed("Left the game", "Escaped the system.") :
+                                themed(
+                                    `Left the game with ${formatTokens(winnings)} tokens.`,
+                                    `Escaped the system with ${formatTokens(winnings)} tokens.`
+                                );
 
                             shipLogContext.record({
                                 text: log,
@@ -183,13 +191,15 @@ export function Hud(): JSX.Element {
                             });
                             shipLogContext.onEscapeSystem();
 
+                            notifySuccess(log);
+
                         } else if (result.simulationResult) {
                             notifySuccess("Escape simulated. See console for details.");
                             console.log("Escape simulation result", result.simulationResult);
                         }
                     }
                 },
-                onError: e => notifyError("Unable to escape the system.", e)
+                onError: e => notifyError("Unable to leave the game.", e)
             }
         );
     }, [
@@ -280,21 +290,21 @@ export function Hud(): JSX.Element {
         if (activeGalaxyContext.focalStar.isHovered) {
             let helpText: string | undefined;
             if (focalStarClickAction === GameAction.ENTER) {
-                helpText = "orbit";
+                helpText = themed(`enter Bucket ${activeGalaxyContext.focalStar.index}`, "orbit");
 
             } else if (focalStarClickAction === GameAction.MOVE) {
-                helpText = "move";
+                helpText = themed(`move to Bucket ${activeGalaxyContext.focalStar.index}`, "move");
 
             } else if (focalStarClickAction === GameAction.LEAVE) {
-                helpText = "escape";
+                helpText = themed("leave", "escape");
 
             } else if (activeGalaxyContext.playerStar.index === activeGalaxyContext.focalStar.index) {
-                helpText = "your orbit";
+                helpText = themed("you are here", "your orbit");
             }
             return helpText === undefined ? undefined : <Text size="md">{helpText}</Text>;
         }
         return undefined;
-    }, [focalStarClickAction]);
+    }, [focalStarClickAction, activeGalaxyContext.focalStar.index]);
 
 
     const abortSwitchTooltip: string = useMemo(() =>
@@ -333,12 +343,11 @@ export function Hud(): JSX.Element {
                         isSourceStar={activeGalaxyContext.focalStar.isSource}
                     />
                     <Tooltip label={(
-                        "Your approximate winnings if you leave now " +
-                        "(not including the program's fee to play)."
+                        "Your approximate winnings if you leave now."
                     )}>
-                        <Text size="lg">
-                            { playerApproximateWinnings && "🪙 " + playerApproximateWinnings }
-                        </Text>
+                        <div>
+                            { playerApproximateWinnings && <MoneyIcon className={styles["winnings-icon"]}/> }
+                        </div>
                     </Tooltip>
                 </div>
                 { activeGalaxyContext.focalStar.isHovered && (
