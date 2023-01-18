@@ -104,18 +104,6 @@
     left: -50%;
 }
 
-.github-icon {
-    stroke-width: 0.05rem;
-    fill: none;
-    stroke: var(--color-primary-lightest);
-    width: 1.1rem;
-    border-radius: 0.25rem;
-}
-
-.github-icon:hover {
-    background-color: var(--color-primary-medium);
-}
-
 .wallet-connect-button {
     composes: button-like from "../../shared/shared.module.css";
 }
