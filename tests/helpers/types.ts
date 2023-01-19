@@ -14,6 +14,7 @@ export interface GameConfig {
     spillRateDecimalTokensPerSecondPerPlayer: anchor.BN;
     nBuckets: number;
     maxPlayers: number;
+    burnRateDecimalTokensPerMove: anchor.BN;
 }
 
 export interface GameState {
@@ -29,6 +30,7 @@ export interface Bucket {
 
 export interface PlayerState {
     bucket: number;
+    burnPenaltyDecimalTokens: anchor.BN;
 }
 
 

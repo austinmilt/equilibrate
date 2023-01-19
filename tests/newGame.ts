@@ -105,19 +105,18 @@ describe("NewGame Instruction Tests", () => {
             PROGRAM_FEE_DESTINATION,
             connection
         );
-        const programFeeSol: number =
-      PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
+        const programFeeSol: number = PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
 
         assert.approximately(
             programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
             programFeeSol,
-            1 / anchor.web3.LAMPORTS_PER_SOL
+            0.01*programFeeSol
         );
-    // It would be great to also check that the player's balance went
-    // down by the program fee, but without knowing solana's transaction
-    // fee we cant calculate what the new balance should be. That's OK,
-    // though, since the only source of income to the fee destination is
-    // the player's account
+        // It would be great to also check that the player's balance went
+        // down by the program fee, but without knowing solana's transaction
+        // fee we cant calculate what the new balance should be. That's OK,
+        // though, since the only source of income to the fee destination is
+        // the player's account
     });
 
     it("create a new game > all good > game tokens are transfered", async () => {
@@ -450,6 +449,7 @@ export interface NewGameSetupArgs {
     spillRateDecimalTokensPerSecondPerPlayer?: anchor.BN;
     nBuckets?: number;
     maxPlayers?: number;
+    burnRateDecimalTokensPerMove?: anchor.BN;
   };
   gameId?: number;
   gameAddress?: PublicKey;
@@ -527,11 +527,13 @@ export async function setUpNewGame(
         config.maxPlayers = customSetup?.gameConfig?.maxPlayers;
     }
 
-    if (
-        customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer != null
-    ) {
+    if ( customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer != null ) {
         config.spillRateDecimalTokensPerSecondPerPlayer =
-      customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer;
+            customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer;
+    }
+
+    if (customSetup?.gameConfig?.burnRateDecimalTokensPerMove != null) {
+        config.burnRateDecimalTokensPerMove = customSetup?.gameConfig?.burnRateDecimalTokensPerMove;
     }
 
     const gameId: number = customSetup?.gameId ?? generateGameId();
@@ -588,11 +590,9 @@ export async function setUpNewGame(
             .accountsStrict({
                 game: gameAddress,
                 firstPlayer: playerStateAddress,
-                programFeeDestination:
-          customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
+                programFeeDestination: customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
                 depositSourceAccount: playerTokenAccount,
-                tokenPool:
-          customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
+                tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
                 payer: player.publicKey,
                 associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
                 tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,

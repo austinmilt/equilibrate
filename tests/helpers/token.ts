@@ -91,6 +91,13 @@ export async function mintTokensToWallet(
     );
 }
 
+export async function getMintSupplyDecimalTokens(
+    mint: PublicKey,
+    connection: Connection
+): Promise<number> {
+    return Number((await spl.getMint(connection, mint)).supply);
+}
+
 export async function makeAssociatedTokenAccount(
     owner: Keypair,
     mint: PublicKey,

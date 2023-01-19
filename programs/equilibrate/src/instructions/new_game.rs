@@ -166,6 +166,7 @@ pub fn new_game(
     player.set_inner(PlayerState {
         // first player always goes into the first bucket
         bucket: 1,
+        burn_penalty_decimal_tokens: 0,
     });
     player.log_make();
 

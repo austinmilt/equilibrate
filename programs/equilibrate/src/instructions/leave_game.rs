@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, AccountsClose};
-use anchor_spl::token::{self, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
     constants::{GAME_SEED, PLAYER_SEED, POOL_MANAGER_SEED},
@@ -17,6 +17,14 @@ pub struct LeaveGame<'info> {
         bump
     )]
     pub game: Account<'info, Game>,
+
+    /// mint of this game
+    #[account(
+        mut,
+        constraint = game.config.mint == game_mint.key()
+        @EquilibrateError::InvalidBurnMint
+    )]
+    pub game_mint: Account<'info, Mint>,
 
     /// CHECK: wallet to which rent should be returned when closing the game account, which must be the same wallet used to make the game
     #[account(
@@ -86,7 +94,7 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
     )?;
 
     // update bucket balances and remove player and their winnings from their bucket
-    let winnings: u64;
+    let mut winnings: u64;
     let game = &mut ctx.accounts.game;
     if game_player_count == 1 {
         // if this is the player to end the game, give them all the remaining tokens
@@ -110,6 +118,16 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
     }
     game.state.last_update_epoch_seconds = now_epoch_seconds;
 
+    // adjust winnings for the burn penalty
+    let decimal_tokens_to_burn: u64;
+    if ctx.accounts.player.burn_penalty_decimal_tokens > winnings {
+        decimal_tokens_to_burn = winnings;
+        winnings = 0;
+    } else {
+        decimal_tokens_to_burn = ctx.accounts.player.burn_penalty_decimal_tokens;
+        winnings -= ctx.accounts.player.burn_penalty_decimal_tokens;
+    }
+
     if cancel_on_loss {
         require_gte!(
             winnings,
@@ -118,12 +136,7 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
         )
     }
 
-    // transfer game tokens from pool account
-    let winnings_transfer_accounts = Transfer {
-        from: ctx.accounts.token_pool.to_account_info(),
-        to: ctx.accounts.winnings_destination_account.to_account_info(),
-        authority: ctx.accounts.pool_manager.to_account_info(),
-    };
+    // burn part of player's winnings
     let token_program = ctx.accounts.token_program.to_account_info();
     let mint = game.config.mint.key();
     let seeds = &[
@@ -132,6 +145,24 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
         &[ctx.accounts.pool_manager.bump],
     ];
     let signer = &[&seeds[..]];
+    if decimal_tokens_to_burn > 0 {
+        let burn_accounts: Burn = Burn {
+            mint: ctx.accounts.game_mint.to_account_info(),
+            from: ctx.accounts.token_pool.to_account_info(),
+            authority: ctx.accounts.pool_manager.to_account_info(),
+        };
+        let burn_context =
+            CpiContext::new_with_signer(token_program.clone(), burn_accounts, signer);
+        token::burn(burn_context, decimal_tokens_to_burn)?;
+        msg!("Burned {} decimal tokens", decimal_tokens_to_burn)
+    }
+
+    // transfer game tokens from pool account
+    let winnings_transfer_accounts = Transfer {
+        from: ctx.accounts.token_pool.to_account_info(),
+        to: ctx.accounts.winnings_destination_account.to_account_info(),
+        authority: ctx.accounts.pool_manager.to_account_info(),
+    };
     let winnings_transfer_context =
         CpiContext::new_with_signer(token_program, winnings_transfer_accounts, signer);
     token::transfer(winnings_transfer_context, winnings)?;

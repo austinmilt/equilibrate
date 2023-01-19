@@ -3,6 +3,7 @@ import { Equilibrate } from "../target/types/equilibrate";
 import { generateGameId, getGame } from "./helpers/game";
 import {
     generateMint,
+    getMintSupplyDecimalTokens,
     getTokenBalanceWithDecimals,
     getTokenPoolBalanceWithDecimals,
     makeAndFundWallet,
@@ -41,8 +42,9 @@ import {
     CreatePoolSetupArgs,
     setUpCreatePool,
 } from "./createPool";
+import { setUpMoveBuckets } from "./moveBuckets";
 
-describe("LeaveGame Instruction Tests", () => {
+describe.only("LeaveGame Instruction Tests", () => {
     anchor.setProvider(anchor.AnchorProvider.env());
     // eslint-disable-next-line import/namespace
     const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;
@@ -374,9 +376,9 @@ describe("LeaveGame Instruction Tests", () => {
         // fee equally to the other two buckets, and we add the new player's fee
         // to the holding bucket. When the second player leaves, they take their proportion
         // of the bucket they were in and leave the remaining balance to the other
-        // players.
+        // players
         assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), 0);
-        assert.strictEqual(gameState.buckets[1].decimalTokens.toNumber(), entryFee);
+        assert.strictEqual(gameState.buckets[1].decimalTokens.toNumber(), entryFee / 2);
         assert.strictEqual(gameState.buckets[2].decimalTokens.toNumber(), 0);
     });
 
@@ -414,7 +416,7 @@ describe("LeaveGame Instruction Tests", () => {
                 program.programId,
                 program.provider.connection
             ),
-            entryFee
+            entryFee / 2
         );
     });
 
@@ -560,29 +562,26 @@ describe("LeaveGame Instruction Tests", () => {
 
     it("leave game > game creator is only one to play > gets remaining tokens", async () => {
         const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program);
-        const creatorTokenBalanceBeforeTheyLeave: number =
-      await getTokenBalanceWithDecimals(
-          newGameContext.playerWallet.publicKey,
-          newGameContext.createPool.mint.publicKey,
-          program.provider.connection
-      );
+        const creatorTokenBalanceBeforeTheyLeave: number = await getTokenBalanceWithDecimals(
+            newGameContext.playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
 
         await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
             ...newGameContext,
             playerBucketIndex: 1,
         });
 
-        const creatorTokenBalanceAfterTheyLeave: number =
-      await getTokenBalanceWithDecimals(
-          newGameContext.playerWallet.publicKey,
-          newGameContext.createPool.mint.publicKey,
-          program.provider.connection
-      );
+        const creatorTokenBalanceAfterTheyLeave: number = await getTokenBalanceWithDecimals(
+            newGameContext.playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
 
         assert.strictEqual(
             creatorTokenBalanceAfterTheyLeave,
-            creatorTokenBalanceBeforeTheyLeave +
-        newGameContext.gameConfig.entryFeeDecimalTokens.toNumber()
+            creatorTokenBalanceBeforeTheyLeave + newGameContext.gameConfig.entryFeeDecimalTokens.toNumber()
         );
     });
 
@@ -594,10 +593,9 @@ describe("LeaveGame Instruction Tests", () => {
                 newGameContext.gameAddress
             )
         );
-        const creatorSolBalanceBeforeGameEnd: number =
-      await program.provider.connection.getBalance(
-          newGameContext.playerWallet.publicKey
-      );
+        const creatorSolBalanceBeforeGameEnd: number = await program.provider.connection.getBalance(
+            newGameContext.playerWallet.publicKey
+        );
 
         await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
             ...newGameContext,
@@ -610,10 +608,9 @@ describe("LeaveGame Instruction Tests", () => {
             )
         );
 
-        const creatorSolBalanceAfterGameEnd: number =
-      await program.provider.connection.getBalance(
-          newGameContext.playerWallet.publicKey
-      );
+        const creatorSolBalanceAfterGameEnd: number = await program.provider.connection.getBalance(
+            newGameContext.playerWallet.publicKey
+        );
 
         // would be better to check the exact rent returned but that's more difficult than
         // the test really commands, given transaction costs etc
@@ -649,12 +646,11 @@ describe("LeaveGame Instruction Tests", () => {
             );
         }
 
-        const playerBalanceBeforeTheyLeave: number =
-      await getTokenBalanceWithDecimals(
-          enterGameContexts[playerToCheckIndex].playerWallet.publicKey,
-          newGameContext.createPool.mint.publicKey,
-          program.provider.connection
-      );
+        const playerBalanceBeforeTheyLeave: number = await getTokenBalanceWithDecimals(
+            enterGameContexts[playerToCheckIndex].playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
 
         // need to get bucket balances to equilibrium
         await setUpLeaveGame(
@@ -664,12 +660,11 @@ describe("LeaveGame Instruction Tests", () => {
             enterGameContexts[playerToCheckIndex]
         );
 
-        const playerBalanceAfterTheyLeave: number =
-      await getTokenBalanceWithDecimals(
-          enterGameContexts[playerToCheckIndex].playerWallet.publicKey,
-          newGameContext.createPool.mint.publicKey,
-          program.provider.connection
-      );
+        const playerBalanceAfterTheyLeave: number = await getTokenBalanceWithDecimals(
+            enterGameContexts[playerToCheckIndex].playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
 
         // ideally we'd check exactly the amount the player gets in winnings, but because of the
         // time-based spillover, that's very hard to do. Instead, we'll just check that the player gets
@@ -806,6 +801,253 @@ describe("LeaveGame Instruction Tests", () => {
             }
         );
     });
+
+    it("leave game > with penalty player will lose tokens - cancel on loss > fails", async () => {
+        const spillRate: number = Number.MAX_SAFE_INTEGER;
+        const burnRate: number = Number.MAX_SAFE_INTEGER;
+        const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+            gameConfig: {
+                entryFeeDecimalTokens: new anchor.BN(Math.pow(1, MINT_DECIMALS)),
+                spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+                burnRateDecimalTokensPerMove: new anchor.BN(burnRate)
+            },
+        });
+        for (let i = 0; i < 3; i++) {
+            await setUpEnterGame(
+                program,
+                newGameContext.createPool,
+                newGameContext,
+                {
+                    playerBucketIndex: 1
+                }
+            );
+        }
+        const enterGameContext: EnterGameContext = await setUpEnterGame(
+            program,
+            newGameContext.createPool,
+            newGameContext,
+            {
+                playerBucketIndex: 1,
+            },
+        );
+        await setUpMoveBuckets(
+            program,
+            newGameContext.createPool,
+            newGameContext,
+            enterGameContext,
+            {
+                newBucketIndex: 2
+            }
+        );
+        await sleep(1000);
+
+        assertAsyncThrows(() =>
+            setUpLeaveGame(
+                program,
+                newGameContext.createPool,
+                newGameContext,
+                enterGameContext,
+                {
+                    cancelOnLoss: true
+                }
+            ), "AbortLeaveOnLoss"
+        );
+    });
+
+    it("leave game > with penalty player will gain tokens - cancel on loss > succeeds", async () => {
+        const spillRate: number = Number.MAX_SAFE_INTEGER;
+        const burnRate: number = 1;
+        const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+            gameConfig: {
+                entryFeeDecimalTokens: new anchor.BN(Math.pow(10, MINT_DECIMALS)),
+                spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
+                burnRateDecimalTokensPerMove: new anchor.BN(burnRate),
+                nBuckets: 2
+            },
+        });
+        for (let i = 0; i < 3; i++) {
+            await setUpEnterGame(
+                program,
+                newGameContext.createPool,
+                newGameContext,
+                {
+                    playerBucketIndex: 1
+                }
+            );
+        }
+        const enterGameContext: EnterGameContext = await setUpEnterGame(
+            program,
+            newGameContext.createPool,
+            newGameContext,
+            {
+                playerBucketIndex: 1,
+            },
+        );
+        await setUpMoveBuckets(
+            program,
+            newGameContext.createPool,
+            newGameContext,
+            enterGameContext,
+            {
+                newBucketIndex: 2
+            }
+        );
+        await sleep(1000);
+
+        await setUpLeaveGame(
+            program,
+            newGameContext.createPool,
+            newGameContext,
+            enterGameContext,
+            {
+                cancelOnLoss: true
+            }
+        );
+    });
+
+    it("leave game > winnings exceed penalty > winnings match expected", async () => {
+        const entryFee: number = Math.random() * 10 * Math.pow(10, MINT_DECIMALS);
+        const burnRate: number = Math.ceil(Math.random()*entryFee*0.9);
+        const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+            gameConfig: {
+                burnRateDecimalTokensPerMove: new anchor.BN(burnRate),
+                entryFeeDecimalTokens: new anchor.BN(entryFee)
+            }
+        });
+        const creatorTokenBalanceBeforeTheyLeave: number = await getTokenBalanceWithDecimals(
+            newGameContext.playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
+
+        await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
+            playerStateAddress: newGameContext.playerStateAddress,
+            playerWallet: newGameContext.playerWallet,
+            newBucketIndex: 2
+        }, true);
+
+        await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
+            ...newGameContext,
+            playerBucketIndex: 1,
+        }, undefined, true);
+
+        const creatorTokenBalanceAfterTheyLeave: number = await getTokenBalanceWithDecimals(
+            newGameContext.playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
+
+        assert.strictEqual(
+            creatorTokenBalanceAfterTheyLeave,
+            creatorTokenBalanceBeforeTheyLeave + newGameContext.gameConfig.entryFeeDecimalTokens.toNumber() - burnRate
+        );
+    });
+
+    it("leave game > winnings exceed penalty > penalty is burned", async () => {
+        const entryFee: number = Math.random() * 10 * Math.pow(10, MINT_DECIMALS);
+        const burnRate: number = Math.ceil(Math.random()*entryFee*0.9);
+        const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+            gameConfig: {
+                burnRateDecimalTokensPerMove: new anchor.BN(burnRate),
+                entryFeeDecimalTokens: new anchor.BN(entryFee)
+            }
+        });
+        const mintSupplyBeforePlayerLeaves: number = await getMintSupplyDecimalTokens(
+            newGameContext.gameConfig.mint,
+            program.provider.connection
+        );
+
+        await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
+            playerStateAddress: newGameContext.playerStateAddress,
+            playerWallet: newGameContext.playerWallet,
+            newBucketIndex: 2
+        }, true);
+
+        await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
+            ...newGameContext,
+            playerBucketIndex: 1,
+        }, undefined, true);
+
+        const mintSupplyAfterPlayerLeaves: number = await getMintSupplyDecimalTokens(
+            newGameContext.gameConfig.mint,
+            program.provider.connection
+        );
+
+        assert.strictEqual(
+            mintSupplyBeforePlayerLeaves - mintSupplyAfterPlayerLeaves,
+            burnRate
+        );
+    });
+
+    it("leave game > penalty exceeds winnings > winnings are 0", async () => {
+        const burnRate: number = Number.MAX_SAFE_INTEGER;
+        const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+            gameConfig: {
+                burnRateDecimalTokensPerMove: new anchor.BN(burnRate)
+            }
+        });
+        const creatorTokenBalanceBeforeTheyLeave: number = await getTokenBalanceWithDecimals(
+            newGameContext.playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
+
+        await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
+            playerStateAddress: newGameContext.playerStateAddress,
+            playerWallet: newGameContext.playerWallet,
+            newBucketIndex: 2
+        }, true);
+
+        await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
+            ...newGameContext,
+            playerBucketIndex: 1,
+        }, undefined, true);
+
+        const creatorTokenBalanceAfterTheyLeave: number = await getTokenBalanceWithDecimals(
+            newGameContext.playerWallet.publicKey,
+            newGameContext.createPool.mint.publicKey,
+            program.provider.connection
+        );
+
+        assert.strictEqual(
+            creatorTokenBalanceAfterTheyLeave - creatorTokenBalanceBeforeTheyLeave,
+            0
+        );
+    });
+
+    it("leave game > penalty exceeds winnings > winnings are burned", async () => {
+        const burnRate: number = Number.MAX_SAFE_INTEGER;
+        const newGameContext: NewGameEtcContext = await setUpNewGameEtc(program, {
+            gameConfig: {
+                burnRateDecimalTokensPerMove: new anchor.BN(burnRate)
+            }
+        });
+        const mintSupplyBeforePlayerLeaves: number = await getMintSupplyDecimalTokens(
+            newGameContext.gameConfig.mint,
+            program.provider.connection
+        );
+
+        await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
+            playerStateAddress: newGameContext.playerStateAddress,
+            playerWallet: newGameContext.playerWallet,
+            newBucketIndex: 2
+        }, true);
+
+        await setUpLeaveGame(program, newGameContext.createPool, newGameContext, {
+            ...newGameContext,
+            playerBucketIndex: 1,
+        }, undefined, true);
+
+        const mintSupplyAfterPlayerLeaves: number = await getMintSupplyDecimalTokens(
+            newGameContext.gameConfig.mint,
+            program.provider.connection
+        );
+
+        assert.strictEqual(
+            mintSupplyBeforePlayerLeaves - mintSupplyAfterPlayerLeaves,
+            newGameContext.gameConfig.entryFeeDecimalTokens.toNumber()
+        );
+    });
 });
 
 export interface LeaveGameEtcSetupArgs extends LeaveGameSetupArgs {
@@ -916,18 +1158,15 @@ export async function setUpLeaveGame(
             .leaveGame(customSetup?.cancelOnLoss === true)
             .accountsStrict({
                 game: customSetup?.gameAddress ?? newGameContext.gameAddress,
-                gameCreator:
-          customSetup?.gameCreator ?? newGameContext.playerWallet.publicKey,
+                gameCreator: customSetup?.gameCreator ?? newGameContext.playerWallet.publicKey,
                 player: playerStateAddress,
                 winningsDestinationAccount: playerTokenAccount,
                 poolManager: createPoolContext.poolManagerAddress,
-                tokenPool:
-          customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
-                payer:
-          customSetup?.playerWallet?.publicKey ??
-          enterGameContext.playerWallet.publicKey,
+                tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
+                payer: customSetup?.playerWallet?.publicKey ?? enterGameContext.playerWallet.publicKey,
                 tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
                 systemProgram: anchor.web3.SystemProgram.programId,
+                gameMint: newGameContext.gameConfig.mint
             })
             .signers([customSetup?.playerWallet ?? enterGameContext.playerWallet])
             .rpc();

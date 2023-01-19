@@ -132,7 +132,10 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u8, pool_manager: Pubkey) -
 
     // create player state account
     let player = &mut ctx.accounts.player;
-    player.set_inner(PlayerState { bucket: i_bucket });
+    player.set_inner(PlayerState {
+        bucket: i_bucket,
+        burn_penalty_decimal_tokens: 0,
+    });
     player.log_make();
 
     Ok(())

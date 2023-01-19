@@ -289,6 +289,14 @@ export type Equilibrate = {
           ]
         },
         {
+          "name": "gameMint",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "mint of this game"
+          ]
+        },
+        {
           "name": "gameCreator",
           "isMut": true,
           "isSigner": false
@@ -398,6 +406,10 @@ export type Equilibrate = {
           {
             "name": "bucket",
             "type": "u8"
+          },
+          {
+            "name": "burnPenaltyDecimalTokens",
+            "type": "u64"
           }
         ]
       }
@@ -440,6 +452,10 @@ export type Equilibrate = {
           {
             "name": "maxPlayers",
             "type": "u16"
+          },
+          {
+            "name": "burnRateDecimalTokensPerMove",
+            "type": "u64"
           }
         ]
       }
@@ -583,16 +599,21 @@ export type Equilibrate = {
     },
     {
       "code": 6019,
+      "name": "InvalidBurnMint",
+      "msg": "Mint being burned must be the one configured for the game"
+    },
+    {
+      "code": 6020,
       "name": "InvalidProgramId",
       "msg": "Program ID must be this program"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "GameCreatorMismatch",
       "msg": "Given gameCreator doesnt match the one that created the game"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
     }
@@ -890,6 +911,14 @@ export const IDL: Equilibrate = {
           ]
         },
         {
+          "name": "gameMint",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "mint of this game"
+          ]
+        },
+        {
           "name": "gameCreator",
           "isMut": true,
           "isSigner": false
@@ -999,6 +1028,10 @@ export const IDL: Equilibrate = {
           {
             "name": "bucket",
             "type": "u8"
+          },
+          {
+            "name": "burnPenaltyDecimalTokens",
+            "type": "u64"
           }
         ]
       }
@@ -1041,6 +1074,10 @@ export const IDL: Equilibrate = {
           {
             "name": "maxPlayers",
             "type": "u16"
+          },
+          {
+            "name": "burnRateDecimalTokensPerMove",
+            "type": "u64"
           }
         ]
       }
@@ -1184,16 +1221,21 @@ export const IDL: Equilibrate = {
     },
     {
       "code": 6019,
+      "name": "InvalidBurnMint",
+      "msg": "Mint being burned must be the one configured for the game"
+    },
+    {
+      "code": 6020,
       "name": "InvalidProgramId",
       "msg": "Program ID must be this program"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "GameCreatorMismatch",
       "msg": "Given gameCreator doesnt match the one that created the game"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
     }
