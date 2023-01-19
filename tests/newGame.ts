@@ -20,7 +20,7 @@ import {
     withoutDecimals,
 } from "./helpers/token";
 import { Game, GameConfig, PlayerState } from "./helpers/types";
-import { Keypair, PublicKey, Connection } from "@solana/web3.js";
+import { Keypair, PublicKey, Connection} from "@solana/web3.js";
 import {
     GAME_SEED,
     getGameAddress,
@@ -29,7 +29,7 @@ import {
 } from "./helpers/address";
 import { assert } from "chai";
 import { assertAsyncThrows } from "./helpers/test";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, NATIVE_MINT } from "@solana/spl-token";
 import { testIsReady } from "./setup";
 import {
     CreatePoolContext,
@@ -435,6 +435,12 @@ describe("NewGame Instruction Tests", () => {
             "ConstraintTokenOwner"
         );
     });
+
+    it.skip("create a new game > native mint - non-zero burn rate > fails", async () => {
+        //TODO not sure how to do this yet... might have to make the wallet, fund it, make
+        //  wrapped mint account, blah blah and then set up config. This will mean changing
+        //  the way that the create game args are handled.
+    });
 });
 
 export interface NewGameEtcSetupArgs extends NewGameSetupArgs {
@@ -541,10 +547,8 @@ export async function setUpNewGame(
     customSetup?.gameAddress ??
     (await getGameAddress(gameId, program.programId));
 
-    const playerTokens: number =
-    customSetup?.playerStartingTokens != null
-        ? customSetup?.playerStartingTokens
-        : Math.ceil(
+    const playerTokens: number = customSetup?.playerStartingTokens != null ?
+        customSetup?.playerStartingTokens : Math.ceil(
             1.1 *
             withoutDecimals(
                 config.entryFeeDecimalTokens.toNumber(),
@@ -552,13 +556,10 @@ export async function setUpNewGame(
             )
         );
 
-    const playerStartingSol: number =
-    customSetup?.playerStartingSol != null
-        ? customSetup?.playerStartingSol
-        : (10 * PROGRAM_FEE_LAMPORTS) / anchor.web3.LAMPORTS_PER_SOL;
+    const playerStartingSol: number = customSetup?.playerStartingSol != null ?
+        customSetup?.playerStartingSol : (10 * PROGRAM_FEE_LAMPORTS) / anchor.web3.LAMPORTS_PER_SOL;
 
-    let { wallet: player, tokenAccount: playerTokenAccount } =
-    await makeAndFundWalletWithTokens(
+    let { wallet: player, tokenAccount: playerTokenAccount } = await makeAndFundWalletWithTokens(
         playerStartingSol,
         playerTokens,
         createPoolContext.mint.publicKey,

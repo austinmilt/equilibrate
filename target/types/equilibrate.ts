@@ -529,91 +529,96 @@ export type Equilibrate = {
     },
     {
       "code": 6005,
+      "name": "CannotBurnNativeMint",
+      "msg": "Cannot burn tokens of native mints"
+    },
+    {
+      "code": 6006,
       "name": "MaxPlayersTooSmall",
       "msg": "Game must allow more than 1 player"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "MaxPlayersTooLarge",
       "msg": "Game cannot have more than 10,000 players"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "BucketDoesNotExist",
       "msg": "Attempted to enter a bucket that doesnt exist"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "CannotEnterHoldingBucket",
       "msg": "Not allowed to enter the holding bucket (index 0)"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "AlreadyInBucket",
       "msg": "Attempted to move within the same bucket"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "GameIsOver",
       "msg": "Attempted to enter a game that has already ended"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "InvalidProgramFeeDestination",
       "msg": "Program fee pubkey must be the one hard-coded in the program"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "InvalidPoolMint",
       "msg": "Pool mint must be the one configured for the game"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "InvalidPoolManager",
       "msg": "Pool manager must be the provided pool manager"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InvalidTokenPool",
       "msg": "Token pool address is incorrect"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidTokenPoolOwner",
       "msg": "Token pool owner must be the pool manager"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InvalidPoolManagerOwner",
       "msg": "Pool manager owner must be this program"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InvalidWinningsDestinationMint",
       "msg": "Token winnings acount mint must be the one configured for the game"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "InvalidTokenSourceMint",
       "msg": "Token source acount mint must be the one configured for the game"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "InvalidBurnMint",
       "msg": "Mint being burned must be the one configured for the game"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "InvalidProgramId",
       "msg": "Program ID must be this program"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "GameCreatorMismatch",
       "msg": "Given gameCreator doesnt match the one that created the game"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
     }
@@ -1151,91 +1156,96 @@ export const IDL: Equilibrate = {
     },
     {
       "code": 6005,
+      "name": "CannotBurnNativeMint",
+      "msg": "Cannot burn tokens of native mints"
+    },
+    {
+      "code": 6006,
       "name": "MaxPlayersTooSmall",
       "msg": "Game must allow more than 1 player"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "MaxPlayersTooLarge",
       "msg": "Game cannot have more than 10,000 players"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "BucketDoesNotExist",
       "msg": "Attempted to enter a bucket that doesnt exist"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "CannotEnterHoldingBucket",
       "msg": "Not allowed to enter the holding bucket (index 0)"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "AlreadyInBucket",
       "msg": "Attempted to move within the same bucket"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "GameIsOver",
       "msg": "Attempted to enter a game that has already ended"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "InvalidProgramFeeDestination",
       "msg": "Program fee pubkey must be the one hard-coded in the program"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "InvalidPoolMint",
       "msg": "Pool mint must be the one configured for the game"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "InvalidPoolManager",
       "msg": "Pool manager must be the provided pool manager"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InvalidTokenPool",
       "msg": "Token pool address is incorrect"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidTokenPoolOwner",
       "msg": "Token pool owner must be the pool manager"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InvalidPoolManagerOwner",
       "msg": "Pool manager owner must be this program"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InvalidWinningsDestinationMint",
       "msg": "Token winnings acount mint must be the one configured for the game"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "InvalidTokenSourceMint",
       "msg": "Token source acount mint must be the one configured for the game"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "InvalidBurnMint",
       "msg": "Mint being burned must be the one configured for the game"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "InvalidProgramId",
       "msg": "Program ID must be this program"
     },
     {
-      "code": 6021,
+      "code": 6022,
       "name": "GameCreatorMismatch",
       "msg": "Given gameCreator doesnt match the one that created the game"
     },
     {
-      "code": 6022,
+      "code": 6023,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
     }

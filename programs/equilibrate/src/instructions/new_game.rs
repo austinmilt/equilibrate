@@ -6,8 +6,8 @@ use anchor_spl::{
 
 use crate::{
     constants::{
-        GAME_MAX_BUCKETS, GAME_MAX_PLAYERS, GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION,
-        PROGRAM_FEE_LAMPORTS,
+        GAME_MAX_BUCKETS, GAME_MAX_PLAYERS, GAME_SEED, NATIVE_MINT, PLAYER_SEED,
+        PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS,
     },
     model::EquilibrateError,
     state::{
@@ -97,6 +97,14 @@ pub fn new_game(
         config.max_players,
         EquilibrateError::MaxPlayersTooLarge
     );
+
+    if config.mint.to_string() == NATIVE_MINT {
+        require_eq!(
+            0,
+            config.burn_rate_decimal_tokens_per_move,
+            EquilibrateError::CannotBurnNativeMint
+        );
+    }
 
     PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 

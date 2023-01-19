@@ -17,6 +17,9 @@ pub enum EquilibrateError {
     #[msg("Token spill rate must be positive")]
     InvalidSpillRate,
 
+    #[msg("Cannot burn tokens of native mints")]
+    CannotBurnNativeMint,
+
     #[msg("Game must allow more than 1 player")]
     MaxPlayersTooSmall,
 
