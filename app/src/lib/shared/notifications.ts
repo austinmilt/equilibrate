@@ -1,4 +1,5 @@
 import { showNotification } from "@mantine/notifications";
+import { DEBUG } from "./constants";
 
 export function notifyError(summary?: string, error?: Error): void {
     notifyErrorCustom(summary, error?.message);
@@ -10,6 +11,9 @@ export function notifyErrorCustom(summary?: string, details?: string): void {
         color: "red",
         message: details,
     });
+    if (DEBUG) {
+        console.error(summary, details);
+    }
 }
 
 
@@ -19,6 +23,9 @@ export function notifyWarning(summary?: string, details?: string): void {
         color: "yellow",
         message: details,
     });
+    if (DEBUG) {
+        console.warn(summary, details);
+    }
 }
 
 
@@ -28,6 +35,9 @@ export function notifySuccess(summary?: string, details?: string): void {
         color: "blue",
         message: details,
     });
+    if (DEBUG) {
+        console.log(summary, details);
+    }
 }
 
 
@@ -37,6 +47,9 @@ export function notifyPotentialBug(summary?: string): void {
         color: "red",
         message: "This is probably a bug. Please report it.",
     });
+    if (DEBUG) {
+        console.log(summary);
+    }
 }
 
 

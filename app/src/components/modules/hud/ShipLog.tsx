@@ -19,7 +19,6 @@ export function ShipLog(props: { gameAddress: PublicKey | undefined }): JSX.Elem
 
     const scrollToBottom: () => void = useCallback(() => {
         if (scrollRef.current != null) {
-            console.log("scrolling");
             scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
         }
     }, [scrollRef.current]);

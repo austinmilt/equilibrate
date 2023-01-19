@@ -89,8 +89,11 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
     const [spillRatePercent, setSpillRatePercent] = useState<number | undefined>(2);
+    const [burnRatePercent, setBurnRatePercent] = useState<number | undefined>(0);
     const [buckets, setBuckets] = useState<number | undefined>(3);
     const [players, setPlayers] = useState<number | undefined>(5);
+
+    const mintIsNative: boolean = useMemo(() => mint?.toBase58() === NATIVE_MINT.toBase58(), [mint]);
 
     const onNewGame: () => void = useCallback(async () => {
         setLoading(true);
@@ -100,10 +103,16 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             spillRate = (spillRatePercent / 100.0) * entryFee;
         }
 
+        let burnRate: number = 0;
+        if (!mintIsNative && (burnRatePercent !== undefined) && (entryFee !== undefined)) {
+            burnRate = (burnRatePercent / 100.0) * entryFee;
+        }
+
         try {
             validateArg(entryFee, "entryFee");
             validateArg(mint, "mint");
             validateArg(spillRate, "spillRate");
+            validateArg(burnRate, "burnRate");
             validateArg(buckets, "buckets");
             validateArg(players, "players");
 
@@ -118,6 +127,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         .setSpillRate(spillRate)
                         .setNumberOfBuckets(buckets)
                         .setMaxPlayers(players)
+                        .setBurnRate(burnRate)
                         // this sets the game address before the game is made, allowing
                         // us to observe the game creation event
                         .withCreateNewGame((address) => {
@@ -143,6 +153,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
         entryFee,
         mint,
         spillRatePercent,
+        burnRatePercent,
         buckets,
         players,
         props.onGameAddressResolved,
@@ -219,11 +230,25 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         precision={0}
                     />
                     <NumberInput
+                        value={mintIsNative ? 0 : burnRatePercent}
+                        label={
+                            <Text>
+                                { themed("Player Move Burn Penalty", "Hydrogen Burn Rate") }<br/>
+                                { mintIsNative ? ("cannot burn native tokens") : "(% of entry fee each move)"}
+                            </Text>
+                        }
+                        onChange={setBurnRatePercent}
+                        min={0}
+                        precision={2}
+                        step={0.5}
+                        disabled={mintIsNative}
+                    />
+                    <NumberInput
                         value={spillRatePercent}
                         label={
                             <Text>
                                 { themed("Token Spill Rate", "Hydrogen Escape Rate") }<br/>
-                                (% of entry fee)
+                                (% of entry fee each second)
                             </Text>
                         }
                         onChange={setSpillRatePercent}

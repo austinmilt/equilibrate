@@ -5,6 +5,8 @@ import { Endpoint } from "../solana/provider";
 import { Duration } from "./duration";
 import { NATIVE_MINT } from "@solana/spl-token";
 
+export const SOLANA_MINT_NAME: string = "SOL";
+
 export const GAMES_LIST_UPDATE_INTERVAL: Duration = parseEnv(
     "GAMES_LIST_UPDATE_INTERVAL",
     import.meta.env.VITE_GAMES_LIST_UPDATE_INTERVAL,
@@ -73,7 +75,21 @@ export const NEW_GAME_DEFAULT_MINT: string = parseEnv<string>(
 );
 
 
-export const SOLANA_MINT_NAME: string = "SOL";
+export const DEBUG: boolean = parseBoolean(
+    "DEBUG",
+    import.meta.env.VITE_DEBUG,
+    false
+);
+
+
+function parseBoolean(name: string, value: string | undefined, defaultValue?: boolean): boolean {
+    return parseEnv(name, value, defaultValue, v => {
+        const lowercase: string = v.toLowerCase().trim();
+        if ((lowercase === "true") || (lowercase === "1")) return true;
+        else if ((lowercase === "false") || (lowercase === "0")) return false;
+        else throw new Error(`Invalid boolean string ${value}`);
+    });
+}
 
 
 function parseEnv<T>(
