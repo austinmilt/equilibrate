@@ -69,6 +69,12 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u8) -> Result<()> {
 
     // update player state account
     ctx.accounts.player.bucket = i_bucket;
+    ctx.accounts.player.burn_penalty_decimal_tokens = ctx
+        .accounts
+        .player
+        .burn_penalty_decimal_tokens
+        .checked_add(game.config.burn_rate_decimal_tokens_per_move)
+        .unwrap();
     ctx.accounts.player.log_move();
 
     Ok(())

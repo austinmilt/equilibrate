@@ -2,7 +2,6 @@ import {
     Group,
     Text,
     ScrollArea,
-    Center
 } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -217,9 +216,16 @@ function GameCard(props: GameCardProps): JSX.Element {
     }, [props.entry, buckets]);
 
     const mintName: string = useMemo(() => {
-        let result: string = props.entry.mintName ?? "";
-        if (gameConfig.mint.toBase58() === NATIVE_MINT.toBase58()) {
+        let result: string;
+        const pubkeyString: string = gameConfig.mint.toBase58();
+        if (pubkeyString === NATIVE_MINT.toBase58()) {
             result = "SOL";
+
+        } else if (props.entry.mintName !== undefined) {
+            result = props.entry.mintName;
+
+        } else {
+            result = pubkeyString.slice(0, 4) + "...";
         }
         return result;
     }, [props.entry.mintName, gameConfig.mint]);

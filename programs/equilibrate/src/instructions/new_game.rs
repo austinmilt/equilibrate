@@ -6,8 +6,8 @@ use anchor_spl::{
 
 use crate::{
     constants::{
-        GAME_MAX_BUCKETS, GAME_MAX_PLAYERS, GAME_SEED, PLAYER_SEED, PROGRAM_FEE_DESTINATION,
-        PROGRAM_FEE_LAMPORTS,
+        ACCOUNTS_VERSION, GAME_MAX_BUCKETS, GAME_MAX_PLAYERS, GAME_SEED, NATIVE_MINT, PLAYER_SEED,
+        PROGRAM_FEE_DESTINATION, PROGRAM_FEE_LAMPORTS,
     },
     model::EquilibrateError,
     state::{
@@ -98,6 +98,14 @@ pub fn new_game(
         EquilibrateError::MaxPlayersTooLarge
     );
 
+    if config.mint.to_string() == NATIVE_MINT {
+        require_eq!(
+            0,
+            config.burn_rate_decimal_tokens_per_move,
+            EquilibrateError::CannotBurnNativeMint
+        );
+    }
+
     PoolManager::validate_token_pool(&ctx.accounts.token_pool, pool_manager, config.mint)?;
 
     let program_fee_transfer_context = CpiContext::new(
@@ -155,17 +163,20 @@ pub fn new_game(
 
     let game = &mut ctx.accounts.game;
     game.set_inner(Game {
-        config,
-        state,
+        version: ACCOUNTS_VERSION,
         id: game_id,
         creator: ctx.accounts.payer.key(),
+        config,
+        state,
     });
     game.log_make();
 
     let player = &mut ctx.accounts.first_player;
     player.set_inner(PlayerState {
+        version: ACCOUNTS_VERSION,
         // first player always goes into the first bucket
         bucket: 1,
+        burn_penalty_decimal_tokens: 0,
     });
     player.log_make();
 

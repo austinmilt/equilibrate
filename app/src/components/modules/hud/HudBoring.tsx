@@ -169,7 +169,11 @@ export function HudBoring(): JSX.Element {
                             console.error(result.error);
 
                         } else if (signature !== undefined) {
-                            const winnings: number | undefined = await tryToEstimateWinnings(signature, connection);
+                            const winnings: number | undefined = await tryToEstimateWinnings(
+                                player,
+                                signature,
+                                connection
+                            );
                             const log: string = winnings === undefined ?
                                 themed("Left the game", "Escaped the system.") :
                                 themed(
@@ -315,14 +319,36 @@ export function HudBoring(): JSX.Element {
     [cancelOnLoss]);
 
 
+    const mintDecimals: number | undefined = gameContext.game?.game?.config.mintDecimals ?? undefined;
+
+
+    const playerPenalty: number = useMemo(() => (
+        gameContext.player?.player?.burnPenaltyDecimalTokens?.toNumber() ?? 0
+    ), [gameContext.player, mintDecimals]);
+
+
+    const playerPenaltyString: string = useMemo(() => (
+        formatTokens(playerPenalty, mintDecimals)
+    ), [playerPenalty]);
+
+
     const playerApproximateWinnings: string | undefined = useMemo(() => {
-        let result: string | undefined;
+        let playerShare: number | undefined;
         const playerStar: StarData | undefined = activeGalaxyContext.playerStar.data;
-        if ((playerStar !== undefined) && (playerStar.satellites > 0)) {
-            result = formatTokens(playerStar.fuel / playerStar.satellites, gameContext.game?.game?.config.mintDecimals);
+        if ((activeGalaxyContext.stars != null) && (activeGalaxyContext.stars[0].satellites === 1)) {
+            playerShare = activeGalaxyContext.galaxy?.state.totalFuel ?? 0;
+
+        } else if ((playerStar !== undefined) && (playerStar.satellites > 0)) {
+            playerShare = playerStar.fuel / playerStar.satellites;
+        }
+
+        let result: string | undefined;
+        if (playerShare !== undefined) {
+            const resultNumber: number = Math.max(0, playerShare - playerPenalty);
+            result = formatTokens(resultNumber, mintDecimals);
         }
         return result;
-    }, [activeGalaxyContext.playerStar.data]);
+    }, [activeGalaxyContext.playerStar.data, playerPenalty]);
 
 
     //TODO extract styles
@@ -363,7 +389,17 @@ export function HudBoring(): JSX.Element {
                         <div style={{display: "flex", flexDirection: "row", justifyContent: "center", alignItems: "center", gap: "0.5rem"}}>
                             <BucketButton {...getBucketButtonProps(0)} className={styles["faucet-button"]}/>
                             <MoneyIcon className={styles["winnings-icon"]}/>
-                            <Text size="xl">{playerApproximateWinnings}</Text>
+                            <Text size="xl">{ playerApproximateWinnings }</Text>
+                            {
+                                (playerPenalty > 0) && (
+                                    <Text
+                                        size="xl"
+                                        title="Amount of your winnings that will be burned due to moving buckets."
+                                    >
+                                        (🔥{playerPenaltyString})
+                                    </Text>
+                                )
+                            }
                         </div>
                         <Text size="sm" color="dimmed">
                             {(playerApproximateWinnings != null) ?
@@ -398,6 +434,7 @@ function BucketButton(props: BucketButtonProps): JSX.Element {
 
 
 async function tryToEstimateWinnings(
+    player: PublicKey,
     transactionSignature: string,
     connection: Connection
 ): Promise<number | undefined> {
@@ -407,25 +444,32 @@ async function tryToEstimateWinnings(
         commitment: "confirmed",
         maxSupportedTransactionVersion: 10
     });
-    if ((transactionResponse?.meta?.preTokenBalances != null)
-        && (transactionResponse?.meta?.postTokenBalances != null)
-    ) {
-        // for some reason the number will be set to null when it's zero, even though
-        // the text versions show it as zero
-        const poolBalanceBefore: number = transactionResponse.meta
-            .preTokenBalances[0]
-            .uiTokenAmount
-            .uiAmount ?? 0;
+    const playerAddress: string = player.toBase58();
 
-        const poolBalanceAfter: number = transactionResponse.meta
-            .postTokenBalances[0]
-            .uiTokenAmount
-            .uiAmount ?? 0;
+    const canSearchBefore: boolean = transactionResponse?.meta?.preTokenBalances != null;
+    const canSearchAfter: boolean = transactionResponse?.meta?.postTokenBalances != null;
+    if (canSearchBefore && canSearchAfter) {
+        // for games where the player's token account isnt closed when they leave (most tokens)
+        // @ts-ignore already verified
+        let metaBefore = transactionResponse.meta.preTokenBalances.find(b => b.owner === playerAddress);
+        // @ts-ignore already verified
+        let metaAfter = transactionResponse.meta.postTokenBalances.find(b => b.owner === playerAddress);
+        if ((metaBefore != null) && (metaAfter != null)) {
+            // for some reason the number will be set to null when it's zero, even though
+            // the text versions show it as zero
+            const playerBalanceBefore: number = metaBefore.uiTokenAmount.uiAmount ?? 0;
+            const playerBalanceAfter: number = metaAfter.uiTokenAmount.uiAmount ?? 0;
+            winnings = playerBalanceAfter - playerBalanceBefore;
+        }
 
-        if ((poolBalanceBefore !== null) && (poolBalanceAfter !== null)) {
-            // I know this looks backwards, but the account being queried is the token pool
-            // of the program (or at least I think it is), so we're looking for the loss
-            // of tokens to find out what's going to the player
+        // for games where the player's token account is closed when they leave (wrapped SOL)
+        if ((winnings === undefined)) {
+            // @ts-ignore already verified
+            metaBefore = transactionResponse.meta.preTokenBalances[0];
+            // @ts-ignore already verified
+            metaAfter = transactionResponse.meta.postTokenBalances[0];
+            const poolBalanceBefore: number = metaBefore.uiTokenAmount.uiAmount ?? 0;
+            const poolBalanceAfter: number = metaAfter.uiTokenAmount.uiAmount ?? 0;
             winnings = poolBalanceBefore - poolBalanceAfter;
         }
     }

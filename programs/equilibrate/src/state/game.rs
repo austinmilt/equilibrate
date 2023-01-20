@@ -5,19 +5,21 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(Debug, PartialEq)]
 pub struct Game {
-    pub config: GameConfig,
-    pub state: GameState,
+    pub version: u8,
     pub id: u64,
     pub creator: Pubkey,
+    pub config: GameConfig,
+    pub state: GameState,
 }
 
 impl Game {
     pub fn get_space(n_buckets_configured: u8) -> usize {
         8 + // account discriminator
-        GameConfig::get_space() +
-        GameState::get_space(n_buckets_configured) +
+        1 + // version
         8 + // id
-        32 // creator
+        32 + // creator
+        GameConfig::get_space() +
+        GameState::get_space(n_buckets_configured)
     }
 
     pub fn update_bucket_balances(&mut self, now_epoch_seconds: u64) {
@@ -112,6 +114,7 @@ pub struct GameConfig {
     pub spill_rate_decimal_tokens_per_second_per_player: u64,
     pub n_buckets: u8,
     pub max_players: u16,
+    pub burn_rate_decimal_tokens_per_move: u64,
 }
 
 impl GameConfig {
@@ -120,7 +123,8 @@ impl GameConfig {
         8 + // entry_fee_decimal_tokens
         8 + // spill_rate_decimal_tokens_per_second_per_player
         1 + // n_buckets
-        8 // max_players
+        8 + // max_players
+        8 // burn_rate_decimal_tokens_per_move
     }
 }
 

@@ -1,5 +1,5 @@
 export type Equilibrate = {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "equilibrate",
   "instructions": [
     {
@@ -289,6 +289,14 @@ export type Equilibrate = {
           ]
         },
         {
+          "name": "gameMint",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "mint of this game"
+          ]
+        },
+        {
           "name": "gameCreator",
           "isMut": true,
           "isSigner": false
@@ -368,6 +376,18 @@ export type Equilibrate = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "publicKey"
+          },
+          {
             "name": "config",
             "type": {
               "defined": "GameConfig"
@@ -378,14 +398,6 @@ export type Equilibrate = {
             "type": {
               "defined": "GameState"
             }
-          },
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "creator",
-            "type": "publicKey"
           }
         ]
       }
@@ -396,8 +408,16 @@ export type Equilibrate = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "bucket",
             "type": "u8"
+          },
+          {
+            "name": "burnPenaltyDecimalTokens",
+            "type": "u64"
           }
         ]
       }
@@ -440,6 +460,10 @@ export type Equilibrate = {
           {
             "name": "maxPlayers",
             "type": "u16"
+          },
+          {
+            "name": "burnRateDecimalTokensPerMove",
+            "type": "u64"
           }
         ]
       }
@@ -513,86 +537,96 @@ export type Equilibrate = {
     },
     {
       "code": 6005,
+      "name": "CannotBurnNativeMint",
+      "msg": "Cannot burn tokens of native mints"
+    },
+    {
+      "code": 6006,
       "name": "MaxPlayersTooSmall",
       "msg": "Game must allow more than 1 player"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "MaxPlayersTooLarge",
       "msg": "Game cannot have more than 10,000 players"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "BucketDoesNotExist",
       "msg": "Attempted to enter a bucket that doesnt exist"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "CannotEnterHoldingBucket",
       "msg": "Not allowed to enter the holding bucket (index 0)"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "AlreadyInBucket",
       "msg": "Attempted to move within the same bucket"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "GameIsOver",
       "msg": "Attempted to enter a game that has already ended"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "InvalidProgramFeeDestination",
       "msg": "Program fee pubkey must be the one hard-coded in the program"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "InvalidPoolMint",
       "msg": "Pool mint must be the one configured for the game"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "InvalidPoolManager",
       "msg": "Pool manager must be the provided pool manager"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InvalidTokenPool",
       "msg": "Token pool address is incorrect"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidTokenPoolOwner",
       "msg": "Token pool owner must be the pool manager"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InvalidPoolManagerOwner",
       "msg": "Pool manager owner must be this program"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InvalidWinningsDestinationMint",
       "msg": "Token winnings acount mint must be the one configured for the game"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "InvalidTokenSourceMint",
       "msg": "Token source acount mint must be the one configured for the game"
     },
     {
-      "code": 6019,
+      "code": 6020,
+      "name": "InvalidBurnMint",
+      "msg": "Mint being burned must be the one configured for the game"
+    },
+    {
+      "code": 6021,
       "name": "InvalidProgramId",
       "msg": "Program ID must be this program"
     },
     {
-      "code": 6020,
+      "code": 6022,
       "name": "GameCreatorMismatch",
       "msg": "Given gameCreator doesnt match the one that created the game"
     },
     {
-      "code": 6021,
+      "code": 6023,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
     }
@@ -600,7 +634,7 @@ export type Equilibrate = {
 };
 
 export const IDL: Equilibrate = {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "equilibrate",
   "instructions": [
     {
@@ -890,6 +924,14 @@ export const IDL: Equilibrate = {
           ]
         },
         {
+          "name": "gameMint",
+          "isMut": true,
+          "isSigner": false,
+          "docs": [
+            "mint of this game"
+          ]
+        },
+        {
           "name": "gameCreator",
           "isMut": true,
           "isSigner": false
@@ -969,6 +1011,18 @@ export const IDL: Equilibrate = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "publicKey"
+          },
+          {
             "name": "config",
             "type": {
               "defined": "GameConfig"
@@ -979,14 +1033,6 @@ export const IDL: Equilibrate = {
             "type": {
               "defined": "GameState"
             }
-          },
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "creator",
-            "type": "publicKey"
           }
         ]
       }
@@ -997,8 +1043,16 @@ export const IDL: Equilibrate = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
             "name": "bucket",
             "type": "u8"
+          },
+          {
+            "name": "burnPenaltyDecimalTokens",
+            "type": "u64"
           }
         ]
       }
@@ -1041,6 +1095,10 @@ export const IDL: Equilibrate = {
           {
             "name": "maxPlayers",
             "type": "u16"
+          },
+          {
+            "name": "burnRateDecimalTokensPerMove",
+            "type": "u64"
           }
         ]
       }
@@ -1114,86 +1172,96 @@ export const IDL: Equilibrate = {
     },
     {
       "code": 6005,
+      "name": "CannotBurnNativeMint",
+      "msg": "Cannot burn tokens of native mints"
+    },
+    {
+      "code": 6006,
       "name": "MaxPlayersTooSmall",
       "msg": "Game must allow more than 1 player"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "MaxPlayersTooLarge",
       "msg": "Game cannot have more than 10,000 players"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "BucketDoesNotExist",
       "msg": "Attempted to enter a bucket that doesnt exist"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "CannotEnterHoldingBucket",
       "msg": "Not allowed to enter the holding bucket (index 0)"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "AlreadyInBucket",
       "msg": "Attempted to move within the same bucket"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "GameIsOver",
       "msg": "Attempted to enter a game that has already ended"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "InvalidProgramFeeDestination",
       "msg": "Program fee pubkey must be the one hard-coded in the program"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "InvalidPoolMint",
       "msg": "Pool mint must be the one configured for the game"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "InvalidPoolManager",
       "msg": "Pool manager must be the provided pool manager"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InvalidTokenPool",
       "msg": "Token pool address is incorrect"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "InvalidTokenPoolOwner",
       "msg": "Token pool owner must be the pool manager"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "InvalidPoolManagerOwner",
       "msg": "Pool manager owner must be this program"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InvalidWinningsDestinationMint",
       "msg": "Token winnings acount mint must be the one configured for the game"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "InvalidTokenSourceMint",
       "msg": "Token source acount mint must be the one configured for the game"
     },
     {
-      "code": 6019,
+      "code": 6020,
+      "name": "InvalidBurnMint",
+      "msg": "Mint being burned must be the one configured for the game"
+    },
+    {
+      "code": 6021,
       "name": "InvalidProgramId",
       "msg": "Program ID must be this program"
     },
     {
-      "code": 6020,
+      "code": 6022,
       "name": "GameCreatorMismatch",
       "msg": "Given gameCreator doesnt match the one that created the game"
     },
     {
-      "code": 6021,
+      "code": 6023,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
     }

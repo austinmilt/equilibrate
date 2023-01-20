@@ -398,8 +398,8 @@ describe("MoveBuckets Instruction Tests", () => {
         ).state;
 
         assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), 0);
-        assert.strictEqual(gameState.buckets[1].decimalTokens.toNumber(), entryFee);
-        assert.strictEqual(gameState.buckets[2].decimalTokens.toNumber(), entryFee);
+        assert.strictEqual(gameState.buckets[1].decimalTokens.toNumber(), entryFee / 2);
+        assert.strictEqual(gameState.buckets[2].decimalTokens.toNumber(), (3/2) * entryFee);
     });
 });
 
@@ -430,7 +430,7 @@ export async function setUpMoveBuckets(
     program: anchor.Program<Equilibrate>,
     createPoolContext: CreatePoolContext,
     newGameContext: NewGameContext,
-    enterGameContext: EnterGameContext,
+    enterGameContext?: EnterGameContext,
     customSetup?: MoveBucketsSetupArgs,
     debug: boolean = false
 ): Promise<MoveBucketsContext> {
@@ -445,21 +445,37 @@ export async function setUpMoveBuckets(
             customSetup.playerWallet.publicKey,
             program.programId
         );
-    } else {
+    } else if (enterGameContext?.playerStateAddress) {
         playerStateAddress = enterGameContext.playerStateAddress;
+    } else {
+        playerStateAddress = newGameContext.playerStateAddress;
     }
 
     let newBucketIndex: number;
     if (customSetup?.newBucketIndex != null) {
         newBucketIndex = customSetup.newBucketIndex;
-    } else {
+    } else if (enterGameContext?.playerBucketIndex) {
         newBucketIndex = enterGameContext.playerBucketIndex;
         while (newBucketIndex === enterGameContext.playerBucketIndex) {
             newBucketIndex = Math.floor(
                 Math.random() * (newGameContext.gameConfig.nBuckets - 1) + 1
             );
         }
+    } else {
+        // the player is the game creator, so they are either in the starting
+        // bucket or have moved and we need to find out which to move them
+        const playerState: PlayerState = await program.account.playerState.fetch(newGameContext.playerStateAddress);
+        newBucketIndex = playerState.bucket;
+        while (newBucketIndex === playerState.bucket) {
+            newBucketIndex = Math.floor(
+                Math.random() * (newGameContext.gameConfig.nBuckets - 1) + 1
+            );
+        }
     }
+
+    const playerWallet: Keypair = customSetup?.playerWallet ?? (
+        enterGameContext?.playerWallet ?? newGameContext.playerWallet
+    );
 
     try {
         await program.methods
@@ -467,11 +483,9 @@ export async function setUpMoveBuckets(
             .accountsStrict({
                 game: customSetup?.gameAddress ?? newGameContext.gameAddress,
                 player: playerStateAddress,
-                payer:
-          customSetup?.playerWallet?.publicKey ??
-          enterGameContext.playerWallet.publicKey,
+                payer: playerWallet.publicKey,
             })
-            .signers([customSetup?.playerWallet ?? enterGameContext.playerWallet])
+            .signers([playerWallet])
             .rpc();
     } catch (e) {
         if (debug) {

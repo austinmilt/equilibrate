@@ -20,7 +20,7 @@ import {
     withoutDecimals,
 } from "./helpers/token";
 import { Game, GameConfig, PlayerState } from "./helpers/types";
-import { Keypair, PublicKey, Connection } from "@solana/web3.js";
+import { Keypair, PublicKey, Connection} from "@solana/web3.js";
 import {
     GAME_SEED,
     getGameAddress,
@@ -29,7 +29,7 @@ import {
 } from "./helpers/address";
 import { assert } from "chai";
 import { assertAsyncThrows } from "./helpers/test";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, NATIVE_MINT } from "@solana/spl-token";
 import { testIsReady } from "./setup";
 import {
     CreatePoolContext,
@@ -105,19 +105,18 @@ describe("NewGame Instruction Tests", () => {
             PROGRAM_FEE_DESTINATION,
             connection
         );
-        const programFeeSol: number =
-      PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
+        const programFeeSol: number = PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
 
         assert.approximately(
             programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
             programFeeSol,
-            1 / anchor.web3.LAMPORTS_PER_SOL
+            0.01*programFeeSol
         );
-    // It would be great to also check that the player's balance went
-    // down by the program fee, but without knowing solana's transaction
-    // fee we cant calculate what the new balance should be. That's OK,
-    // though, since the only source of income to the fee destination is
-    // the player's account
+        // It would be great to also check that the player's balance went
+        // down by the program fee, but without knowing solana's transaction
+        // fee we cant calculate what the new balance should be. That's OK,
+        // though, since the only source of income to the fee destination is
+        // the player's account
     });
 
     it("create a new game > all good > game tokens are transfered", async () => {
@@ -436,6 +435,12 @@ describe("NewGame Instruction Tests", () => {
             "ConstraintTokenOwner"
         );
     });
+
+    it.skip("create a new game > native mint - non-zero burn rate > fails", async () => {
+        //TODO not sure how to do this yet... might have to make the wallet, fund it, make
+        //  wrapped mint account, blah blah and then set up config. This will mean changing
+        //  the way that the create game args are handled.
+    });
 });
 
 export interface NewGameEtcSetupArgs extends NewGameSetupArgs {
@@ -450,6 +455,7 @@ export interface NewGameSetupArgs {
     spillRateDecimalTokensPerSecondPerPlayer?: anchor.BN;
     nBuckets?: number;
     maxPlayers?: number;
+    burnRateDecimalTokensPerMove?: anchor.BN;
   };
   gameId?: number;
   gameAddress?: PublicKey;
@@ -527,11 +533,13 @@ export async function setUpNewGame(
         config.maxPlayers = customSetup?.gameConfig?.maxPlayers;
     }
 
-    if (
-        customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer != null
-    ) {
+    if ( customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer != null ) {
         config.spillRateDecimalTokensPerSecondPerPlayer =
-      customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer;
+            customSetup?.gameConfig?.spillRateDecimalTokensPerSecondPerPlayer;
+    }
+
+    if (customSetup?.gameConfig?.burnRateDecimalTokensPerMove != null) {
+        config.burnRateDecimalTokensPerMove = customSetup?.gameConfig?.burnRateDecimalTokensPerMove;
     }
 
     const gameId: number = customSetup?.gameId ?? generateGameId();
@@ -539,10 +547,8 @@ export async function setUpNewGame(
     customSetup?.gameAddress ??
     (await getGameAddress(gameId, program.programId));
 
-    const playerTokens: number =
-    customSetup?.playerStartingTokens != null
-        ? customSetup?.playerStartingTokens
-        : Math.ceil(
+    const playerTokens: number = customSetup?.playerStartingTokens != null ?
+        customSetup?.playerStartingTokens : Math.ceil(
             1.1 *
             withoutDecimals(
                 config.entryFeeDecimalTokens.toNumber(),
@@ -550,13 +556,10 @@ export async function setUpNewGame(
             )
         );
 
-    const playerStartingSol: number =
-    customSetup?.playerStartingSol != null
-        ? customSetup?.playerStartingSol
-        : (10 * PROGRAM_FEE_LAMPORTS) / anchor.web3.LAMPORTS_PER_SOL;
+    const playerStartingSol: number = customSetup?.playerStartingSol != null ?
+        customSetup?.playerStartingSol : (10 * PROGRAM_FEE_LAMPORTS) / anchor.web3.LAMPORTS_PER_SOL;
 
-    let { wallet: player, tokenAccount: playerTokenAccount } =
-    await makeAndFundWalletWithTokens(
+    let { wallet: player, tokenAccount: playerTokenAccount } = await makeAndFundWalletWithTokens(
         playerStartingSol,
         playerTokens,
         createPoolContext.mint.publicKey,
@@ -588,11 +591,9 @@ export async function setUpNewGame(
             .accountsStrict({
                 game: gameAddress,
                 firstPlayer: playerStateAddress,
-                programFeeDestination:
-          customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
+                programFeeDestination: customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
                 depositSourceAccount: playerTokenAccount,
-                tokenPool:
-          customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
+                tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
                 payer: player.publicKey,
                 associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
                 tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,

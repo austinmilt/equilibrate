@@ -5,7 +5,7 @@ import { MINT_DECIMALS } from "./token";
 import { Equilibrate } from "../../target/types/equilibrate";
 
 export const PROGRAM_FEE_DESTINATION: PublicKey = new PublicKey("EQui1fSdC2HetpETDAoaLaPYvYR7xVuXmLyUiiEvfA2h");
-export const PROGRAM_FEE_LAMPORTS: number = 15000000;
+export const PROGRAM_FEE_LAMPORTS: number = 25000000;
 export const MAX_GAME_BUCKETS: number = 64;
 
 export function generateGameId(): number {
@@ -34,7 +34,8 @@ export function generateGameConfig(mint: PublicKey): GameConfig {
         entryFeeDecimalTokens: new anchor.BN(entryFeeDecimalTokens),
         spillRateDecimalTokensPerSecondPerPlayer: new anchor.BN(spillRate),
         nBuckets: nBuckets,
-        maxPlayers: maxPlayers
+        maxPlayers: maxPlayers,
+        burnRateDecimalTokensPerMove: new anchor.BN(0)
     };
 }
 

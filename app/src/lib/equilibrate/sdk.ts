@@ -9,6 +9,7 @@ import {
 import { Equilibrate } from "../../../../target/types/equilibrate";
 import {
     ASSOCIATED_TOKEN_PROGRAM_ID,
+    BURN_RATE_MIN,
     ENTRY_FEE_MIN_EXCLUSIVE,
     GAME_BUCKETS_MAX,
     GAME_BUCKETS_MIN,
@@ -46,6 +47,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import { AnchorError } from "@project-serum/anchor";
 import { SimpleCache } from "./cache";
 import { Duration } from "../shared/duration";
+import { mapGameAccountToCurrentVersion } from "./accounts";
 
 export interface SubmitTransactionFunction {
   (transaction: Transaction, connection: Connection): Promise<string>;
@@ -311,7 +313,10 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
 
         // get the mint decimals for all mints in all games
-        const gamesListRaw = await program.account.game.all();
+        const gamesListRaw = (await program.account.game.all()).map(g => ({
+            ...g,
+            account: mapGameAccountToCurrentVersion(g.account)
+        }));
         const mints: Set<PublicKey> = new Set<PublicKey>();
         const mintDecimals: Map<string, number> = new Map<string, number>();
         gamesListRaw.forEach(r => mints.add(r.account.config.mint));
@@ -458,7 +463,7 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
         return await this.gameCache.getOrFetch(
             address.toBase58(),
-            async () => (await program.account.game.fetch(address)) as Game
+            async () => mapGameAccountToCurrentVersion(await program.account.game.fetch(address))
         );
     }
 
@@ -879,6 +884,7 @@ export class EquilibrateRequest {
         spillRateTokensPerSecondPerPlayer?: number;
         nBuckets?: number;
         maxPlayers?: number;
+        burnRateTokensPerMove?: number;
     } = {};
     private bucketIndex: number | undefined;
     private gameId: number | undefined;
@@ -959,6 +965,25 @@ export class EquilibrateRequest {
             "spillRateTokensPerSecondPerPlayer"
         );
         this.config.spillRateTokensPerSecondPerPlayer = spillRateTokensPerSecondPerPlayer;
+        return this;
+    }
+
+
+    /**
+     * Sets the burn rate for a new game.
+     *
+     * @param burnRateTokensPerMove burn rate in normal units (not whole-number decimal units) of
+     * tokens per player move
+     * @returns this request
+     * @throws if the burn rate is too low
+     */
+    public setBurnRate(burnRateTokensPerMove: number): EquilibrateRequest {
+        Assert.greaterThanOrEqualTo(
+            burnRateTokensPerMove,
+            BURN_RATE_MIN,
+            "burnRateTokensPerMove"
+        );
+        this.config.burnRateTokensPerMove = burnRateTokensPerMove;
         return this;
     }
 
@@ -1142,6 +1167,10 @@ export class EquilibrateRequest {
         );
         Assert.notNullish(this.config.nBuckets, "nBuckets");
         Assert.notNullish(this.config.maxPlayers, "maxPlayers");
+        Assert.notNullish(
+            this.config.burnRateTokensPerMove,
+            "burnRateTokensPerMove"
+        );
     }
 
 
@@ -1153,10 +1182,17 @@ export class EquilibrateRequest {
         );
         Assert.notNullish(this.config.nBuckets, "nBuckets");
         Assert.notNullish(this.config.maxPlayers, "maxPlayers");
+        Assert.notNullish(
+            this.config.burnRateTokensPerMove,
+            "burnRateTokensPerMove"
+        );
         const mintToDecimalMultiplier: number = await this.computeMintToDecimalMultiplier();
         const entryFeeWithDecimals: anchor.BN = await this.computeEntryFeeDecimalTokens(mintToDecimalMultiplier);
         const spillRateWithDecimals: anchor.BN = new anchor.BN(
             this.config.spillRateTokensPerSecondPerPlayer * mintToDecimalMultiplier
+        );
+        const burnRateDecimalTokensPerMove: anchor.BN = new anchor.BN(
+            this.config.burnRateTokensPerMove * mintToDecimalMultiplier
         );
 
         return {
@@ -1164,7 +1200,8 @@ export class EquilibrateRequest {
             entryFeeDecimalTokens: entryFeeWithDecimals,
             spillRateDecimalTokensPerSecondPerPlayer: spillRateWithDecimals,
             nBuckets: this.config.nBuckets,
-            maxPlayers: this.config.maxPlayers
+            maxPlayers: this.config.maxPlayers,
+            burnRateDecimalTokensPerMove: burnRateDecimalTokensPerMove
         };
     }
 
@@ -1409,7 +1446,8 @@ export class EquilibrateRequest {
                     poolManager: poolManagerAddress,
                     tokenPool: tokenPoolAddress,
                     gameCreator: game.creator,
-                    winningsDestinationAccount: playerTokenAccount
+                    winningsDestinationAccount: playerTokenAccount,
+                    gameMint: mint
                 })
                 .instruction();
 
@@ -1525,7 +1563,10 @@ export class EquilibrateRequest {
         const transaction: Transaction = new Transaction();
         for (const step of this.steps) {
             try {
-                transaction.add(...(await step.buildInstructions()));
+                const instructions: TransactionInstruction[] = await step.buildInstructions();
+                if (instructions.length > 0) {
+                    transaction.add(...instructions);
+                }
 
             } catch (e) {
                 throw new Error(`Error while building instructions for '${step.name}'`, {cause: e});
@@ -1569,6 +1610,9 @@ export class EquilibrateRequest {
                         result = { error: e, anchorErrorCode: PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS };
 
                     } else {
+                        if (e.logs != null) {
+                            console.error([e.message, "\nPROGRAM LOGS", ...e.logs].join("\n"));
+                        }
                         throw e;
                     }
                 } else {

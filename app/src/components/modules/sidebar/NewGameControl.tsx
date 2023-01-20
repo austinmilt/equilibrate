@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { MintData, useMintList } from "../../../lib/shared/mint-list";
-import { Notifications } from "../../../lib/shared/notifications";
+import { Notifications, notifyError, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
@@ -14,6 +14,9 @@ import { useShipLogs } from "../hud/ShipLog";
 import styles from "./styles.module.css";
 import { SOLANA_MINT_NAME } from "../../../lib/shared/constants";
 import { themed } from "../../shared/theme";
+import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useEndpoint } from "../../../lib/solana/provider";
+import { generateMintAndMintToWallet } from "../../../dev/token";
 
 
 interface NewGameControlProps {
@@ -89,8 +92,11 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
     const [spillRatePercent, setSpillRatePercent] = useState<number | undefined>(2);
+    const [burnRatePercent, setBurnRatePercent] = useState<number | undefined>(0);
     const [buckets, setBuckets] = useState<number | undefined>(3);
     const [players, setPlayers] = useState<number | undefined>(5);
+
+    const mintIsNative: boolean = useMemo(() => mint?.toBase58() === NATIVE_MINT.toBase58(), [mint]);
 
     const onNewGame: () => void = useCallback(async () => {
         setLoading(true);
@@ -100,10 +106,16 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
             spillRate = (spillRatePercent / 100.0) * entryFee;
         }
 
+        let burnRate: number = 0;
+        if (!mintIsNative && (burnRatePercent !== undefined) && (entryFee !== undefined)) {
+            burnRate = (burnRatePercent / 100.0) * entryFee;
+        }
+
         try {
             validateArg(entryFee, "entryFee");
             validateArg(mint, "mint");
             validateArg(spillRate, "spillRate");
+            validateArg(burnRate, "burnRate");
             validateArg(buckets, "buckets");
             validateArg(players, "players");
 
@@ -118,6 +130,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         .setSpillRate(spillRate)
                         .setNumberOfBuckets(buckets)
                         .setMaxPlayers(players)
+                        .setBurnRate(burnRate)
                         // this sets the game address before the game is made, allowing
                         // us to observe the game creation event
                         .withCreateNewGame((address) => {
@@ -143,6 +156,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
         entryFee,
         mint,
         spillRatePercent,
+        burnRatePercent,
         buckets,
         players,
         props.onGameAddressResolved,
@@ -219,11 +233,25 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         precision={0}
                     />
                     <NumberInput
+                        value={mintIsNative ? 0 : burnRatePercent}
+                        label={
+                            <Text>
+                                { themed("Player Move Burn Penalty", "Hydrogen Burn Rate") }<br/>
+                                { mintIsNative ? "(cannot burn native tokens)" : "(% of entry fee each move)"}
+                            </Text>
+                        }
+                        onChange={setBurnRatePercent}
+                        min={0}
+                        precision={2}
+                        step={0.5}
+                        disabled={mintIsNative}
+                    />
+                    <NumberInput
                         value={spillRatePercent}
                         label={
                             <Text>
                                 { themed("Token Spill Rate", "Hydrogen Escape Rate") }<br/>
-                                (% of entry fee)
+                                (% of entry fee each second)
                             </Text>
                         }
                         onChange={setSpillRatePercent}
@@ -273,6 +301,7 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
     const [nameOrAddress, setNameOrAddress] = useState<string>(NATIVE_MINT.toBase58());
     const [lastValidMintAddress, setLastValidMintAddress] = useState<string | undefined>();
     const mintListContext = useMintList();
+    const { key: endpoint } = useEndpoint();
 
     const selectItems: AutoCompleteItemProps[] = useMemo(() =>
         mintListContext.mints?.map(mint =>
@@ -330,15 +359,58 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
 
 
     return (
-        <Autocomplete
-            value={nameOrAddress}
-            onChange={setNameOrAddress}
-            label="Token Mint Address"
-            data={selectItems}
-            itemComponent={AutoCompleteItem}
-            filter={searchMatch}
-            description={description}
-            maxDropdownHeight={InlineStyles.MINT_SELECT.dropdownMaxHeightPixels}
-        />
+        <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "flex-end", gap: "0.5rem"}}>
+            <Autocomplete
+                value={nameOrAddress}
+                onChange={setNameOrAddress}
+                label="Token Mint Address"
+                data={selectItems}
+                itemComponent={AutoCompleteItem}
+                filter={searchMatch}
+                description={description}
+                maxDropdownHeight={InlineStyles.MINT_SELECT.dropdownMaxHeightPixels}
+            />
+            {(endpoint === "local") && <MakeMintAndFund onSuccess={mint => setNameOrAddress(mint.toBase58())} />}
+        </div>
+    );
+}
+
+
+function MakeMintAndFund(props: { onSuccess: (mint: PublicKey) => void }): JSX.Element {
+    const wallet = useAnchorWallet();
+    const { connection } = useConnection();
+    const { key: endpoint } = useEndpoint();
+    const [loading, setLoading] = useState<boolean>(false);
+    const disabled: boolean = useMemo(() => (
+        loading ||
+        (endpoint !== "local") ||
+        (wallet === undefined)
+    ), [endpoint, loading, wallet]);
+
+    const onClick: () => Promise<void> = useCallback(async () => {
+        if (wallet === undefined) return;
+        setLoading(true);
+        try {
+            const { mint } = await generateMintAndMintToWallet(wallet.publicKey, 100, connection);
+            props.onSuccess(mint.publicKey);
+            notifySuccess(
+                "Mint Success!",
+                `Made ${mint.publicKey.toBase58()} and minted 100 tokens to ${wallet.publicKey.toBase58()}`
+            );
+        } catch (e) {
+            notifyError("Mint Failed!", e as Error);
+            console.error(JSON.stringify(e, undefined, 2));
+
+        } finally {
+            setLoading(false);
+        }
+        setLoading(false);
+    }, [wallet, connection]);
+
+
+    return (
+        <Button onClick={ onClick } disabled={disabled}>
+            {loading ? <Loader/> : "+"}
+        </Button>
     );
 }

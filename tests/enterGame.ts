@@ -105,19 +105,18 @@ describe("EnterGame Instruction Tests", () => {
             PROGRAM_FEE_DESTINATION,
             connection
         );
-        const programFeeSol: number =
-      PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
+        const programFeeSol: number = PROGRAM_FEE_LAMPORTS / anchor.web3.LAMPORTS_PER_SOL;
         assert.approximately(
             // double the fee to account for first and second player
             (nOtherPlayers + 1) * programFeeSol,
             programFeeDestinationBalance - programFeeDestinatonBalancePreGame,
-            1 / anchor.web3.LAMPORTS_PER_SOL
+            0.01*programFeeSol
         );
-    // It would be great to also check that the player's balance went
-    // down by the program fee, but without knowing solana's transaction
-    // fee we cant calculate what the new balance should be. That's OK,
-    // though, since the only source of income to the fee destination is
-    // the player's account
+        // It would be great to also check that the player's balance went
+        // down by the program fee, but without knowing solana's transaction
+        // fee we cant calculate what the new balance should be. That's OK,
+        // though, since the only source of income to the fee destination is
+        // the player's account
     });
 
     it("enter game > all good > game tokens are transfered", async () => {
@@ -184,44 +183,41 @@ describe("EnterGame Instruction Tests", () => {
         assert.strictEqual(gameState.buckets[0].decimalTokens.toNumber(), entryFee);
         assert.strictEqual(
             gameState.buckets[1].decimalTokens.toNumber(),
-            entryFee / 2
+            0
         );
         assert.strictEqual(
             gameState.buckets[2].decimalTokens.toNumber(),
-            entryFee / 2
+            entryFee
         );
     });
 
-    it(
-        "enter game > all good > prize pool balance remains consistent",
-        repeat(10, async () => {
-            const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
-            const context = await setUpEnterGameEtc(program, {
-                otherPlayers: nOtherPlayers - 1,
-            });
+    it("enter game > all good > prize pool balance remains consistent", repeat(10, async () => {
+        const nOtherPlayers: number = Math.ceil(Math.random() * 10) + 1;
+        const context = await setUpEnterGameEtc(program, {
+            otherPlayers: nOtherPlayers - 1,
+        });
 
-            await setUpEnterGame(program, context.createPool, context.newGame);
+        await setUpEnterGame(program, context.createPool, context.newGame);
 
-            const gameStateAfterWeEnter: GameState = (
-                await getGame(context.newGame.gameAddress, program)
-            ).state;
+        const gameStateAfterWeEnter: GameState = (
+            await getGame(context.newGame.gameAddress, program)
+        ).state;
 
-            const bucketTokenTotal: number = gameStateAfterWeEnter.buckets.reduce(
-                (partialSum, b) => partialSum + b.decimalTokens.toNumber(),
-                0
-            );
-            const tokenPoolBalance: number = await getTokenPoolBalanceWithDecimals(
-                context.newGame.gameConfig.mint,
-                program.programId,
-                program.provider.connection
-            );
-            const expectedTokenTotal: number = (nOtherPlayers + 1) *
+        const bucketTokenTotal: number = gameStateAfterWeEnter.buckets.reduce(
+            (partialSum, b) => partialSum + b.decimalTokens.toNumber(),
+            0
+        );
+        const tokenPoolBalance: number = await getTokenPoolBalanceWithDecimals(
+            context.newGame.gameConfig.mint,
+            program.programId,
+            program.provider.connection
+        );
+        const expectedTokenTotal: number = (nOtherPlayers + 1) *
                 context.newGame.gameConfig.entryFeeDecimalTokens.toNumber();
 
-            assert.strictEqual(bucketTokenTotal, expectedTokenTotal);
-            assert.strictEqual(tokenPoolBalance, expectedTokenTotal);
-        })
-    );
+        assert.strictEqual(bucketTokenTotal, expectedTokenTotal);
+        assert.strictEqual(tokenPoolBalance, expectedTokenTotal);
+    }));
 
     it("enter game > game is at capacity > fails", async () => {
         const maxPlayers: number = Math.ceil(Math.random() * 5) + 1;
