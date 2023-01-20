@@ -169,7 +169,11 @@ export function HudBoring(): JSX.Element {
                             console.error(result.error);
 
                         } else if (signature !== undefined) {
-                            const winnings: number | undefined = await tryToEstimateWinnings(signature, connection);
+                            const winnings: number | undefined = await tryToEstimateWinnings(
+                                player,
+                                signature,
+                                connection
+                            );
                             const log: string = winnings === undefined ?
                                 themed("Left the game", "Escaped the system.") :
                                 themed(
@@ -398,6 +402,7 @@ function BucketButton(props: BucketButtonProps): JSX.Element {
 
 
 async function tryToEstimateWinnings(
+    player: PublicKey,
     transactionSignature: string,
     connection: Connection
 ): Promise<number | undefined> {
@@ -407,25 +412,32 @@ async function tryToEstimateWinnings(
         commitment: "confirmed",
         maxSupportedTransactionVersion: 10
     });
-    if ((transactionResponse?.meta?.preTokenBalances != null)
-        && (transactionResponse?.meta?.postTokenBalances != null)
-    ) {
-        // for some reason the number will be set to null when it's zero, even though
-        // the text versions show it as zero
-        const poolBalanceBefore: number = transactionResponse.meta
-            .preTokenBalances[0]
-            .uiTokenAmount
-            .uiAmount ?? 0;
+    const playerAddress: string = player.toBase58();
 
-        const poolBalanceAfter: number = transactionResponse.meta
-            .postTokenBalances[0]
-            .uiTokenAmount
-            .uiAmount ?? 0;
+    const canSearchBefore: boolean = transactionResponse?.meta?.preTokenBalances != null;
+    const canSearchAfter: boolean = transactionResponse?.meta?.postTokenBalances != null;
+    if (canSearchBefore && canSearchAfter) {
+        // for games where the player's token account isnt closed when they leave (most tokens)
+        // @ts-ignore already verified
+        let metaBefore = transactionResponse.meta.preTokenBalances.find(b => b.owner === playerAddress);
+        // @ts-ignore already verified
+        let metaAfter = transactionResponse.meta.postTokenBalances.find(b => b.owner === playerAddress);
+        if ((metaBefore != null) && (metaAfter != null)) {
+            // for some reason the number will be set to null when it's zero, even though
+            // the text versions show it as zero
+            const playerBalanceBefore: number = metaBefore.uiTokenAmount.uiAmount ?? 0;
+            const playerBalanceAfter: number = metaAfter.uiTokenAmount.uiAmount ?? 0;
+            winnings = playerBalanceAfter - playerBalanceBefore;
+        }
 
-        if ((poolBalanceBefore !== null) && (poolBalanceAfter !== null)) {
-            // I know this looks backwards, but the account being queried is the token pool
-            // of the program (or at least I think it is), so we're looking for the loss
-            // of tokens to find out what's going to the player
+        // for games where the player's token account is closed when they leave (wrapped SOL)
+        if ((winnings === undefined)) {
+            // @ts-ignore already verified
+            metaBefore = transactionResponse.meta.preTokenBalances[0];
+            // @ts-ignore already verified
+            metaAfter = transactionResponse.meta.postTokenBalances[0];
+            const poolBalanceBefore: number = metaBefore.uiTokenAmount.uiAmount ?? 0;
+            const poolBalanceAfter: number = metaAfter.uiTokenAmount.uiAmount ?? 0;
             winnings = poolBalanceBefore - poolBalanceAfter;
         }
     }
