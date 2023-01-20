@@ -301,7 +301,7 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
     const [nameOrAddress, setNameOrAddress] = useState<string>(NATIVE_MINT.toBase58());
     const [lastValidMintAddress, setLastValidMintAddress] = useState<string | undefined>();
     const mintListContext = useMintList();
-    const { isProd: endpointIsProd } = useEndpoint();
+    const { key: endpoint } = useEndpoint();
 
     const selectItems: AutoCompleteItemProps[] = useMemo(() =>
         mintListContext.mints?.map(mint =>
@@ -370,7 +370,7 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
                 description={description}
                 maxDropdownHeight={InlineStyles.MINT_SELECT.dropdownMaxHeightPixels}
             />
-            {!endpointIsProd && <MakeMintAndFund onSuccess={mint => setNameOrAddress(mint.toBase58())} />}
+            {(endpoint === "local") && <MakeMintAndFund onSuccess={mint => setNameOrAddress(mint.toBase58())} />}
         </div>
     );
 }
