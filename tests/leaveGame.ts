@@ -44,7 +44,7 @@ import {
 } from "./createPool";
 import { setUpMoveBuckets } from "./moveBuckets";
 
-describe.only("LeaveGame Instruction Tests", () => {
+describe("LeaveGame Instruction Tests", () => {
     anchor.setProvider(anchor.AnchorProvider.env());
     // eslint-disable-next-line import/namespace
     const program = anchor.workspace.Equilibrate as anchor.Program<Equilibrate>;

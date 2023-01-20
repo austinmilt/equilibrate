@@ -379,7 +379,7 @@ export function Hud(): JSX.Element {
                                 (playerPenalty > 0) && (
                                     <Text
                                         size="xl"
-                                        title="Amount of your winnings that will be burned due to moving buckets."
+                                        title="Amount of your winnings that will be burned due to moving your ship."
                                     >
                                         (🔥{playerPenaltyString})
                                     </Text>
