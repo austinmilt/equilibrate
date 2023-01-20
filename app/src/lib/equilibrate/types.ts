@@ -14,12 +14,12 @@ export interface GameWithEnrichedConfig extends Game {
 
 
 export interface Game {
-    // since v0.2.0
-    version: number;
     id: anchor.BN;
     creator: PublicKey;
     config: GameConfig;
     state: GameState;
+    // since v0.2.0
+    version: number;
 }
 
 
@@ -69,15 +69,15 @@ export interface PlayerStateEnriched extends PlayerState {
 
 
 export interface PlayerState {
-    // since v0.2.0
-    version: number;
     bucket: number;
     burnPenaltyDecimalTokens: anchor.BN;
+    // since v0.2.0
+    version: number;
 }
 
 
 export interface PoolManager {
+    bump: number;
     // since v0.2.0
     version: number;
-    bump: number;
 }
