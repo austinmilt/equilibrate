@@ -1,5 +1,5 @@
 export type Equilibrate = {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "equilibrate",
   "instructions": [
     {
@@ -376,6 +376,18 @@ export type Equilibrate = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "publicKey"
+          },
+          {
             "name": "config",
             "type": {
               "defined": "GameConfig"
@@ -386,14 +398,6 @@ export type Equilibrate = {
             "type": {
               "defined": "GameState"
             }
-          },
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "creator",
-            "type": "publicKey"
           }
         ]
       }
@@ -403,6 +407,10 @@ export type Equilibrate = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "bucket",
             "type": "u8"
@@ -626,7 +634,7 @@ export type Equilibrate = {
 };
 
 export const IDL: Equilibrate = {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "equilibrate",
   "instructions": [
     {
@@ -1003,6 +1011,18 @@ export const IDL: Equilibrate = {
         "kind": "struct",
         "fields": [
           {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "type": "publicKey"
+          },
+          {
             "name": "config",
             "type": {
               "defined": "GameConfig"
@@ -1013,14 +1033,6 @@ export const IDL: Equilibrate = {
             "type": {
               "defined": "GameState"
             }
-          },
-          {
-            "name": "id",
-            "type": "u64"
-          },
-          {
-            "name": "creator",
-            "type": "publicKey"
           }
         ]
       }
@@ -1030,6 +1042,10 @@ export const IDL: Equilibrate = {
       "type": {
         "kind": "struct",
         "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
           {
             "name": "bucket",
             "type": "u8"

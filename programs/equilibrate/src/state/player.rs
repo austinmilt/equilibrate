@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(Debug, Copy, PartialEq)]
 pub struct PlayerState {
+    pub version: u8,
     pub bucket: u8,
     pub burn_penalty_decimal_tokens: u64,
 }
@@ -10,6 +11,7 @@ pub struct PlayerState {
 impl PlayerState {
     pub fn get_space() -> usize {
         8 + // account discriminator
+        1 + // version
         1 + // bucket
         8 // burn_penalty_decimal_tokens
     }

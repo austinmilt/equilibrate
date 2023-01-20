@@ -20,3 +20,4 @@ export const GAME_MAX_PLAYERS_MAX: number = 10000;
 export const GAME_MAX_PLAYERS_MIN: number = 2;
 export const PLAYER_BUCKET_INDEX_MIN: number = 1;
 export const PROGRAM_ERROR_ABORT_LEAVE_ON_LOSS: string = "AbortLeaveOnLoss";
+export const ACCOUNTS_VERSION: number = 1; // needs to match what's in the program constants

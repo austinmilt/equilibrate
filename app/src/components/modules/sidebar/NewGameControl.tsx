@@ -237,7 +237,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
                         label={
                             <Text>
                                 { themed("Player Move Burn Penalty", "Hydrogen Burn Rate") }<br/>
-                                { mintIsNative ? ("cannot burn native tokens") : "(% of entry fee each move)"}
+                                { mintIsNative ? "(cannot burn native tokens)" : "(% of entry fee each move)"}
                             </Text>
                         }
                         onChange={setBurnRatePercent}

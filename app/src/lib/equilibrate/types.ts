@@ -14,10 +14,12 @@ export interface GameWithEnrichedConfig extends Game {
 
 
 export interface Game {
-  config: GameConfig;
-  state: GameState;
-  id: anchor.BN;
-  creator: PublicKey;
+    // since v0.2.0
+    version: number;
+    id: anchor.BN;
+    creator: PublicKey;
+    config: GameConfig;
+    state: GameState;
 }
 
 
@@ -32,6 +34,7 @@ export interface GameConfig {
     spillRateDecimalTokensPerSecondPerPlayer: anchor.BN;
     nBuckets: number;
     maxPlayers: number;
+    // since v0.2.0
     burnRateDecimalTokensPerMove: anchor.BN;
 }
 
@@ -66,11 +69,15 @@ export interface PlayerStateEnriched extends PlayerState {
 
 
 export interface PlayerState {
+    // since v0.2.0
+    version: number;
     bucket: number;
     burnPenaltyDecimalTokens: anchor.BN;
 }
 
 
 export interface PoolManager {
+    // since v0.2.0
+    version: number;
     bump: number;
 }

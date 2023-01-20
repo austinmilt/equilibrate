@@ -2,7 +2,6 @@ import {
     Group,
     Text,
     ScrollArea,
-    Center
 } from "@mantine/core";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo, useState } from "react";

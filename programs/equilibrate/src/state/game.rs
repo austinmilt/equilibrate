@@ -5,19 +5,21 @@ use anchor_lang::prelude::*;
 #[account]
 #[derive(Debug, PartialEq)]
 pub struct Game {
-    pub config: GameConfig,
-    pub state: GameState,
+    pub version: u8,
     pub id: u64,
     pub creator: Pubkey,
+    pub config: GameConfig,
+    pub state: GameState,
 }
 
 impl Game {
     pub fn get_space(n_buckets_configured: u8) -> usize {
         8 + // account discriminator
-        GameConfig::get_space() +
-        GameState::get_space(n_buckets_configured) +
+        1 + // version
         8 + // id
-        32 // creator
+        32 + // creator
+        GameConfig::get_space() +
+        GameState::get_space(n_buckets_configured)
     }
 
     pub fn update_bucket_balances(&mut self, now_epoch_seconds: u64) {

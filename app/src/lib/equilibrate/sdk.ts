@@ -47,6 +47,7 @@ import { NATIVE_MINT } from "@solana/spl-token";
 import { AnchorError } from "@project-serum/anchor";
 import { SimpleCache } from "./cache";
 import { Duration } from "../shared/duration";
+import { mapGameAccountToCurrentVersion } from "./accounts";
 
 export interface SubmitTransactionFunction {
   (transaction: Transaction, connection: Connection): Promise<string>;
@@ -312,7 +313,10 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
 
         // get the mint decimals for all mints in all games
-        const gamesListRaw = await program.account.game.all();
+        const gamesListRaw = (await program.account.game.all()).map(g => ({
+            ...g,
+            account: mapGameAccountToCurrentVersion(g.account)
+        }));
         const mints: Set<PublicKey> = new Set<PublicKey>();
         const mintDecimals: Map<string, number> = new Map<string, number>();
         gamesListRaw.forEach(r => mints.add(r.account.config.mint));
@@ -459,7 +463,7 @@ export class EquilibrateSDK {
         const program: anchor.Program<Equilibrate> = this.program;
         return await this.gameCache.getOrFetch(
             address.toBase58(),
-            async () => (await program.account.game.fetch(address)) as Game
+            async () => mapGameAccountToCurrentVersion(await program.account.game.fetch(address))
         );
     }
 
