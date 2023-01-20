@@ -15,7 +15,7 @@ equilibrate = "Equi1uCecmsviNx18BnTiDDFrGoDFzoUsKHVu9btACaM"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "./kp.json"
 
 [scripts]
