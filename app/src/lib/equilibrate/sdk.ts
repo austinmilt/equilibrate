@@ -1559,7 +1559,10 @@ export class EquilibrateRequest {
         const transaction: Transaction = new Transaction();
         for (const step of this.steps) {
             try {
-                transaction.add(...(await step.buildInstructions()));
+                const instructions: TransactionInstruction[] = await step.buildInstructions();
+                if (instructions.length > 0) {
+                    transaction.add(...instructions);
+                }
 
             } catch (e) {
                 throw new Error(`Error while building instructions for '${step.name}'`, {cause: e});

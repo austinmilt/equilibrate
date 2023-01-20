@@ -4,7 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { forwardRef, useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { MintData, useMintList } from "../../../lib/shared/mint-list";
-import { Notifications } from "../../../lib/shared/notifications";
+import { Notifications, notifyError, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
 import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
@@ -14,6 +14,9 @@ import { useShipLogs } from "../hud/ShipLog";
 import styles from "./styles.module.css";
 import { SOLANA_MINT_NAME } from "../../../lib/shared/constants";
 import { themed } from "../../shared/theme";
+import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
+import { useEndpoint } from "../../../lib/solana/provider";
+import { generateMintAndMintToWallet } from "../../../dev/token";
 
 
 interface NewGameControlProps {
@@ -298,6 +301,7 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
     const [nameOrAddress, setNameOrAddress] = useState<string>(NATIVE_MINT.toBase58());
     const [lastValidMintAddress, setLastValidMintAddress] = useState<string | undefined>();
     const mintListContext = useMintList();
+    const { isProd: endpointIsProd } = useEndpoint();
 
     const selectItems: AutoCompleteItemProps[] = useMemo(() =>
         mintListContext.mints?.map(mint =>
@@ -355,15 +359,58 @@ function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Ele
 
 
     return (
-        <Autocomplete
-            value={nameOrAddress}
-            onChange={setNameOrAddress}
-            label="Token Mint Address"
-            data={selectItems}
-            itemComponent={AutoCompleteItem}
-            filter={searchMatch}
-            description={description}
-            maxDropdownHeight={InlineStyles.MINT_SELECT.dropdownMaxHeightPixels}
-        />
+        <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", alignItems: "flex-end", gap: "0.5rem"}}>
+            <Autocomplete
+                value={nameOrAddress}
+                onChange={setNameOrAddress}
+                label="Token Mint Address"
+                data={selectItems}
+                itemComponent={AutoCompleteItem}
+                filter={searchMatch}
+                description={description}
+                maxDropdownHeight={InlineStyles.MINT_SELECT.dropdownMaxHeightPixels}
+            />
+            {!endpointIsProd && <MakeMintAndFund onSuccess={mint => setNameOrAddress(mint.toBase58())} />}
+        </div>
+    );
+}
+
+
+function MakeMintAndFund(props: { onSuccess: (mint: PublicKey) => void }): JSX.Element {
+    const wallet = useAnchorWallet();
+    const { connection } = useConnection();
+    const { key: endpoint } = useEndpoint();
+    const [loading, setLoading] = useState<boolean>(false);
+    const disabled: boolean = useMemo(() => (
+        loading ||
+        (endpoint !== "local") ||
+        (wallet === undefined)
+    ), [endpoint, loading, wallet]);
+
+    const onClick: () => Promise<void> = useCallback(async () => {
+        if (wallet === undefined) return;
+        setLoading(true);
+        try {
+            const { mint } = await generateMintAndMintToWallet(wallet.publicKey, 100, connection);
+            props.onSuccess(mint.publicKey);
+            notifySuccess(
+                "Mint Success!",
+                `Made ${mint.publicKey.toBase58()} and minted 100 tokens to ${wallet.publicKey.toBase58()}`
+            );
+        } catch (e) {
+            notifyError("Mint Failed!", e as Error);
+            console.error(JSON.stringify(e, undefined, 2));
+
+        } finally {
+            setLoading(false);
+        }
+        setLoading(false);
+    }, [wallet, connection]);
+
+
+    return (
+        <Button onClick={ onClick } disabled={disabled}>
+            {loading ? <Loader/> : "+"}
+        </Button>
     );
 }
