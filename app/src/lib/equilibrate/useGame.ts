@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useEquilibrate } from "./provider";
 import { GameEvent, PlayerStateEvent, RequestResult } from "./sdk";
 import { GameEnriched } from "./types";
-import { Duration } from "../shared/duration";
 
 interface OnSuccessFunction {
     (result: RequestResult): void;

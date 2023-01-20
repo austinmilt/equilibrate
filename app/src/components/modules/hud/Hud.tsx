@@ -322,14 +322,36 @@ export function Hud(): JSX.Element {
     [cancelOnLoss]);
 
 
+    const mintDecimals: number | undefined = gameContext.game?.game?.config.mintDecimals ?? undefined;
+
+
+    const playerPenalty: number = useMemo(() => (
+        gameContext.player?.player?.burnPenaltyDecimalTokens?.toNumber() ?? 0
+    ), [gameContext.player, mintDecimals]);
+
+
+    const playerPenaltyString: string = useMemo(() => (
+        formatTokens(playerPenalty, mintDecimals)
+    ), [playerPenalty]);
+
+
     const playerApproximateWinnings: string | undefined = useMemo(() => {
-        let result: string | undefined;
+        let playerShare: number | undefined;
         const playerStar: StarData | undefined = activeGalaxyContext.playerStar.data;
-        if ((playerStar !== undefined) && (playerStar.satellites > 0)) {
-            result = formatTokens(playerStar.fuel / playerStar.satellites, gameContext.game?.game?.config.mintDecimals);
+        if ((activeGalaxyContext.stars != null) && (activeGalaxyContext.stars[0].satellites === 1)) {
+            playerShare = activeGalaxyContext.galaxy?.state.totalFuel ?? 0;
+
+        } else if ((playerStar !== undefined) && (playerStar.satellites > 0)) {
+            playerShare = playerStar.fuel / playerStar.satellites;
+        }
+
+        let result: string | undefined;
+        if (playerShare !== undefined) {
+            const resultNumber: number = Math.max(0, playerShare - playerPenalty);
+            result = formatTokens(resultNumber, mintDecimals);
         }
         return result;
-    }, [activeGalaxyContext.playerStar.data]);
+    }, [activeGalaxyContext.playerStar.data, playerPenalty]);
 
 
     return <div className={styles["hud"]}>
@@ -351,7 +373,18 @@ export function Hud(): JSX.Element {
                         "Your approximate winnings if you leave now."
                     )}>
                         <div>
-                            { playerApproximateWinnings && <MoneyIcon className={styles["winnings-icon"]}/> }
+                            <MoneyIcon className={styles["winnings-icon"]}/>
+                            <Text size="xl">{ playerApproximateWinnings }</Text>
+                            {
+                                (playerPenalty > 0) && (
+                                    <Text
+                                        size="xl"
+                                        title="Amount of your winnings that will be burned due to moving buckets."
+                                    >
+                                        (🔥{playerPenaltyString})
+                                    </Text>
+                                )
+                            }
                         </div>
                     </Tooltip>
                 </div>
