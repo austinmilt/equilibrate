@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { createContext, ReactNode, useContext, useState } from "react";
+
 export interface ActiveGameContextState {
     address: PublicKey | undefined;
     set: (address: PublicKey | undefined) => void;

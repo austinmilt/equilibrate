@@ -244,6 +244,7 @@ export class EquilibrateSDK {
     // we allow these to be undefined so that on startup we
     // dont have to deal with null checks
     private readonly program: anchor.Program<Equilibrate> | undefined;
+    private readonly player: PublicKey | undefined;
 
     private readonly games: Map<string, GameEnriched> = new Map<string, GameEnriched>();
     private readonly gameSubscriptions: Map<string, Subscription<GameEvent>> =
@@ -264,8 +265,9 @@ export class EquilibrateSDK {
     );
     private readonly gameCache: SimpleCache<string, Game> = SimpleCache.withTtl(Duration.ofMilliseconds(50));
 
-    private constructor(program: anchor.Program<Equilibrate> | undefined) {
+    private constructor(program: anchor.Program<Equilibrate> | undefined, player: PublicKey | undefined) {
         this.program = program;
+        this.player = player;
     }
 
 
@@ -274,16 +276,17 @@ export class EquilibrateSDK {
      * the user has signed in
      */
     public static dummy(): EquilibrateSDK {
-        return new EquilibrateSDK(undefined);
+        return new EquilibrateSDK(undefined, undefined);
     }
 
 
     /**
      * @param program game program
+     * @param player override player to use if not using the one from the program provider
      * @returns instantiated SDK ready to be used
      */
-    public static from(program: anchor.Program<Equilibrate>): EquilibrateSDK {
-        return new EquilibrateSDK(program);
+    public static from(program: anchor.Program<Equilibrate>, player?: PublicKey): EquilibrateSDK {
+        return new EquilibrateSDK(program, player);
     }
 
 
@@ -296,7 +299,7 @@ export class EquilibrateSDK {
 
 
     /**
-     * @param player optional player to use as the player rather than the one configured on the provider
+     * @param player optional player to use as the player rather than the one configured in the SDK
      * @returns a new request builder for a single request (multiple instructions) to the chain
      */
     public request(player?: PublicKey): EquilibrateRequest {
@@ -329,7 +332,7 @@ export class EquilibrateSDK {
         ));
 
         // figure out which games the user is playing
-        const player: PublicKey | undefined = program.provider.publicKey;
+        const player: PublicKey | undefined = this.getPlayer();
         const userIsPlaying: Map<string, boolean> = new Map<string, boolean>();
         if (player !== undefined) {
             await Promise.all(gamesListRaw.map(async (entry) => {
@@ -388,11 +391,12 @@ export class EquilibrateSDK {
      * @returns true if active player is playing this game
      */
     public async playerInGame(gameAddress: PublicKey, player?: PublicKey): Promise<boolean> {
+        player = this.getPlayer(player);
         Assert.notNullish(this.program, "program");
-        Assert.notNullish(this.program.provider.publicKey, "player");
+        Assert.notNullish(player, "player");
         const playerStateAddress: PublicKey = await getPlayerStateAddress(
             gameAddress,
-            player ?? this.program.provider.publicKey,
+            player,
             this.program.programId
         );
         const connection: Connection = this.program.provider.connection;
@@ -411,7 +415,7 @@ export class EquilibrateSDK {
     public async getPlayerState(gameAddress: PublicKey, player?: PublicKey): Promise<PlayerState | null> {
         Assert.notNullish(this.program, "program");
 
-        const targetPlayer: PublicKey | undefined = player ?? this.program.provider.publicKey;
+        const targetPlayer: PublicKey | undefined = this.getPlayer(player);
         Assert.notNullish(targetPlayer, "player");
 
         const playerStateAddress: PublicKey = await getPlayerStateAddress(
@@ -848,6 +852,11 @@ export class EquilibrateSDK {
             await this.program.provider.connection.removeAccountChangeListener(subscription.id);
             this.playerStateSubscriptions.delete(playerStateAddressString);
         }
+    }
+
+
+    private getPlayer(override?: PublicKey | undefined): PublicKey | undefined {
+        return override ?? (this.player ?? this.program?.provider.publicKey);
     }
 }
 
