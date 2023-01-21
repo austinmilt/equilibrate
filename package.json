@@ -4,7 +4,8 @@
     "build": "yarn --cwd app vite build",
     "deploy": "./app/deploy.sh",
     "preview": "yarn --cwd app vite preview",
-    "lint": "yarn --cwd app eslint"
+    "lint": "yarn --cwd app eslint",
+    "test": "anchor test --provider.cluster localnet"
   },
   "private": true,
   "workspaces": [

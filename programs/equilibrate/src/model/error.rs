@@ -73,4 +73,7 @@ pub enum EquilibrateError {
 
     #[msg("Player chose to abort leaving rather than lose tokens")]
     AbortLeaveOnLoss,
+
+    #[msg("Provided player must match the player in the player state")]
+    InvalidPlayer,
 }

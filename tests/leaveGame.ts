@@ -56,7 +56,7 @@ describe("LeaveGame Instruction Tests", () => {
             program.programId
         );
         const badGameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("a bad seed my dude"),
                     new anchor.BN(gameId).toArrayLike(Buffer, "le", 8),
@@ -100,7 +100,7 @@ describe("LeaveGame Instruction Tests", () => {
             program.programId
         );
         const badGameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(GAME_SEED),
                     new anchor.BN(gameId + 1).toArrayLike(Buffer, "le", 8),
@@ -142,13 +142,13 @@ describe("LeaveGame Instruction Tests", () => {
         );
     });
 
-    it("leave game > player - bad seed - seed > fails", async () => {
+    it("leave game > player state - bad seed - seed > fails", async () => {
         const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
             program
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("this player sucks"),
                     enterEtcContext.newGame.gameAddress.toBuffer(),
@@ -165,20 +165,20 @@ describe("LeaveGame Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
         );
     });
 
-    it("leave game > player - bad seed - game  > fails", async () => {
+    it("leave game > player state - bad seed - game  > fails", async () => {
         const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
             program
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     Keypair.generate().publicKey.toBuffer(),
@@ -195,20 +195,20 @@ describe("LeaveGame Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
         );
     });
 
-    it("leave game > player - bad seed - payer > fails", async () => {
+    it("leave game > player state - bad seed - player > fails", async () => {
         const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
             program
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     enterEtcContext.newGame.gameAddress.toBuffer(),
@@ -225,20 +225,20 @@ describe("LeaveGame Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
         );
     });
 
-    it("leave game > player - owner isnt program > fails", async () => {
+    it("leave game > player state - owner isnt program > fails", async () => {
         const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
             program
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     enterEtcContext.newGame.gameAddress.toBuffer(),
@@ -255,10 +255,30 @@ describe("LeaveGame Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
+        );
+    });
+
+    it("leave game > player - player doesnt match player_state.player > fails", async () => {
+        const enterEtcContext: EnterGameEtcContext = await setUpEnterGameEtc(
+            program
+        );
+
+        await assertAsyncThrows(() =>
+            setUpLeaveGame(
+                program,
+                enterEtcContext.createPool,
+                enterEtcContext.newGame,
+                enterEtcContext,
+                {
+                    payer: enterEtcContext.playerWallet,
+                    player: Keypair.generate().publicKey
+                }
+            ),
+        "ConstraintSeeds"
         );
     });
 
@@ -922,7 +942,7 @@ describe("LeaveGame Instruction Tests", () => {
 
         await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
             playerStateAddress: newGameContext.playerStateAddress,
-            playerWallet: newGameContext.playerWallet,
+            payer: newGameContext.playerWallet,
             newBucketIndex: 2
         }, true);
 
@@ -959,7 +979,7 @@ describe("LeaveGame Instruction Tests", () => {
 
         await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
             playerStateAddress: newGameContext.playerStateAddress,
-            playerWallet: newGameContext.playerWallet,
+            payer: newGameContext.playerWallet,
             newBucketIndex: 2
         }, true);
 
@@ -994,7 +1014,7 @@ describe("LeaveGame Instruction Tests", () => {
 
         await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
             playerStateAddress: newGameContext.playerStateAddress,
-            playerWallet: newGameContext.playerWallet,
+            payer: newGameContext.playerWallet,
             newBucketIndex: 2
         }, true);
 
@@ -1029,7 +1049,7 @@ describe("LeaveGame Instruction Tests", () => {
 
         await setUpMoveBuckets(program, newGameContext.createPool, newGameContext, undefined, {
             playerStateAddress: newGameContext.playerStateAddress,
-            playerWallet: newGameContext.playerWallet,
+            payer: newGameContext.playerWallet,
             newBucketIndex: 2
         }, true);
 
@@ -1059,8 +1079,9 @@ export interface LeaveGameEtcSetupArgs extends LeaveGameSetupArgs {
 export interface LeaveGameSetupArgs {
   gameAddress?: PublicKey;
   gameCreator?: PublicKey;
+  player?: PublicKey;
   playerStateAddress?: PublicKey;
-  playerWallet?: Keypair;
+  payer?: Keypair;
   playerTokenAccount?: PublicKey;
   tokenPoolAddress?: PublicKey;
   cancelOnLoss?: boolean
@@ -1128,13 +1149,24 @@ export async function setUpLeaveGame(
 ): Promise<LeaveGameContext> {
     if (!testIsReady()) throw new Error("not ready");
 
+    let player: PublicKey;
+    if (customSetup?.player) {
+        player = customSetup?.player;
+
+    } else if (customSetup?.payer) {
+        player = customSetup.payer.publicKey;
+
+    } else {
+        player = enterGameContext.playerWallet.publicKey;
+    }
+
     let playerStateAddress: PublicKey;
     if (customSetup?.playerStateAddress) {
         playerStateAddress = customSetup?.playerStateAddress;
-    } else if (customSetup?.playerWallet) {
+    } else if (customSetup?.payer) {
         playerStateAddress = await getPlayerStateAddress(
             newGameContext.gameAddress,
-            customSetup.playerWallet.publicKey,
+            customSetup.payer.publicKey,
             program.programId
         );
     } else {
@@ -1144,10 +1176,10 @@ export async function setUpLeaveGame(
     let playerTokenAccount: PublicKey;
     if (customSetup?.playerTokenAccount) {
         playerTokenAccount = customSetup.playerTokenAccount;
-    } else if (customSetup?.playerWallet) {
+    } else if (customSetup?.payer) {
         playerTokenAccount = await getAssociatedTokenAddress(
             createPoolContext.mint.publicKey,
-            customSetup?.playerWallet.publicKey
+            customSetup?.payer.publicKey
         );
     } else {
         playerTokenAccount = enterGameContext.playerTokenAccount;
@@ -1159,16 +1191,17 @@ export async function setUpLeaveGame(
             .accountsStrict({
                 game: customSetup?.gameAddress ?? newGameContext.gameAddress,
                 gameCreator: customSetup?.gameCreator ?? newGameContext.playerWallet.publicKey,
-                player: playerStateAddress,
+                player: player,
+                playerState: playerStateAddress,
                 winningsDestinationAccount: playerTokenAccount,
                 poolManager: createPoolContext.poolManagerAddress,
                 tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,
-                payer: customSetup?.playerWallet?.publicKey ?? enterGameContext.playerWallet.publicKey,
+                payer: customSetup?.payer?.publicKey ?? enterGameContext.playerWallet.publicKey,
                 tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
                 systemProgram: anchor.web3.SystemProgram.programId,
                 gameMint: newGameContext.gameConfig.mint
             })
-            .signers([customSetup?.playerWallet ?? enterGameContext.playerWallet])
+            .signers([customSetup?.payer ?? enterGameContext.playerWallet])
             .rpc();
     } catch (e) {
         if (debug) {

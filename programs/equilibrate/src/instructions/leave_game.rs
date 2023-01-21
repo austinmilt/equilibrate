@@ -35,22 +35,30 @@ pub struct LeaveGame<'info> {
     pub game_creator: AccountInfo<'info>,
 
     /// player state account of the leaving player; rent will be returned
-    /// to the payer (who must be the player)
+    /// to the player
     #[account(
         mut,
-        seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
+        seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), player.key().as_ref()],
         bump,
         owner = id(),
-        close = payer,
+        close = player,
     )]
-    pub player: Account<'info, PlayerState>,
+    pub player_state: Account<'info, PlayerState>,
+
+    /// CHECK: destination for player_state rent
+    #[account(
+        mut,
+        constraint = player.key() == player_state.player
+        @EquilibrateError::InvalidPlayer,
+    )]
+    pub player: AccountInfo<'info>,
 
     /// player's token acount to which their winnings are transferred;
-    /// owner/authority must be the payer
+    /// owner/authority must be the player
     #[account(
         mut,
         token::mint = game.config.mint,
-        token::authority = payer,
+        token::authority = player,
     )]
     pub winnings_destination_account: Account<'info, TokenAccount>,
 
@@ -65,7 +73,7 @@ pub struct LeaveGame<'info> {
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
-    /// transaction fee payer; receives rent of closed player account
+    /// transaction fee payer
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -101,7 +109,7 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
         winnings = game.state.buckets.iter().map(|b| b.decimal_tokens).sum();
     } else {
         game.update_bucket_balances(now_epoch_seconds.try_into().unwrap());
-        let i_current = ctx.accounts.player.bucket as usize;
+        let i_current = ctx.accounts.player_state.bucket as usize;
         winnings = game.state.buckets[i_current]
             .decimal_tokens
             .checked_div(game.state.buckets[i_current].players.into())
@@ -120,12 +128,12 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
 
     // adjust winnings for the burn penalty
     let decimal_tokens_to_burn: u64;
-    if ctx.accounts.player.burn_penalty_decimal_tokens > winnings {
+    if ctx.accounts.player_state.burn_penalty_decimal_tokens > winnings {
         decimal_tokens_to_burn = winnings;
         winnings = 0;
     } else {
-        decimal_tokens_to_burn = ctx.accounts.player.burn_penalty_decimal_tokens;
-        winnings -= ctx.accounts.player.burn_penalty_decimal_tokens;
+        decimal_tokens_to_burn = ctx.accounts.player_state.burn_penalty_decimal_tokens;
+        winnings -= ctx.accounts.player_state.burn_penalty_decimal_tokens;
     }
 
     if cancel_on_loss {
@@ -167,7 +175,7 @@ pub fn leave_game(ctx: Context<LeaveGame>, cancel_on_loss: bool) -> Result<()> {
         CpiContext::new_with_signer(token_program, winnings_transfer_accounts, signer);
     token::transfer(winnings_transfer_context, winnings)?;
 
-    ctx.accounts.player.log_leave(winnings);
+    ctx.accounts.player_state.log_leave(winnings);
 
     // close the game and return rent to the game creator
     if game_player_count == 1 {

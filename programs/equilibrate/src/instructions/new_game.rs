@@ -19,6 +19,7 @@ use crate::{
 #[derive(Accounts)]
 #[instruction(config: GameConfig, game_id: u64, pool_manager: Pubkey)]
 pub struct NewGame<'info> {
+    /// game account of the game being created
     #[account(
         init,
         payer = payer,
@@ -28,6 +29,7 @@ pub struct NewGame<'info> {
     )]
     pub game: Account<'info, Game>,
 
+    /// player state of the game creator and first player
     #[account(
         init,
         payer = payer,
@@ -35,7 +37,7 @@ pub struct NewGame<'info> {
         seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
         bump,
     )]
-    pub first_player: Account<'info, PlayerState>,
+    pub first_player_state: Account<'info, PlayerState>,
 
     /// CHECK: wallet where the program fee should be deposited
     #[account(
@@ -45,12 +47,14 @@ pub struct NewGame<'info> {
     )]
     pub program_fee_destination: AccountInfo<'info>,
 
+    /// token account from which the game's mint entry fee for this player comes from
     #[account(
         mut,
         token::mint = config.mint,
     )]
     pub deposit_source_account: Account<'info, TokenAccount>,
 
+    /// token account pool where player fees are deposited
     #[account(
         mut,
         token::mint = config.mint,
@@ -58,6 +62,7 @@ pub struct NewGame<'info> {
     )]
     pub token_pool: Account<'info, TokenAccount>,
 
+    /// payer and player
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -171,12 +176,13 @@ pub fn new_game(
     });
     game.log_make();
 
-    let player = &mut ctx.accounts.first_player;
+    let player = &mut ctx.accounts.first_player_state;
     player.set_inner(PlayerState {
         version: ACCOUNTS_VERSION,
         // first player always goes into the first bucket
         bucket: 1,
         burn_penalty_decimal_tokens: 0,
+        player: ctx.accounts.payer.key(),
     });
     player.log_make();
 

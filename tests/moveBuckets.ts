@@ -40,7 +40,7 @@ describe("MoveBuckets Instruction Tests", () => {
             program.programId
         );
         const badGameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("a bad seed my dude"),
                     new anchor.BN(gameId).toArrayLike(Buffer, "le", 8),
@@ -81,7 +81,7 @@ describe("MoveBuckets Instruction Tests", () => {
             program.programId
         );
         const badGameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(GAME_SEED),
                     new anchor.BN(gameId + 1).toArrayLike(Buffer, "le", 8),
@@ -119,7 +119,7 @@ describe("MoveBuckets Instruction Tests", () => {
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("this player sucks"),
                     enterEtcContext.newGame.gameAddress.toBuffer(),
@@ -136,7 +136,7 @@ describe("MoveBuckets Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
@@ -149,7 +149,7 @@ describe("MoveBuckets Instruction Tests", () => {
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     Keypair.generate().publicKey.toBuffer(),
@@ -166,7 +166,7 @@ describe("MoveBuckets Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
@@ -179,7 +179,7 @@ describe("MoveBuckets Instruction Tests", () => {
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     enterEtcContext.newGame.gameAddress.toBuffer(),
@@ -196,7 +196,7 @@ describe("MoveBuckets Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
@@ -209,7 +209,7 @@ describe("MoveBuckets Instruction Tests", () => {
         );
 
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     enterEtcContext.newGame.gameAddress.toBuffer(),
@@ -226,7 +226,7 @@ describe("MoveBuckets Instruction Tests", () => {
                 enterEtcContext.newGame,
                 enterEtcContext,
                 {
-                    playerWallet: enterEtcContext.playerWallet,
+                    payer: enterEtcContext.playerWallet,
                     playerStateAddress: badPlayerStateAddress,
                 }
             )
@@ -411,8 +411,9 @@ export interface MoveBucketsEtcSetupArgs extends MoveBucketsSetupArgs {
 
 export interface MoveBucketsSetupArgs {
   gameAddress?: PublicKey;
+  player?: PublicKey;
   playerStateAddress?: PublicKey;
-  playerWallet?: Keypair;
+  payer?: Keypair;
   newBucketIndex?: number;
 }
 
@@ -436,13 +437,24 @@ export async function setUpMoveBuckets(
 ): Promise<MoveBucketsContext> {
     if (!testIsReady()) throw new Error("not ready");
 
+    let player: PublicKey;
+    if (customSetup?.player) {
+        player = customSetup?.player;
+
+    } else if (customSetup?.payer) {
+        player = customSetup.payer.publicKey;
+
+    } else {
+        player = enterGameContext.playerWallet.publicKey;
+    }
+
     let playerStateAddress: PublicKey;
     if (customSetup?.playerStateAddress) {
         playerStateAddress = customSetup?.playerStateAddress;
-    } else if (customSetup?.playerWallet) {
+    } else if (customSetup?.payer) {
         playerStateAddress = await getPlayerStateAddress(
             newGameContext.gameAddress,
-            customSetup.playerWallet.publicKey,
+            customSetup.payer.publicKey,
             program.programId
         );
     } else if (enterGameContext?.playerStateAddress) {
@@ -473,16 +485,16 @@ export async function setUpMoveBuckets(
         }
     }
 
-    const playerWallet: Keypair = customSetup?.playerWallet ?? (
+    const playerWallet: Keypair = customSetup?.payer ?? (
         enterGameContext?.playerWallet ?? newGameContext.playerWallet
     );
 
     try {
         await program.methods
-            .moveBuckets(newBucketIndex)
+            .moveBuckets(player, newBucketIndex)
             .accountsStrict({
                 game: customSetup?.gameAddress ?? newGameContext.gameAddress,
-                player: playerStateAddress,
+                playerState: playerStateAddress,
                 payer: playerWallet.publicKey,
             })
             .signers([playerWallet])

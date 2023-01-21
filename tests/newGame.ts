@@ -29,7 +29,7 @@ import {
 } from "./helpers/address";
 import { assert } from "chai";
 import { assertAsyncThrows } from "./helpers/test";
-import { getAssociatedTokenAddress, NATIVE_MINT } from "@solana/spl-token";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { testIsReady } from "./setup";
 import {
     CreatePoolContext,
@@ -157,7 +157,7 @@ describe("NewGame Instruction Tests", () => {
     it("create a new game > game - bad seed - seed > fails", async () => {
         const gameId: number = generateGameId();
         const gameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("a bad seed my dude"),
                     new anchor.BN(gameId).toArrayLike(Buffer, "le", 8),
@@ -175,7 +175,7 @@ describe("NewGame Instruction Tests", () => {
         const gameId: number = generateGameId();
         const gameId2: number = gameId + 1;
         const gameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(GAME_SEED),
                     new anchor.BN(gameId2).toArrayLike(Buffer, "le", 8),
@@ -197,7 +197,7 @@ describe("NewGame Instruction Tests", () => {
             program.programId
         );
         const playerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("this player sucks"),
                     gameAddress.toBuffer(),
@@ -225,7 +225,7 @@ describe("NewGame Instruction Tests", () => {
             program.programId
         );
         const playerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     Keypair.generate().publicKey.toBuffer(),
@@ -253,7 +253,7 @@ describe("NewGame Instruction Tests", () => {
             program.programId
         );
         const playerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     gameAddress.toBuffer(),
@@ -590,7 +590,7 @@ export async function setUpNewGame(
             )
             .accountsStrict({
                 game: gameAddress,
-                firstPlayer: playerStateAddress,
+                firstPlayerState: playerStateAddress,
                 programFeeDestination: customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
                 depositSourceAccount: playerTokenAccount,
                 tokenPool: customSetup?.tokenPoolAddress ?? createPoolContext.tokenPoolAddress,

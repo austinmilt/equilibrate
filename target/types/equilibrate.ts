@@ -82,12 +82,18 @@ export type Equilibrate = {
         {
           "name": "game",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "game account of the game being created"
+          ]
         },
         {
-          "name": "firstPlayer",
+          "name": "firstPlayerState",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "player state of the game creator and first player"
+          ]
         },
         {
           "name": "programFeeDestination",
@@ -97,17 +103,26 @@ export type Equilibrate = {
         {
           "name": "depositSourceAccount",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "token account from which the game's mint entry fee for this player comes from"
+          ]
         },
         {
           "name": "tokenPool",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "token account pool where player fees are deposited"
+          ]
         },
         {
           "name": "payer",
           "isMut": true,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "payer and player"
+          ]
         },
         {
           "name": "associatedTokenProgram",
@@ -162,7 +177,7 @@ export type Equilibrate = {
           ]
         },
         {
-          "name": "player",
+          "name": "playerState",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -250,7 +265,7 @@ export type Equilibrate = {
           ]
         },
         {
-          "name": "player",
+          "name": "playerState",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -267,6 +282,10 @@ export type Equilibrate = {
         }
       ],
       "args": [
+        {
+          "name": "player",
+          "type": "publicKey"
+        },
         {
           "name": "bucket",
           "type": "u8"
@@ -302,13 +321,18 @@ export type Equilibrate = {
           "isSigner": false
         },
         {
-          "name": "player",
+          "name": "playerState",
           "isMut": true,
           "isSigner": false,
           "docs": [
             "player state account of the leaving player; rent will be returned",
-            "to the payer (who must be the player)"
+            "to the player"
           ]
+        },
+        {
+          "name": "player",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "winningsDestinationAccount",
@@ -316,7 +340,7 @@ export type Equilibrate = {
           "isSigner": false,
           "docs": [
             "player's token acount to which their winnings are transferred;",
-            "owner/authority must be the payer"
+            "owner/authority must be the player"
           ]
         },
         {
@@ -341,7 +365,7 @@ export type Equilibrate = {
           "isMut": true,
           "isSigner": true,
           "docs": [
-            "transaction fee payer; receives rent of closed player account"
+            "transaction fee payer"
           ]
         },
         {
@@ -418,6 +442,10 @@ export type Equilibrate = {
           {
             "name": "burnPenaltyDecimalTokens",
             "type": "u64"
+          },
+          {
+            "name": "player",
+            "type": "publicKey"
           }
         ]
       }
@@ -629,6 +657,11 @@ export type Equilibrate = {
       "code": 6023,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidPlayer",
+      "msg": "Provided player must match the player in the player state"
     }
   ]
 };
@@ -717,12 +750,18 @@ export const IDL: Equilibrate = {
         {
           "name": "game",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "game account of the game being created"
+          ]
         },
         {
-          "name": "firstPlayer",
+          "name": "firstPlayerState",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "player state of the game creator and first player"
+          ]
         },
         {
           "name": "programFeeDestination",
@@ -732,17 +771,26 @@ export const IDL: Equilibrate = {
         {
           "name": "depositSourceAccount",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "token account from which the game's mint entry fee for this player comes from"
+          ]
         },
         {
           "name": "tokenPool",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "docs": [
+            "token account pool where player fees are deposited"
+          ]
         },
         {
           "name": "payer",
           "isMut": true,
-          "isSigner": true
+          "isSigner": true,
+          "docs": [
+            "payer and player"
+          ]
         },
         {
           "name": "associatedTokenProgram",
@@ -797,7 +845,7 @@ export const IDL: Equilibrate = {
           ]
         },
         {
-          "name": "player",
+          "name": "playerState",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -885,7 +933,7 @@ export const IDL: Equilibrate = {
           ]
         },
         {
-          "name": "player",
+          "name": "playerState",
           "isMut": true,
           "isSigner": false,
           "docs": [
@@ -902,6 +950,10 @@ export const IDL: Equilibrate = {
         }
       ],
       "args": [
+        {
+          "name": "player",
+          "type": "publicKey"
+        },
         {
           "name": "bucket",
           "type": "u8"
@@ -937,13 +989,18 @@ export const IDL: Equilibrate = {
           "isSigner": false
         },
         {
-          "name": "player",
+          "name": "playerState",
           "isMut": true,
           "isSigner": false,
           "docs": [
             "player state account of the leaving player; rent will be returned",
-            "to the payer (who must be the player)"
+            "to the player"
           ]
+        },
+        {
+          "name": "player",
+          "isMut": true,
+          "isSigner": false
         },
         {
           "name": "winningsDestinationAccount",
@@ -951,7 +1008,7 @@ export const IDL: Equilibrate = {
           "isSigner": false,
           "docs": [
             "player's token acount to which their winnings are transferred;",
-            "owner/authority must be the payer"
+            "owner/authority must be the player"
           ]
         },
         {
@@ -976,7 +1033,7 @@ export const IDL: Equilibrate = {
           "isMut": true,
           "isSigner": true,
           "docs": [
-            "transaction fee payer; receives rent of closed player account"
+            "transaction fee payer"
           ]
         },
         {
@@ -1053,6 +1110,10 @@ export const IDL: Equilibrate = {
           {
             "name": "burnPenaltyDecimalTokens",
             "type": "u64"
+          },
+          {
+            "name": "player",
+            "type": "publicKey"
           }
         ]
       }
@@ -1264,6 +1325,11 @@ export const IDL: Equilibrate = {
       "code": 6023,
       "name": "AbortLeaveOnLoss",
       "msg": "Player chose to abort leaving rather than lose tokens"
+    },
+    {
+      "code": 6024,
+      "name": "InvalidPlayer",
+      "msg": "Provided player must match the player in the player state"
     }
   ]
 };

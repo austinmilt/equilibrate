@@ -6,6 +6,7 @@ pub struct PlayerState {
     pub version: u8,
     pub bucket: u8,
     pub burn_penalty_decimal_tokens: u64,
+    pub player: Pubkey,
 }
 
 impl PlayerState {
@@ -13,7 +14,8 @@ impl PlayerState {
         8 + // account discriminator
         1 + // version
         1 + // bucket
-        8 // burn_penalty_decimal_tokens
+        8 + // burn_penalty_decimal_tokens
+        32 // player
     }
 
     pub fn log_make(&self) {

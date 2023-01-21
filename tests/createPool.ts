@@ -90,7 +90,7 @@ describe("CreatePool Instruction Tests", () => {
         const authority: Keypair = await makeAndFundWallet(5, connection);
         const mint: Keypair = await generateMint(authority, connection);
         const poolManagerAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("a bad seed my dude"),
                     mint.publicKey.toBuffer(),
@@ -113,7 +113,7 @@ describe("CreatePool Instruction Tests", () => {
         const authority: Keypair = await makeAndFundWallet(5, connection);
         const mint: Keypair = await generateMint(authority, connection);
         const poolManagerAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(POOL_MANAGER_SEED),
                     (await generateMint(authority, connection)).publicKey.toBuffer(),
@@ -137,7 +137,7 @@ describe("CreatePool Instruction Tests", () => {
         const mint: Keypair = await generateMint(authority, connection);
         const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
         const tokenPoolAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("a bad seed my dude"),
                     mint.publicKey.toBuffer(),
@@ -164,7 +164,7 @@ describe("CreatePool Instruction Tests", () => {
         const mint: Keypair = await generateMint(authority, connection);
         const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
         const tokenPoolAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(POOL_SEED),
                     (await generateMint(await makeAndFundWallet(1, connection), connection)).publicKey.toBuffer(),
@@ -191,7 +191,7 @@ describe("CreatePool Instruction Tests", () => {
         const mint: Keypair = await generateMint(authority, connection);
         const [poolManagerAddress, poolManagerBump] = await getPoolManagerAddress(mint.publicKey, program.programId);
         const tokenPoolAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(POOL_SEED),
                     mint.publicKey.toBuffer(),

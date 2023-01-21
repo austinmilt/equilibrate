@@ -36,7 +36,7 @@ pub mod equilibrate {
 
     /// Moves the player from one bucket into another. Trying to move into the same
     /// bucket the player is already in will result in a failure.
-    pub fn move_buckets(ctx: Context<MoveBuckets>, bucket: u8) -> Result<()> {
+    pub fn move_buckets(ctx: Context<MoveBuckets>, _player: Pubkey, bucket: u8) -> Result<()> {
         instructions::move_buckets(ctx, bucket)
     }
 

@@ -30,7 +30,7 @@ pub struct EnterGame<'info> {
         bump,
         owner = id(),
     )]
-    pub player: Account<'info, PlayerState>,
+    pub player_state: Account<'info, PlayerState>,
 
     /// CHECK: wallet where the program fee should be deposited
     #[account(
@@ -133,11 +133,12 @@ pub fn enter_game(ctx: Context<EnterGame>, i_bucket: u8, pool_manager: Pubkey) -
     game.state.last_update_epoch_seconds = now_epoch_seconds;
 
     // create player state account
-    let player = &mut ctx.accounts.player;
+    let player = &mut ctx.accounts.player_state;
     player.set_inner(PlayerState {
         version: ACCOUNTS_VERSION,
         bucket: i_bucket,
         burn_penalty_decimal_tokens: 0,
+        player: ctx.accounts.payer.key(),
     });
     player.log_make();
 

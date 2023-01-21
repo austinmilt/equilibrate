@@ -8,6 +8,7 @@ use crate::{
 };
 
 #[derive(Accounts)]
+#[instruction(player: Pubkey)]
 pub struct MoveBuckets<'info> {
     /// game account of the game being played
     #[account(
@@ -20,11 +21,11 @@ pub struct MoveBuckets<'info> {
     /// player state account of the moving player
     #[account(
         mut,
-        seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), payer.key().as_ref()],
+        seeds = [PLAYER_SEED.as_ref(), game.key().as_ref(), player.as_ref()],
         bump,
         owner = id()
     )]
-    pub player: Account<'info, PlayerState>,
+    pub player_state: Account<'info, PlayerState>,
 
     /// payer for paying moving transaction fee
     #[account(mut)]
@@ -36,7 +37,7 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u8) -> Result<()> {
 
     // check constraints
     require_neq!(
-        ctx.accounts.player.bucket,
+        ctx.accounts.player_state.bucket,
         i_bucket,
         EquilibrateError::AlreadyInBucket
     );
@@ -56,7 +57,7 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u8) -> Result<()> {
 
     // update bucket balances and move player to their new bucket
     game.update_bucket_balances(now_epoch_seconds.try_into().unwrap());
-    let i_current = ctx.accounts.player.bucket as usize;
+    let i_current = ctx.accounts.player_state.bucket as usize;
     game.state.buckets[i_current].players = game.state.buckets[i_current]
         .players
         .checked_sub(1)
@@ -68,14 +69,14 @@ pub fn move_buckets(ctx: Context<MoveBuckets>, i_bucket: u8) -> Result<()> {
     game.state.last_update_epoch_seconds = now_epoch_seconds;
 
     // update player state account
-    ctx.accounts.player.bucket = i_bucket;
-    ctx.accounts.player.burn_penalty_decimal_tokens = ctx
+    ctx.accounts.player_state.bucket = i_bucket;
+    ctx.accounts.player_state.burn_penalty_decimal_tokens = ctx
         .accounts
-        .player
+        .player_state
         .burn_penalty_decimal_tokens
         .checked_add(game.config.burn_rate_decimal_tokens_per_move)
         .unwrap();
-    ctx.accounts.player.log_move();
+    ctx.accounts.player_state.log_move();
 
     Ok(())
 }

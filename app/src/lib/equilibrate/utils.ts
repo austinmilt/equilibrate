@@ -7,7 +7,7 @@ export async function getGameAddress(
     gameId: number,
     programId: PublicKey
 ): Promise<PublicKey> {
-    return (await PublicKey.findProgramAddress(
+    return (PublicKey.findProgramAddressSync(
         [
             anchor.utils.bytes.utf8.encode(GAME_SEED),
             new anchor.BN(gameId).toArrayLike(Buffer, "le", 8),
@@ -22,7 +22,7 @@ export async function getPlayerStateAddress(
     player: PublicKey,
     programId: PublicKey
 ): Promise<PublicKey> {
-    return (await PublicKey.findProgramAddress(
+    return (PublicKey.findProgramAddressSync(
         [
             anchor.utils.bytes.utf8.encode(PLAYER_SEED),
             game.toBuffer(),
@@ -37,7 +37,7 @@ export async function getTokenPoolAddress(
     mint: PublicKey,
     programId: PublicKey
 ): Promise<PublicKey> {
-    return (await PublicKey.findProgramAddress(
+    return (PublicKey.findProgramAddressSync(
         [
             anchor.utils.bytes.utf8.encode(POOL_SEED),
             mint.toBuffer(),
@@ -52,7 +52,7 @@ export async function getPoolManagerAddress(
     mint: PublicKey,
     programId: PublicKey
 ): Promise<[PublicKey, number]> {
-    return (await PublicKey.findProgramAddress(
+    return (PublicKey.findProgramAddressSync(
         [
             anchor.utils.bytes.utf8.encode(POOL_MANAGER_SEED),
             mint.toBuffer(),

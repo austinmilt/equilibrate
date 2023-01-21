@@ -242,7 +242,7 @@ describe("EnterGame Instruction Tests", () => {
             program.programId
         );
         const badGameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("a bad seed my dude"),
                     new anchor.BN(gameId).toArrayLike(Buffer, "le", 8),
@@ -276,7 +276,7 @@ describe("EnterGame Instruction Tests", () => {
             program.programId
         );
         const badGameAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(GAME_SEED),
                     new anchor.BN(gameId + 1).toArrayLike(Buffer, "le", 8),
@@ -306,7 +306,7 @@ describe("EnterGame Instruction Tests", () => {
             program.provider.connection
         );
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode("this player sucks"),
                     newGameContext.gameAddress.toBuffer(),
@@ -332,7 +332,7 @@ describe("EnterGame Instruction Tests", () => {
             program.provider.connection
         );
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     Keypair.generate().publicKey.toBuffer(),
@@ -358,7 +358,7 @@ describe("EnterGame Instruction Tests", () => {
             program.provider.connection
         );
         const badPlayerStateAddress: PublicKey = (
-            await PublicKey.findProgramAddress(
+            PublicKey.findProgramAddressSync(
                 [
                     anchor.utils.bytes.utf8.encode(PLAYER_SEED),
                     newGameContext.gameAddress.toBuffer(),
@@ -656,7 +656,7 @@ export async function setUpEnterGame(
                 .enterGame(bucketIndex, createPoolContext.poolManagerAddress)
                 .accountsStrict({
                     game: customSetup?.gameAddress ?? newGameContext.gameAddress,
-                    player: playerStateAddress,
+                    playerState: playerStateAddress,
                     programFeeDestination:
             customSetup?.programFeeDestination ?? PROGRAM_FEE_DESTINATION,
                     depositSourceAccount: playerTokenAccount,
