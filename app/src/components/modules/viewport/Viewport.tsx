@@ -1,8 +1,8 @@
 import { RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Stage, Layer, Text } from "react-konva";
 import Konva from "konva";
-import { ActiveGalaxyProvider } from "../../shared/galaxy/provider";
-import { useActiveGame } from "../../shared/game/provider";
+import { ActiveGalaxyProvider } from "../../shared/providers/galaxy";
+import { useActiveGame } from "../../shared/providers/game";
 import { Hud } from "../hud/Hud";
 import { Galaxy } from "./Galaxy";
 import styles from "./styles.module.css";

@@ -1,4 +1,4 @@
-import { ActiveGalaxyProvider } from "../../shared/galaxy/provider";
+import { ActiveGalaxyProvider } from "../../shared/providers/galaxy";
 import { GalaxyBoring } from "./GalaxyBoring";
 import styles from "./styles.module.css";
 import { useRef, useMemo, RefObject, useState, useCallback, useEffect } from "react";

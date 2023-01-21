@@ -2,13 +2,13 @@ import { MantineProvider } from "@mantine/core";
 import { NotificationsProvider } from "@mantine/notifications";
 import { EquilibrateProgramProvider } from "../../../lib/equilibrate/provider";
 import { EndpointProvider, SolanaProvider } from "../../../lib/solana/provider";
-import { ActiveGameProvider } from "../../shared/game/provider";
+import { ActiveGameProvider } from "../../shared/providers/game";
 import { Sidebar } from "../sidebar/Sidebar";
 import { ViewportBoring } from "../viewport/ViewportBoring";
 import { WelcomeModal } from "./WelcomeModal";
 import styles from "./styles.module.css";
 import "./root.css";
-import { StartupProvider } from "../../shared/startup/provider";
+import { StartupProvider } from "../../shared/providers/startup";
 import { Viewport } from "../viewport/Viewport";
 import { Themed } from "../../shared/theme";
 

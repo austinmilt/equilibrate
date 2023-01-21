@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEquilibrate } from "../../../lib/equilibrate/provider";
 import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types";
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
-import { useActiveGame } from "../../shared/game/provider";
+import { useActiveGame } from "../../shared/providers/game";
 import { useInterval } from "../../../lib/shared/useInterval";
 import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";

@@ -3,7 +3,7 @@ import { Bucket, BucketEnriched, GameEnriched } from "../../../lib/equilibrate/t
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { VIEWPORT_UPDATE_INTERVAL_MS } from "../../../lib/shared/constants";
 import { useInterval } from "../../../lib/shared/useInterval";
-import { ActiveGameContextState, useActiveGame } from "../game/provider";
+import { ActiveGameContextState, useActiveGame } from "./game";
 
 export interface StarData {
     fuel: number; // equivalent to bucket balance

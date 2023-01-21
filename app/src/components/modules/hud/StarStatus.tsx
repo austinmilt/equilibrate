@@ -1,11 +1,11 @@
 import { RingProgress, Center, Text, Image } from "@mantine/core";
 import { useMemo } from "react";
 import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
-import { StarData } from "../../shared/galaxy/provider";
+import { StarData } from "../../shared/providers/galaxy";
 import { InlineStyles } from "../../shared/inline-styles";
 import styles from "./styles.module.css";
 import { useGame } from "../../../lib/equilibrate/useGame";
-import { useActiveGame } from "../../shared/game/provider";
+import { useActiveGame } from "../../shared/providers/game";
 import { GameConfigEnriched } from "../../../lib/equilibrate/types";
 import HydrogenIcon from "./hydrogen-icon.svg";
 import { MoneyIcon } from "../../shared/icons/MoneyIcon";

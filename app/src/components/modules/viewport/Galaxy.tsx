@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Group } from "react-konva";
-import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/galaxy/provider";
+import { ActiveGalaxyContextState, useActiveGalaxy } from "../../shared/providers/galaxy";
 import { Satellite } from "./Satellite";
 import { Star } from "./Star";
 import { useComputedStarProps } from "./useComputedStarProps";

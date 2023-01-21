@@ -1,8 +1,8 @@
 import { Tooltip, Text, Center, Loader } from "@mantine/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GameContext, useGame, UseGameError, UseGameErrorCode } from "../../../lib/equilibrate/useGame";
-import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
-import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
+import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/providers/galaxy";
+import { ActiveGameContextState, useActiveGame } from "../../shared/providers/game";
 import { ShipLog, useCleanShipLogs, useShipLogs } from "./ShipLog";
 import { Notifications, notifyError, notifyPotentialBug, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";

@@ -7,7 +7,7 @@ import { MintData, useMintList } from "../../../lib/shared/mint-list";
 import { Notifications, notifyError, notifySuccess } from "../../../lib/shared/notifications";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
-import { ActiveGameContextState, useActiveGame } from "../../shared/game/provider";
+import { ActiveGameContextState, useActiveGame } from "../../shared/providers/game";
 import { InlineStyles } from "../../shared/inline-styles";
 import { Button } from "../../shared/model/button";
 import { useShipLogs } from "../hud/ShipLog";

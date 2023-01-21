@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/galaxy/provider";
+import { ActiveGalaxyContextState, StarData, useActiveGalaxy } from "../../shared/providers/galaxy";
 import styles from "./styles.module.css";
 import { InlineStyles } from "../../shared/inline-styles";
 

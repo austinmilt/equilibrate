@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { StarData, GalaxyConstants } from "../../shared/galaxy/provider";
+import { StarData, GalaxyConstants } from "../../shared/providers/galaxy";
 import { GalaxyProps } from "./Galaxy";
 
 export interface StarProps {
