@@ -1140,7 +1140,7 @@ export class EquilibrateRequest {
                     rent: RENT_SYSVAR,
                     systemProgram: SYSTEM_PROGRAM_ID,
                     game: gameAddress,
-                    firstPlayer: playerStateAddress,
+                    firstPlayerState: playerStateAddress,
                     programFeeDestination: PROGRAM_FEE_DESTINATION,
                     depositSourceAccount: playerTokenAccount,
                     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID
@@ -1341,7 +1341,7 @@ export class EquilibrateRequest {
                     tokenProgram: TOKEN_PROGRAM_ID,
                     systemProgram: SYSTEM_PROGRAM_ID,
                     rent: RENT_SYSVAR,
-                    player: playerStateAddress
+                    playerState: playerStateAddress
                 })
                 .instruction();
 
@@ -1374,11 +1374,11 @@ export class EquilibrateRequest {
             );
             const instruction: TransactionInstruction = await this.program
                 .methods
-                .moveBuckets(bucketIndex)
+                .moveBuckets(this.playerAddress, bucketIndex)
                 .accountsStrict({
                     game: gameAddress,
                     payer: this.playerAddress,
-                    player: playerStateAddress
+                    playerState: playerStateAddress
                 })
                 .instruction();
 
@@ -1442,7 +1442,8 @@ export class EquilibrateRequest {
                     payer: this.playerAddress,
                     tokenProgram: TOKEN_PROGRAM_ID,
                     systemProgram: SYSTEM_PROGRAM_ID,
-                    player: playerStateAddress,
+                    player: this.playerAddress,
+                    playerState: playerStateAddress,
                     poolManager: poolManagerAddress,
                     tokenPool: tokenPoolAddress,
                     gameCreator: game.creator,
