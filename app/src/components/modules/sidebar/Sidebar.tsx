@@ -18,7 +18,7 @@ import { SettingsMenu } from "./SettingsMenu";
 import styles from "./styles.module.css";
 import { useMintList } from "../../../lib/shared/mint-list";
 import { NATIVE_MINT } from "@solana/spl-token";
-import { formatTokens } from "../../../lib/shared/number";
+import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -30,14 +30,10 @@ export function Sidebar(): JSX.Element {
 
     return (
         <nav className={styles["sidebar"]}>
-            <Text className={styles["title"]}>B*cket</Text>
+            <Text className={styles["title"]}>B🔥nket</Text>
             <div className={styles["header"]}>
                 <Group spacing={3}>
                     <Text>Games</Text>
-                    <NewGameControl
-                        onGameAddressResolved={ (address) => gamesListContext.selectGame(address, false) }
-                        onSuccess={gamesListContext.refreshList}
-                    />
                 </Group>
                 <Group spacing={0}>
                     <SettingsMenu/>
@@ -237,6 +233,11 @@ function GameCard(props: GameCardProps): JSX.Element {
         >
             <Text size="sm">Pot: {totalTokensWithoutDecimals} {mintName}</Text>
             <Text size="sm">Fee: {entryFeeWithoutDecimals} {mintName}</Text>
+            {(gameConfig.burnRateDecimalTokensPerMove.toNumber() > 0) && (
+                <Text size="sm">Burn: {
+                    formatTokensShort(gameConfig.burnRateDecimalTokensPerMove.toNumber(), gameConfig.mintDecimals)
+                } / move</Text>
+            )}
             <Group noWrap>
                 <Text size="sm">Players: {`${buckets[0].players} / ${gameConfig.maxPlayers}`}</Text>
                 {

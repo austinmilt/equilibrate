@@ -54,7 +54,7 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
             <Carousel>
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
-                        Welcome to B*cket! Collect as much as you can by
+                        Welcome to B🔥nket! Collect as much as you can by
                         strategically choosing which bucket to occupy and
                         when you leave.
                         <br/><br/>

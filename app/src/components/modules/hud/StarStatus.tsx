@@ -53,11 +53,12 @@ function FuelGuage(props: StarStatusProps): JSX.Element {
 
     const fuelFormatted: string | undefined = useMemo(() => {
         if (props.data?.fuel === undefined) return undefined;
+        console.log(gameConfig?.mintDecimals);
         return themed(
             formatTokens(props.data.fuel, gameConfig?.mintDecimals),
             formatTokensShort(props.data.fuel)
         );
-    }, [props.data?.fuel]);
+    }, [props.data?.fuel, gameConfig?.mintDecimals]);
 
 
     const fuelDirectionIndicator: React.ReactNode = useMemo(() => {

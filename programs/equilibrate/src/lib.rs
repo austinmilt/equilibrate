@@ -7,7 +7,7 @@ use anchor_lang::prelude::*;
 use instructions::*;
 use state::*;
 
-declare_id!("Equi1uCecmsviNx18BnTiDDFrGoDFzoUsKHVu9btACaM");
+declare_id!("BuckEtJp6Y7sv6nunxX6agCa64dX3LCqx1GTJgKcZoUe");
 
 #[program]
 pub mod equilibrate {

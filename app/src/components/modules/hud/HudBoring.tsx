@@ -360,7 +360,7 @@ export function HudBoring(): JSX.Element {
                         <td key={i} style={{display: "flex", flexDirection: "column", width: "100%", padding: "0.5rem"}}>
                             <div style={{display: "flex", flexDirection: "row", justifyContent: "space-between", padding: "0.2rem", gap: "1rem"}}>
                                 <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: "0.2rem"}}>
-                                    <div style={{width: "1rem"}}><MoneyIcon/></div> {formatTokensShort(star.fuel, 9)}
+                                    <div style={{width: "1rem"}}><MoneyIcon/></div> {formatTokensShort(star.fuel, mintDecimals)}
                                 </div>
                                 {i > 0 &&
                                     <div style={{display: "flex", flexDirection: "row", flexWrap: "nowrap", gap: "0.2rem"}}>

@@ -3,10 +3,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-equilibrate = "Equi1uCecmsviNx18BnTiDDFrGoDFzoUsKHVu9btACaM"
+equilibrate = "BuckEtJp6Y7sv6nunxX6agCa64dX3LCqx1GTJgKcZoUe"
 
 [programs.devnet]
-equilibrate = "Equi1uCecmsviNx18BnTiDDFrGoDFzoUsKHVu9btACaM"
+equilibrate = "BuckEtJp6Y7sv6nunxX6agCa64dX3LCqx1GTJgKcZoUe"
 
 [programs.mainnet]
 equilibrate = "Equi1uCecmsviNx18BnTiDDFrGoDFzoUsKHVu9btACaM"
