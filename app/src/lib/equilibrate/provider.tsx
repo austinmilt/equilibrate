@@ -23,6 +23,11 @@ export interface EquilibrateProgramContextState {
     player: PublicKey | undefined;
 
     /**
+     * Payer for transaction fees
+     */
+    feePayer: PublicKey | undefined;
+
+    /**
      * @param payer payer to use in place of wallet from wallet-adapter (e.g. autosign payer)
      * @returns void
      */
@@ -67,6 +72,7 @@ export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.
     const value: EquilibrateProgramContextState = {
         equilibrate: sdk,
         equilibrateIsReady: sdk.isReady(),
+        feePayer: payer.publicKey,
         player: anchorWallet?.publicKey,
         setPayer: setOverridePayer
     };

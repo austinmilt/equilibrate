@@ -17,7 +17,6 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import styles from "./styles.module.css";
 import { MoneyIcon } from "../../shared/icons/MoneyIcon";
 import { themed } from "../../shared/theme";
-import { DEBUG } from "../../../lib/shared/constants";
 
 enum GameAction {
     ENTER,
