@@ -61,7 +61,7 @@ export function EquilibrateProgramProvider(props: { children: ReactNode }): JSX.
             PROGRAM_ID,
             provider ?? ({} as anchor.AnchorProvider)
         );
-        setSdk(EquilibrateSDK.from(program));
+        setSdk(EquilibrateSDK.from(program, anchorWallet?.publicKey));
     }, [payer, connection, setSdk]);
 
     const value: EquilibrateProgramContextState = {
