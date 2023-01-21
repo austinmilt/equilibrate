@@ -82,7 +82,7 @@ export function WelcomeModalControlled(props: Props): JSX.Element {
                 <Carousel.Item>
                     <div style={{display: "flex", flexDirection: "column"}}>
                         <img src={BoringGameDescriptionImage} alt="tutorial" width="100%" style={{margin: "1rem"}}/>
-                        Collect your tokens by leaving the game when the bucket
+                        Maximize your tokens by leaving the game when the bucket
                         you occupy has a lot of tokens and few players.
                         <br/><br/>
                         And that&apos;s it! To get started, click a game from
