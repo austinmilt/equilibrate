@@ -12,7 +12,7 @@ import { InlineStyles } from "../../shared/inline-styles";
 import { Button } from "../../shared/model/button";
 import { useShipLogs } from "../hud/ShipLog";
 import styles from "./styles.module.css";
-import { SOLANA_MINT_NAME } from "../../../lib/shared/constants";
+import { NEW_GAME_DEFAULT_MINT, SOLANA_MINT_NAME } from "../../../lib/shared/constants";
 import { themed } from "../../shared/theme";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useEndpoint } from "../../../lib/solana/provider";
@@ -89,7 +89,7 @@ export function NewGameModal(props: NewGameModalProps): JSX.Element {
     const [newGameTransactionSignature, setNewGameTransactionSignature] = useState<string | undefined>();
     const [showAdvancedSettings, setShowAdvancedSettings] = useState<boolean>(false);
 
-    const [mint, setMint] = useState<PublicKey | null>(NATIVE_MINT);
+    const [mint, setMint] = useState<PublicKey | null>(NEW_GAME_DEFAULT_MINT);
     const [entryFee, setEntryFee] = useState<number | undefined>(0.1);
     const [spillRatePercent, setSpillRatePercent] = useState<number | undefined>(2);
     const [burnRatePercent, setBurnRatePercent] = useState<number | undefined>(0);
@@ -298,7 +298,7 @@ AutoCompleteItem.displayName = "AutoCompleteItem";
 
 
 function MintSelect(props: { onMintSelect: (mint: PublicKey) => void }): JSX.Element {
-    const [nameOrAddress, setNameOrAddress] = useState<string>(NATIVE_MINT.toBase58());
+    const [nameOrAddress, setNameOrAddress] = useState<string>(NEW_GAME_DEFAULT_MINT.toBase58());
     const [lastValidMintAddress, setLastValidMintAddress] = useState<string | undefined>();
     const mintListContext = useMintList();
     const { key: endpoint } = useEndpoint();

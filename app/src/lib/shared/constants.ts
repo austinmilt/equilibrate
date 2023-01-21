@@ -1,6 +1,6 @@
 // https://vitejs.dev/guide/env-and-mode.html
 
-import { clusterApiUrl } from "@solana/web3.js";
+import { PublicKey, clusterApiUrl } from "@solana/web3.js";
 import { Endpoint } from "../solana/provider";
 import { Duration } from "./duration";
 import { NATIVE_MINT } from "@solana/spl-token";
@@ -68,10 +68,11 @@ export const USE_BORING_THEME: boolean = parseEnv<boolean>(
 );
 
 
-export const NEW_GAME_DEFAULT_MINT: string = parseEnv<string>(
+export const NEW_GAME_DEFAULT_MINT: PublicKey = parseEnv<PublicKey>(
     "NEW_GAME_DEFAULT_MINT",
     import.meta.env.VITE_NEW_GAME_DEFAULT_MINT,
-    NATIVE_MINT.toBase58(),
+    NATIVE_MINT,
+    v => new PublicKey(v)
 );
 
 
