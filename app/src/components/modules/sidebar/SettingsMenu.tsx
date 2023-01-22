@@ -182,7 +182,7 @@ function ClusterControl(): JSX.Element {
 }
 
 
-function AirdropButton(): JSX.Element {
+export function AirdropButton(): JSX.Element {
     const wallet = useAnchorWallet();
     const { key: endpoint, isProd: endpointIsProd } = useEndpoint();
     const [loading, setLoading] = useState<boolean>(false);
@@ -206,7 +206,7 @@ function AirdropButton(): JSX.Element {
 
         } else {
             try {
-                const transactionId: string = await connection.requestAirdrop(wallet.publicKey, 1*LAMPORTS_PER_SOL);
+                const transactionId: string = await connection.requestAirdrop(wallet.publicKey, 2*LAMPORTS_PER_SOL);
                 const blockhash = await connection.getLatestBlockhash();
                 await connection.confirmTransaction({...blockhash, signature: transactionId}, "finalized");
                 const newSol: number = (await connection.getBalance(wallet.publicKey)) / LAMPORTS_PER_SOL;
@@ -227,7 +227,7 @@ function AirdropButton(): JSX.Element {
 
     return (
         <Button onClick={ onAirdrop } disabled={loading}>
-            {loading ? <Loader/> : "Airdrop"}
+            {loading ? <Loader/> : "Get 2 devSOL"}
         </Button>
     );
 }

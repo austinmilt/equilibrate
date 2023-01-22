@@ -13,19 +13,18 @@ import { useInterval } from "../../../lib/shared/useInterval";
 import { BONK_FAUCET, GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
 import { Notifications, notifyError, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
-import { SettingsMenu } from "./SettingsMenu";
+import { AirdropButton, SettingsMenu } from "./SettingsMenu";
 import styles from "./styles.module.css";
 import { useMintList } from "../../../lib/shared/mint-list";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
 import { Button } from "../../shared/model/button";
 import { useEndpoint } from "../../../lib/solana/provider";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
 import { Duration } from "../../../lib/shared/duration";
-import * as anchor from "@project-serum/anchor";
 import { getTokenBalance, sendTokens } from "../../../dev/token";
-import { makeTransactionUrl, useMakeTransactionUrl } from "../../../lib/shared/transaction";
+import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -39,7 +38,12 @@ export function Sidebar(): JSX.Element {
     return (
         <nav className={styles["sidebar"]}>
             <Text className={styles["title"]}>B🔥nket</Text>
-            {!isProd && <BonkFaucet/>}
+            {!isProd && (
+                <div>
+                    <BonkFaucet/>
+                    <AirdropButton/>
+                </div>
+            )}
             <div className={styles["header"]}>
                 <Group spacing={3}>
                     <Text>Games</Text>
@@ -104,7 +108,7 @@ function BonkFaucet(): JSX.Element {
 
     return (
         <Button onClick={onClick}>
-            <Text size="xs">Get 1M $BONK</Text>
+            <Text size="xs">Get 1M $devBONK</Text>
         </Button>
     );
 }

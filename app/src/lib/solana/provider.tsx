@@ -24,7 +24,7 @@ export function SolanaProvider(props: {children: React.ReactNode}): JSX.Element 
     );
 
     return <ConnectionProvider endpoint={solanaRpcUrl}>
-        <WalletProvider wallets={wallets} autoConnect>
+        <WalletProvider wallets={wallets}>
             <WalletModalProvider>
                 { props.children }
             </WalletModalProvider>

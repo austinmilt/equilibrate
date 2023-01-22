@@ -1,10 +1,10 @@
 // see root.css for reference
 export class InlineStyles {
     public static GLOBAL = {
-        colorHydrogen: "#EBB729",
+        colorHydrogen: "#FFB02E",
         colorPlayer: "#D9594C",
         colorTextBase: "#e6e6e6",
-        colorCooling: "#2F488A",
+        colorCooling: "#FFB02E",
         colorPrimaryDarkest: "#1E1E1E",
         colorMoney: "#7dc97d"
     };
