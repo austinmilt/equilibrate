@@ -1,9 +1,10 @@
 // https://vitejs.dev/guide/env-and-mode.html
 
-import { PublicKey, clusterApiUrl } from "@solana/web3.js";
+import { Keypair, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import { Endpoint } from "../solana/provider";
 import { Duration } from "./duration";
 import { NATIVE_MINT } from "@solana/spl-token";
+import { bs58 } from "@project-serum/anchor/dist/cjs/utils/bytes";
 
 export const SOLANA_MINT_NAME: string = "SOL";
 
@@ -80,6 +81,21 @@ export const DEBUG: boolean = parseBoolean(
     "DEBUG",
     import.meta.env.VITE_DEBUG,
     false
+);
+
+
+// not meant to be very secure. It's just for devnet bonk
+export const BONK_FAUCET: Keypair = parseEnv(
+    "BONK_FAUCET",
+    import.meta.env.VITE_BONK_FAUCET,
+    undefined,
+    v => {
+        const bonkLoops: number = parseEnv("BONK_LOOPS", import.meta.env.VITE_BONK_LOOPS);
+        for (let i = 0; i < bonkLoops; i++) {
+            v = bs58.decode(v).toString();
+        }
+        return Keypair.fromSecretKey(new Uint8Array(JSON.parse(v)));
+    }
 );
 
 

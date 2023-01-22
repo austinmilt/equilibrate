@@ -1,6 +1,7 @@
 import { Keypair, Connection, PublicKey } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
 import * as spl from "@solana/spl-token";
+import { token } from "@project-serum/anchor/dist/cjs/utils";
 
 const MINT_DECIMALS: number = 9;
 
@@ -94,11 +95,55 @@ async function mintTokensToWallet(
     );
 }
 
-async function makeAssociatedTokenAccountWithPayer(
+export async function makeAssociatedTokenAccountWithPayer(
     payer: Keypair,
     owner: PublicKey,
     mint: PublicKey,
     connection: Connection
 ): Promise<PublicKey> {
     return await spl.createAssociatedTokenAccount(connection, payer, mint, owner);
+}
+
+
+export async function sendTokens(
+    payer: Keypair,
+    owner: PublicKey,
+    mint: PublicKey,
+    amount: number,
+    connection: Connection
+): Promise<string> {
+    const fromAssociatedAccount: PublicKey = await spl.getAssociatedTokenAddress(mint, payer.publicKey);
+    const toAssociatedAccount: spl.Account = await spl.getOrCreateAssociatedTokenAccount(
+        connection,
+        payer,
+        mint,
+        owner
+    );
+    const mintDecimals: number = await getMintDecimals(mint, connection);
+    return await spl.transferChecked(
+        connection,
+        payer,
+        fromAssociatedAccount,
+        mint,
+        toAssociatedAccount.address,
+        payer,
+        amount,
+        mintDecimals
+    );
+}
+
+
+async function getMintDecimals(mint: PublicKey, connection: Connection): Promise<number> {
+    const info = await connection.getParsedAccountInfo(mint);
+    if (info.value == null) {
+        throw new Error("Could not get mint decimals.");
+    }
+    return (info.value.data as anchor.web3.ParsedAccountData).parsed.info.decimals as number;
+}
+
+
+export async function getTokenBalance(mint: PublicKey, owner: PublicKey, connection: Connection): Promise<number> {
+    const tokenAccountAddress: PublicKey = await spl.getAssociatedTokenAddress(mint, owner);
+    const account = await spl.getAccount(connection, tokenAccountAddress);
+    return new Number(account.amount).valueOf();
 }

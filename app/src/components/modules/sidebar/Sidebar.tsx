@@ -10,15 +10,22 @@ import { Bucket, Game, GameConfigEnriched } from "../../../lib/equilibrate/types
 import { GamesListEntry } from "../../../lib/equilibrate/sdk";
 import { useActiveGame } from "../../shared/game/provider";
 import { useInterval } from "../../../lib/shared/useInterval";
-import { GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
+import { BONK_FAUCET, GAMES_LIST_UPDATE_INTERVAL } from "../../../lib/shared/constants";
 import { useGame } from "../../../lib/equilibrate/useGame";
-import { NewGameControl } from "./NewGameControl";
-import { Notifications, notifyWarning } from "../../../lib/shared/notifications";
+import { Notifications, notifyError, notifySuccess, notifyWarning } from "../../../lib/shared/notifications";
 import { SettingsMenu } from "./SettingsMenu";
 import styles from "./styles.module.css";
 import { useMintList } from "../../../lib/shared/mint-list";
 import { NATIVE_MINT } from "@solana/spl-token";
 import { formatTokens, formatTokensShort } from "../../../lib/shared/number";
+import { Button } from "../../shared/model/button";
+import { useEndpoint } from "../../../lib/solana/provider";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWallet";
+import { Duration } from "../../../lib/shared/duration";
+import * as anchor from "@project-serum/anchor";
+import { getTokenBalance, sendTokens } from "../../../dev/token";
+import { makeTransactionUrl, useMakeTransactionUrl } from "../../../lib/shared/transaction";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -27,10 +34,12 @@ interface SetGameFunction {
 
 export function Sidebar(): JSX.Element {
     const gamesListContext = useGamesList();
+    const { isProd } = useEndpoint();
 
     return (
         <nav className={styles["sidebar"]}>
             <Text className={styles["title"]}>B🔥nket</Text>
+            {!isProd && <BonkFaucet/>}
             <div className={styles["header"]}>
                 <Group spacing={3}>
                     <Text>Games</Text>
@@ -55,6 +64,48 @@ export function Sidebar(): JSX.Element {
             </ScrollArea>
 
         </nav>
+    );
+}
+
+const BONK_COOLDOWN: Duration = Duration.ofMinutes(1);
+const BONK_MINT: PublicKey = new PublicKey("bonkKjzREa7pVBRD6nFPAKRaHhS7XpDhhgZCZdGNkuU");
+const BONK_AIRDROP_AMOUNT: number = 1e6*Math.pow(10, 5);
+
+function BonkFaucet(): JSX.Element {
+    const [cooldownEnd, setCooldownEnd] = useState<Date>(new Date(0));
+    const { connection } = useConnection();
+    const connectWalletIfNeeded = useInsertConnectWallet();
+    const makeTransactionUrl = useMakeTransactionUrl();
+
+    const onClick = useCallback(async () => {
+        if (await getTokenBalance(BONK_MINT, BONK_FAUCET.publicKey, connection) < BONK_AIRDROP_AMOUNT) {
+            notifyError("Faucet is empty :(");
+            return;
+        }
+        const cooldownRemaining: number = cooldownEnd.getTime() - new Date().getTime();
+        if (cooldownRemaining > 0) {
+            const cooldownSeconds: number = Math.floor(Duration.ofMilliseconds(cooldownRemaining).asSeconds());
+            notifyWarning(`BONK! On cooldown for another ${cooldownSeconds} seconds`);
+
+        } else {
+            connectWalletIfNeeded((destination) => {
+                sendTokens(BONK_FAUCET, destination, BONK_MINT, BONK_AIRDROP_AMOUNT, connection)
+                    .then(sig => {
+                        notifySuccess("Bonk sent!", "See developer console for transaction URL.");
+                        console.log("Bonk sent! See on solana explorer", makeTransactionUrl(sig));
+                        setCooldownEnd(BONK_COOLDOWN.fromNow());
+                    })
+                    .catch(e => {
+                        notifyError("Bonk failed :/", e);
+                    });
+            });
+        }
+    }, [connectWalletIfNeeded, connection, cooldownEnd, makeTransactionUrl]);
+
+    return (
+        <Button onClick={onClick}>
+            <Text size="xs">Get 1M $BONK</Text>
+        </Button>
     );
 }
 
@@ -232,7 +283,7 @@ function GameCard(props: GameCardProps): JSX.Element {
             onClick={() => props.setGame(props.entry.publicKey)}
         >
             <Text size="sm">Pot: {totalTokensWithoutDecimals} {mintName}</Text>
-            <Text size="sm">Fee: {entryFeeWithoutDecimals} {mintName}</Text>
+            <Text size="sm">Entry: {entryFeeWithoutDecimals} {mintName}</Text>
             {(gameConfig.burnRateDecimalTokensPerMove.toNumber() > 0) && (
                 <Text size="sm">Burn: {
                     formatTokensShort(gameConfig.burnRateDecimalTokensPerMove.toNumber(), gameConfig.mintDecimals)
