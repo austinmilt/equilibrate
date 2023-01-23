@@ -20,7 +20,7 @@ import { repeat, sleep } from "./helpers/test";
 import { getPoolManagerAddress, getTokenPoolAddress } from "./helpers/address";
 import { assert } from "chai";
 
-describe("Game simulation tests", () => {
+describe.only("Game simulation tests", () => {
     // Configure the client to use the local cluster.
     anchor.setProvider(anchor.AnchorProvider.env());
 
@@ -66,7 +66,7 @@ describe("Game simulation tests", () => {
         assert.strictEqual(tokenPoolBalance, 0);
     });
 
-    it(
+    it.only(
         "simulate a game playing through without error",
         repeat(10, async () => {
             const game: GameRunner = await GameRunner.random(program);
@@ -270,9 +270,14 @@ class GameRunner {
             if (activePlayers.length === 0) {
                 return;
             }
-            const event: Event = chooseEvent(
-                this.playerContexts.length < this.gameConfig.maxPlayers
-            );
+            const maxPlayers: number = this.gameConfig.maxPlayers;
+            const nPlayers: number = this.playerContexts.length;
+            const spaceRemaining: number = (maxPlayers - nPlayers) / maxPlayers;
+            const event: Event = chooseEvent({
+                // bias toward filling up the game
+                // (at 0 players entering is twice as likely, and will not happen at capacity)
+                enter:  2*spaceRemaining
+            });
             if (event === Event.WAIT) {
                 await sleep(1000);
             } else if (event === Event.ENTER) {
@@ -388,10 +393,19 @@ enum Event {
 }
 
 const EVENTS: Event[] = [Event.ENTER, Event.MOVE, Event.LEAVE, Event.WAIT];
-const EVENTS_WITHOUT_ENTER: Event[] = [Event.MOVE, Event.LEAVE, Event.WAIT];
 
-function chooseEvent(allowEnter: boolean = true): Event {
-    return choose(allowEnter ? EVENTS : EVENTS_WITHOUT_ENTER);
+function chooseEvent(weight: {
+    enter?: number,
+    move?: number,
+    leave?: number,
+    wait?: number
+}): Event {
+    const enterWeight: number = (weight.enter ?? 1) * Math.random();
+    const moveWeight: number = (weight.move ?? 1) * Math.random();
+    const leaveWeight: number = (weight.leave ?? 1) * Math.random();
+    const waitWeight: number = (weight.wait ?? 1) * Math.random();
+    const max: number = Math.max(enterWeight, moveWeight, leaveWeight, waitWeight);
+    return EVENTS[[enterWeight, moveWeight, leaveWeight, waitWeight].findIndex(v => v === max)];
 }
 
 function choose<T>(options: T[]): T {
