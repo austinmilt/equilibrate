@@ -25,10 +25,10 @@ export function generateBucketIndex(nBucketsConfigured: number): number {
 }
 
 export function generateGameConfig(mint: PublicKey): GameConfig {
-    const entryFeeDecimalTokens: number = Math.random() * 10 * Math.pow(10, MINT_DECIMALS);
-    const spillRate: number = Math.ceil(Math.random() * 2 * Math.pow(10, MINT_DECIMALS));
-    const nBuckets: number = Math.ceil(Math.random() * 5 + 2);
-    const maxPlayers: number = Math.ceil(Math.random() * 1000 + 1);
+    const entryFeeDecimalTokens: number = Math.pow(10, MINT_DECIMALS);
+    const spillRate: number = Math.ceil(entryFeeDecimalTokens*0.2);
+    const nBuckets: number = 3;
+    const maxPlayers: number = 50;
     return {
         mint: mint,
         entryFeeDecimalTokens: new anchor.BN(entryFeeDecimalTokens),

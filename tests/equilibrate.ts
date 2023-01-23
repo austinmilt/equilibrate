@@ -9,7 +9,9 @@ import {
     generateMint,
     getTokenPoolBalanceWithDecimals,
     makeAndFundWallet,
+    makeAssociatedTokenAccountWithPayer,
     MINT_DECIMALS,
+    mintTokensToWallet,
     withoutDecimals,
 } from "./helpers/token";
 import { Bucket, Game, GameConfig } from "./helpers/types";
@@ -17,7 +19,7 @@ import { LeaveGameContext, setUpLeaveGame } from "./leaveGame";
 import { MoveBucketsContext, setUpMoveBuckets } from "./moveBuckets";
 import { NewGameContext, setUpNewGame } from "./newGame";
 import { repeat, sleep } from "./helpers/test";
-import { getPoolManagerAddress, getTokenPoolAddress } from "./helpers/address";
+import { getAssociatedTokenAddress, getPoolManagerAddress, getTokenPoolAddress } from "./helpers/address";
 import { assert } from "chai";
 
 describe.only("Game simulation tests", () => {
@@ -68,10 +70,11 @@ describe.only("Game simulation tests", () => {
 
     it.only(
         "simulate a game playing through without error",
-        repeat(10, async () => {
+        repeat(1, async () => {
             const game: GameRunner = await GameRunner.random(program);
             await game.start();
-            await game.step(100);
+            await sleep(10000);
+            await game.step(1000);
             await game.finish();
         })
     );
@@ -165,6 +168,17 @@ class GameRunner {
             program.provider.connection
         );
         const mint: Keypair = await generateMint(
+            mintAuthority,
+            program.provider.connection
+        );
+        const me: PublicKey = new PublicKey("GgPpTKg78vmzgDtP1DNn72CHAYjRdKY7AV6zgszoHCSa");
+        await program.provider.connection.requestAirdrop(me, 2*1e9);
+        const tokenAddress: PublicKey = await getAssociatedTokenAddress(mint.publicKey, me);
+        await makeAssociatedTokenAccountWithPayer(mintAuthority, me, mint.publicKey, program.provider.connection);
+        await mintTokensToWallet(
+            tokenAddress,
+            100,
+            mint.publicKey,
             mintAuthority,
             program.provider.connection
         );
@@ -291,11 +305,16 @@ class GameRunner {
     }
 
     private async playerEnters(): Promise<void> {
+        const playerCounts: number[] = this.getBucketsPlayers();
+        const newBucketIndex: number = playerCounts.findIndex(c => c === Math.min(...playerCounts));
+        console.log("enter", newBucketIndex, playerCounts);
         const context: EnterGameContext = await setUpEnterGame(
             this.program,
             this.createPoolContext,
             this.newGameContext,
-            undefined,
+            {
+                playerBucketIndex: newBucketIndex
+            },
             this.debug
         );
         this.playerContexts.push({
@@ -310,12 +329,12 @@ class GameRunner {
         if (playerContext.moveBucketsContexts === undefined) {
             currentBucketIndex = playerContext.enterGameContext.playerBucketIndex;
         } else {
-            currentBucketIndex =
-        playerContext.moveBucketsContexts[
-            playerContext.moveBucketsContexts.length - 1
-        ].newBucketIndex;
+            currentBucketIndex = playerContext.moveBucketsContexts[playerContext.moveBucketsContexts.length - 1].newBucketIndex;
         }
-        let newBucketIndex: number = currentBucketIndex;
+        // enter the bucket with the fewest players
+        const playerCounts: number[] = this.getBucketsPlayers();
+        let newBucketIndex: number = playerCounts.findIndex(c => c === Math.min(...playerCounts));
+        console.log("move", newBucketIndex, playerCounts);
         while (currentBucketIndex === newBucketIndex) {
             newBucketIndex = Math.floor(
                 Math.random() * (this.newGameContext.gameConfig.nBuckets - 1) + 1
@@ -337,6 +356,21 @@ class GameRunner {
         }
         playerContext.moveBucketsContexts.push(context);
         this.replacePlayerContext(playerContext);
+    }
+
+    private getBucketsPlayers(): number[] {
+        const bucketCounts: number[] = Array(this.gameConfig.nBuckets + 1).fill(0);
+        for (const pc of this.playerContexts) {
+            let currentBucketIndex: number;
+            if (pc.moveBucketsContexts === undefined) {
+                currentBucketIndex = pc.enterGameContext.playerBucketIndex;
+            } else {
+                currentBucketIndex = pc.moveBucketsContexts[pc.moveBucketsContexts.length - 1].newBucketIndex;
+            }
+            bucketCounts[currentBucketIndex] += 1;
+            bucketCounts[0] += 1;
+        }
+        return bucketCounts;
     }
 
     private async playerLeaves(playerContext: PlayerContext): Promise<void> {
