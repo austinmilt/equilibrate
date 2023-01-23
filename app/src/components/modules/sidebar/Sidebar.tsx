@@ -25,6 +25,7 @@ import { useInsertConnectWallet } from "../../../lib/shared/useInsertConnectWall
 import { Duration } from "../../../lib/shared/duration";
 import { getTokenBalance, sendTokens } from "../../../dev/token";
 import { useMakeTransactionUrl } from "../../../lib/shared/transaction";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 interface SetGameFunction {
     (address: PublicKey): void;
@@ -39,7 +40,8 @@ export function Sidebar(): JSX.Element {
         <nav className={styles["sidebar"]}>
             <Text className={styles["title"]}>B🔥nket</Text>
             {!isProd && (
-                <div>
+                <div style={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center"}}>
+                    <WalletMultiButton className={styles["wallet-connect-button"]}/>
                     <BonkFaucet/>
                     <AirdropButton/>
                 </div>

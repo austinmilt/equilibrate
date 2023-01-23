@@ -56,7 +56,7 @@ export function HudBoring(): JSX.Element {
                         result = await equilibrate.playerInGame(activeGame, overridePlayer);
                     }
 
-                    if (!result) {
+                    if (!result && player !== undefined) {
                         result = await equilibrate.playerInGame(activeGame, player);
                     }
                 }

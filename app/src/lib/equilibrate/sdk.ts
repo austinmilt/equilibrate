@@ -389,10 +389,11 @@ export class EquilibrateSDK {
      */
     public async playerInGame(gameAddress: PublicKey, player?: PublicKey): Promise<boolean> {
         Assert.notNullish(this.program, "program");
-        Assert.notNullish(this.program.provider.publicKey, "player");
+        player = player ?? this.program.provider.publicKey;
+        Assert.notNullish(player, "player");
         const playerStateAddress: PublicKey = await getPlayerStateAddress(
             gameAddress,
-            player ?? this.program.provider.publicKey,
+            player,
             this.program.programId
         );
         const connection: Connection = this.program.provider.connection;
@@ -663,14 +664,15 @@ export class EquilibrateSDK {
      * @throws if this is a dummy SDK instance
      */
     public async stopWatchingGame(gameAddress: PublicKey): Promise<void> {
-        Assert.notNullish(this.program, "program");
-        const gameAddressString: string = gameAddress.toBase58();
-        const subscription: Subscription<GameEvent> | undefined = this.gameSubscriptions.get(gameAddressString);
-        if (subscription !== undefined) {
-            subscription.emitter.unsubscribeAll();
-            await this.program.provider.connection.removeAccountChangeListener(subscription.id);
-            this.gameSubscriptions.delete(gameAddressString);
-        }
+        //TODO fix (probably need to fix who is unsubbing rather than this method)
+        // Assert.notNullish(this.program, "program");
+        // const gameAddressString: string = gameAddress.toBase58();
+        // const subscription: Subscription<GameEvent> | undefined = this.gameSubscriptions.get(gameAddressString);
+        // if (subscription !== undefined) {
+        //     subscription.emitter.unsubscribeAll();
+        //     await this.program.provider.connection.removeAccountChangeListener(subscription.id);
+        //     this.gameSubscriptions.delete(gameAddressString);
+        // }
     }
 
 
@@ -833,21 +835,22 @@ export class EquilibrateSDK {
      * @throws if this is a dummy SDK instance
      */
     public async stopWatchingPlayerState(playerAddress: PublicKey, gameAddress: PublicKey): Promise<void> {
-        Assert.notNullish(this.program, "program");
-        const playerStateAddress: PublicKey = await getPlayerStateAddress(
-            gameAddress,
-            playerAddress,
-            this.program.programId
-        );
-        const playerStateAddressString: string = playerStateAddress.toBase58();
-        const subscription: Subscription<PlayerStateEvent> | undefined
-            = this.playerStateSubscriptions.get(playerStateAddressString);
+        //TODO fix (probably need to fix who is unsubbing rather than this method)
+        // Assert.notNullish(this.program, "program");
+        // const playerStateAddress: PublicKey = await getPlayerStateAddress(
+        //     gameAddress,
+        //     playerAddress,
+        //     this.program.programId
+        // );
+        // const playerStateAddressString: string = playerStateAddress.toBase58();
+        // const subscription: Subscription<PlayerStateEvent> | undefined
+        //     = this.playerStateSubscriptions.get(playerStateAddressString);
 
-        if (subscription !== undefined) {
-            subscription.emitter.unsubscribeAll();
-            await this.program.provider.connection.removeAccountChangeListener(subscription.id);
-            this.playerStateSubscriptions.delete(playerStateAddressString);
-        }
+        // if (subscription !== undefined) {
+        //     subscription.emitter.unsubscribeAll();
+        //     await this.program.provider.connection.removeAccountChangeListener(subscription.id);
+        //     this.playerStateSubscriptions.delete(playerStateAddressString);
+        // }
     }
 }
 
